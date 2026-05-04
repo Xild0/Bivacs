@@ -35,5 +35,21 @@ Cuore del server Node.js
 --- 
 
 ## Regole d'oro
-1. Mai lavorare tutti sul ramo `main`. Quando dobbiamo creare una nuova funzionalità, creiamo un nuovo branch, facciamo i commit li e poi apriamo una Pull Request du GitHub
-2. File `.env`: quando creeremo il database o useremo chiavi segrete, ognuno dovrà creare un file chiamato `.env` dentro code/backend. **NON FATE MAI** `git add .env`, questo file deve rimanere strettamente locale sui nostri pc.
+1. Mai lavorare tutti sul ramo `main`. Quando dobbiamo creare una nuova funzionalità, creiamo un nuovo branch, facciamo i commit li e poi carichiamo il tutto nel main su GitHub: 
+
+    * Creare un branch: 
+        1. `git checkout main` 
+        2. `git pull origin main`
+        3. `git checkout -b <nome_branch>` tramite il comando `git branch`è inoltre possibile vedere una lista dei rami con un asterisco di fianco al branch attuale.
+    * Lavorare e salvare nel branch: 
+        1. `git add .` 
+        2. `git commit -m "Commit"`
+    * Caricare il branch online: 
+        1. `git push -u origin <nome_branch>`
+        2. `git checkout main`
+        3. `git pull origin main`
+        4. `git merge <nome_branch>`
+        5. `git push origin main`
+    
+2. File `.env`: quando creeremo il database o useremo chiavi segrete, ognuno dovrà creare un file chiamato `.env` dentro code/backend. 
+**NON FATE MAI** `git add .env`, questo file deve rimanere strettamente locale sui nostri pc, ma se dalla cartella origin farete `git add .` non ci saranno problemi in quanto ho inserito dentro `.gitignore` un comando per ignorare il file .env
