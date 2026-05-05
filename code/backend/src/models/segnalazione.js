@@ -21,7 +21,7 @@ const segnalazioneSchema = new mongoose.Schema({
     foto: {
         type: String,
         required: [true, 'La foto della segnalazione è obbligatoria']
-    }
+    },
 
 
     statoSegnalazione: {
