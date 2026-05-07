@@ -1,34 +1,39 @@
-const mongoose = require('mongoose'); 
+const mongoose = require('mongoose');
 
 const datoMeteoSchema = new mongoose.Schema({
     id: {
-        type: Number, 
-        required: [true, 'l\'ID del dato meteo è obbligatorio']
-    }, 
+        type: Number,
+        required: [true, 'L\'ID del dato meteo è obbligatorio']
+    },
+    bivacco: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Bivacco',
+        required: [true, 'Il riferimento al bivacco è obbligatorio']
+    },
     temperatura: {
         type: Number,
         required: [true, 'Temperatura obbligatoria']
-    }, 
+    },
     vento: {
-        type: Number, 
+        type: Number,
         required: [true, 'Vento obbligatorio']
-    }, 
+    },
     precipitazioni: {
-        type: Number, 
-        required: [true, 'Precitipazioni obbligatorie']
-    }, 
+        type: Number,
+        required: [true, 'Precipitazioni obbligatorie']
+    },
     allertaPAT: {
-        type: Boolean
-    }, 
+        type: Boolean,
+        default: false
+    },
     livelloRischio: {
-        type: String
-    }, 
+        type: String,
+        enum: ['basso', 'moderato', 'marcato', 'forte', 'molto_forte']
+    },
     aggiornato: {
-        type: Date
+        type: Date,
+        default: Date.now
     }
-}, 
-{
-    timestamps: true
-});
+}, { timestamps: true });
 
-module.exports = mongoose.model('datoMeteo', datoMeteoSchema);
+module.exports = mongoose.model('DatoMeteo', datoMeteoSchema);

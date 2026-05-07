@@ -1,22 +1,29 @@
 // importing libraries
-const express = require ('express');
-const cors = require ('cors');
+const express = require('express');
+const cors = require('cors');
 const path = require('path');
-require ('dotenv').config({ path: path.resolve(__dirname, '../.env') }); 
+require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 const connectDB = require('./config/db');
 
-// init app with express
+// importazione delle route
+const bivacchiRouter = require('./routes/bivacchi');
+
+// init app con express
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
-// test route
+// registrazione delle route API
+// tutte le richieste a /api/v1/bivacchi vengono gestite da bivacciRouter
+app.use('/api/v1/bivacchi', bivacchiRouter);
+
+// route di test per verificare che il server sia online
 app.get('/', (req, res) => {
     res.send('Server Bivacs online');
 });
 
-// server launch
+// avvio del server
 const PORT = process.env.PORT || 5000;
 
 (async () => {
@@ -25,4 +32,3 @@ const PORT = process.env.PORT || 5000;
         console.log('Server avviato sulla porta ' + PORT);
     });
 })();
-

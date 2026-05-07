@@ -39,6 +39,10 @@ const bivaccoSchema = new mongoose.Schema(
         type: String,
         required: [true, 'La zona del bivacco è obbligatoria']
     }, 
+    percorsi: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Percorso'
+    }],
     emergenza: { 
         type: Boolean, 
         default: false

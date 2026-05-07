@@ -1,23 +1,29 @@
-const mongoose = require ('mongoose'); 
+const mongoose = require('mongoose');
 
 const risorseUtiliSchema = new mongoose.Schema({
     id: {
-        type: Number, 
+        type: Number,
         required: [true, 'L\'ID delle risorse è obbligatorio']
-    }, 
+    },
+    bivacco: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Bivacco',
+        required: [true, 'Il riferimento al bivacco è obbligatorio']
+    },
+    autore: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Utente'
+    },
     acqua: {
-        type: String, 
-        required: [true, 'Le info sull\'acqua sono obbligatorie'], 
+        type: String,
+        required: [true, 'Le info sull\'acqua sono obbligatorie'],
         enum: ['disponibile', 'scarsa', 'assente', 'non_verificata']
     },
     legna: {
-        type: String, 
-        required: [true, 'Le info sulla legna sono obbligatorie'], 
+        type: String,
+        required: [true, 'Le info sulla legna sono obbligatorie'],
         enum: ['disponibile', 'scarsa', 'assente', 'non_verificata']
     }
-}, 
-{
-    timestamps: true
-});
+}, { timestamps: true });
 
-module.exports = mongoose.model('risorseUtili', risorseUtiliSchema);
+module.exports = mongoose.model('RisorseUtili', risorseUtiliSchema);
