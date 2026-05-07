@@ -42,6 +42,18 @@ const bivaccoSchema = new mongoose.Schema(
     emergenza: { 
         type: Boolean, 
         default: false
+    },
+    acquaPresente: {
+        type: Boolean,
+        default: true
+    },
+    legnaDisponibile: {
+        type: Boolean,
+        default: true
+    },
+    ultimoCheckStato: {
+    type: Date,
+    default: Date.now
     }
 },
 {
