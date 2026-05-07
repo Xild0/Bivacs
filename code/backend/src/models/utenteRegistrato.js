@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+
 const Utente = require('./utente');
 
 const utenteRegistratoSchema = new mongoose.Schema(
