@@ -7,7 +7,7 @@ const Percorso = require('../models/percorso');
 /*
     GET /api/v1/bivacchi
     Restituisce la lista dei bivacchi con filtri opzionali.
- 
+    Copre le user story: US06, US07, US08, US09, US10
  */
 router.get('/', async (req, res) => {
     try {
@@ -17,31 +17,28 @@ router.get('/', async (req, res) => {
         // oggetto filtro: viene popolato solo con i parametri presenti nella richiesta
         const filtro = {};
 
-        // US07 — ricerca per nome (case-insensitive)
-
+        // US07: ricerca per nome (case-insensitive)
         if (nome) {
             filtro.nome = { $regex: nome, $options: 'i' };
         }
 
-        // US09 — filtro per zona geografica (case-insensitive)
+        // US09: filtro per zona geografica (case-insensitive)
         if (zona) {
             filtro.zona = { $regex: zona, $options: 'i' };
         }
 
-        // US08 — filtro per range di altitudine
+        // US08: filtro per range di altitudine
         if (altitudineMin || altitudineMax) {
             filtro.altitudine = {};
             if (altitudineMin) filtro.altitudine.$gte = Number(altitudineMin);
             if (altitudineMax) filtro.altitudine.$lte = Number(altitudineMax);
         }
 
-        // US10 — filtro per posti letto minimi disponibili
+        // US10:filtro per posti letto minimi disponibili
         if (postiLetto) {
             filtro.postiLetto = { $gte: Number(postiLetto) };
         }
 
-        // esecuzione query con il filtro costruito
-        // .select() limita i campi restituiti (performance)
         const bivacchi = await Bivacco.find(filtro).select(
             'nome latitudine longitudine altitudine postiLetto zona dotazioni emergenza acquaPresente legnaDisponibile ultimoCheckStato'
         );
@@ -57,11 +54,54 @@ router.get('/', async (req, res) => {
 });
 
 /*
+    POST /api/v1/bivacchi
+    Inserisce un nuovo bivacco nel database.
+ */
+router.post('/', async (req, res) => {
+    try {
+        // crea una nuova istanza del modello con i dati del body
+        const bivacco = new Bivacco({
+            nome:              req.body.nome,
+            latitudine:        req.body.latitudine,
+            longitudine:       req.body.longitudine,
+            altitudine:        req.body.altitudine,
+            postiLetto:        req.body.postiLetto,
+            dotazioni:         req.body.dotazioni,
+            zona:              req.body.zona,
+            emergenza:         req.body.emergenza         || false,
+            acquaPresente:     req.body.acquaPresente     || true,
+            legnaDisponibile:  req.body.legnaDisponibile  || true,
+        });
+
+        // salvataggio nel database
+        const bivaccoSalvato = await bivacco.save();
+
+        res
+            .status(201)
+            .location('/api/v1/bivacchi/' + bivaccoSalvato._id)
+            .json(bivaccoSalvato);
+
+    } catch (err) {
+        // ValidationError si verifica quando mancano campi required o i valori non rispettano i vincoli del modello
+        if (err.name === 'ValidationError') {
+            return res.status(400).json({
+                message: 'Dati non validi',
+                error: err.message
+            });
+        }
+        res.status(500).json({
+            message: 'Errore interno del server',
+            error: err.message
+        });
+    }
+});
+
+/*
     GET /api/v1/bivacchi/:id
     Restituisce la scheda completa di un singolo bivacco.
- 
-    Il campo emergenza (true/false) indica se è attivo un alert sul bivacco — corrisponde a RF37 del D1.
-*/
+    Copre le user story: US11 e US12
+    Il campo emergenza (true/false) indica se è attivo un alert sul bivacco.
+ */
 
 router.get('/:id', async (req, res) => {
     try {
@@ -74,6 +114,7 @@ router.get('/:id', async (req, res) => {
         res.status(200).json(bivacco);
 
     } catch (err) {
+        // CastError si verifica quando l'id passato non è un ObjectId MongoDB valido
         if (err.name === 'CastError') {
             return res.status(400).json({ message: 'ID bivacco non valido' });
         }
@@ -87,8 +128,9 @@ router.get('/:id', async (req, res) => {
 /*
     GET /api/v1/bivacchi/:id/percorsi
     Restituisce tutti i percorsi associati a un bivacco.
+    Copre la user story: US14
+    Un bivacco può avere più percorsi (es. ottimale e panoramico).
  */
-
 router.get('/:id/percorsi', async (req, res) => {
     try {
         // prima verifica che il bivacco esista
@@ -103,6 +145,62 @@ router.get('/:id/percorsi', async (req, res) => {
         res.status(200).json(percorsi);
 
     } catch (err) {
+        if (err.name === 'CastError') {
+            return res.status(400).json({ message: 'ID bivacco non valido' });
+        }
+        res.status(500).json({
+            message: 'Errore interno del server',
+            error: err.message
+        });
+    }
+});
+
+/*
+    POST /api/v1/bivacchi/:id/percorsi
+    Inserisce un nuovo percorso associato a un bivacco.
+    Un bivacco può avere più percorsi (es. ottimale e panoramico). Dopo il salvataggio, 
+    l'ObjectId del percorso viene aggiunto all'array percorsi del bivacco corrispondente.
+ */
+router.post('/:id/percorsi', async (req, res) => {
+    try {
+        // verifica che il bivacco esista prima di creare il percorso
+        const bivacco = await Bivacco.findById(req.params.id);
+        if (!bivacco) {
+            return res.status(404).json({ message: 'Bivacco non trovato' });
+        }
+
+        // crea il percorso collegato al bivacco tramite ObjectId
+        const percorso = new Percorso({
+            bivacco:       req.params.id,
+            tipo:          req.body.tipo          || 'ottimale',
+            gpxFile:       req.body.gpxFile,
+            dislivello:    req.body.dislivello,
+            difficolta:    req.body.difficolta,
+            lunghezza:     req.body.lunghezza,
+            durataStimata: req.body.durataStimata
+        });
+
+        const percorsoSalvato = await percorso.save();
+
+        // aggiorna l'array percorsi del bivacco aggiungendo il nuovo ObjectId
+        // $push aggiunge un elemento all'array senza sovrascrivere gli altri
+        await Bivacco.findByIdAndUpdate(
+            req.params.id,
+            { $push: { percorsi: percorsoSalvato._id } }
+        );
+
+        res
+            .status(201)
+            .location('/api/v1/bivacchi/' + req.params.id + '/percorsi/' + percorsoSalvato._id)
+            .json(percorsoSalvato);
+
+    } catch (err) {
+        if (err.name === 'ValidationError') {
+            return res.status(400).json({
+                message: 'Dati non validi',
+                error: err.message
+            });
+        }
         if (err.name === 'CastError') {
             return res.status(400).json({ message: 'ID bivacco non valido' });
         }
