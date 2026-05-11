@@ -210,5 +210,51 @@ router.post('/:id/percorsi', async (req, res) => {
         });
     }
 });
+/*
+    PATCH /api/v1/bivacchi/:id/risorse
+    Permette a un utente di aggiornare lo stato di acqua e legna.
+    Inoltre riporta anche la data in cui è avvenuta la segnalazione
+    Copre le user story: US16 e US17.
+*/
+router.patch('/:id/risorse', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { acquaPresente, legnaDisponibile } = req.body;
+
+        // Creiamo un oggetto con i campi da aggiornare
+        const aggiornamenti = {};
+        
+        // Controlliamo cosa è stato inviato nel body per non sovrascrivere con undefined
+        if (acquaPresente !== undefined) aggiornamenti.acquaPresente = acquaPresente;
+        if (legnaDisponibile !== undefined) aggiornamenti.legnaDisponibile = legnaDisponibile;
+        
+        // Aggiorniamo anche la data dell'ultima segnalazione
+        aggiornamenti.ultimoCheckStato = Date.now();
+
+        const bivaccoAggiornato = await Bivacco.findByIdAndUpdate(
+            id,
+            { $set: aggiornamenti },
+            { new: true, runValidators: true }
+        );
+
+        if (!bivaccoAggiornato) {
+            return res.status(404).json({ message: 'Bivacco non trovato' });
+        }
+
+        res.status(200).json({
+            message: 'Risorse aggiornate con successo',
+            data: bivaccoAggiornato
+        });
+
+    } catch (err) {
+        if (err.name === 'CastError') {
+            return res.status(400).json({ message: 'ID bivacco non valido' });
+        }
+        res.status(500).json({
+            message: 'Errore durante l\'aggiornamento delle risorse',
+            error: err.message
+        });
+    }
+
 
 module.exports = router;
