@@ -255,6 +255,6 @@ router.patch('/:id/risorse', async (req, res) => {
             error: err.message
         });
     }
-
+});
 
 module.exports = router;
