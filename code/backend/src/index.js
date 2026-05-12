@@ -1,3 +1,6 @@
+const dns = require("dns");
+dns.setServers(["8.8.8.8", "1.1.1.1"]);
+
 // importing libraries
 const express = require('express');
 const cors = require('cors');
