@@ -1,5 +1,12 @@
-const dns= require("dns");
-dns.setServers(["8.8.8.8","1.1.1.1"]);
+const dns = require("dns");
+dns.setServers(["8.8.8.8", "1.1.1.1"]);
+
+/**
+ * DA LASCIARE PER EVITARE PROBLEMI DI COMPATIBILITà
+ */
+const crypto = require('crypto');
+global.crypto = crypto.webcrypto || crypto;
+
 // importing libraries
 const express = require('express');
 const cors = require('cors');
@@ -8,6 +15,7 @@ require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 const connectDB = require('./config/db');
 
 // importazione delle route
+const connectDB = require('./config/db');
 const bivacchiRoute = require('./routes/bivacchi');
 const recensioniRoute = require('./routes/recensioniRoute');
 const autenticazioneRoute = require('./routes/autenticazione')
@@ -21,6 +29,7 @@ app.use('/uploads', express.static('uploads'));
 
 // registrazione delle route API
 // tutte le richieste a /api/v1/bivacchi vengono gestite da bivacciRouter
+app.use('/uploads', express.static('uploads'));
 app.use('/api/v1/bivacchi', bivacchiRoute);
 app.use('/api/v1/recensioni', recensioniRoute);
 app.use('/api/v1/auth', autenticazioneRoute);
