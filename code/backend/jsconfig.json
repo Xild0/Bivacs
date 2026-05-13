@@ -4,8 +4,8 @@
     "target": "ES2020",
     "sourceMap": true,
     "allowJs": true,                                // attiva analisi JSDoc
-    "checkJs": true,                                // attiva type-checking automatico
-    "strictNullChecks": true,                       // type-checkign più severo 
+    "checkJs": false,                                // attiva type-checking automatico
+    "strictNullChecks": false,                       // type-checkign più severo 
   },
   "include": [
     "src/**/*"

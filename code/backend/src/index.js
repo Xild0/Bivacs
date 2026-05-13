@@ -1,5 +1,12 @@
-const dns= require("dns");
-dns.setServers(["8.8.8.8","1.1.1.1"]);
+//const dns = require("dns");
+//dns.setServers(["8.8.8.8", "1.1.1.1"]);
+
+/**
+ * DA LASCIARE PER EVITARE PROBLEMI DI COMPATIBILITà
+ */
+const crypto = require('crypto');
+global.crypto = crypto.webcrypto || crypto;
+
 // importing libraries
 const express = require('express');
 const cors = require('cors');
@@ -23,7 +30,7 @@ app.use(express.json());
 app.use('/api/v1/bivacchi', bivacchiRoute);
 app.use('/api/v1/recensioni', recensioniRoute);
 app.use('/api/v1/auth', autenticazioneRoute);
-app.use('./api/v1/profilo', profiloRoute);
+app.use('/api/v1/profilo', profiloRoute);
 // route di test per verificare che il server sia online
 app.get('/', (req, res) => {
     res.send('Server Bivacs online');
