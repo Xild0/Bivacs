@@ -41,5 +41,20 @@ const protectRoute = (req, res, next) => {
         res.status(401).json({ errore: 'Sessione scaduta o token non valido. Effettua nuovamente il login.' });
     }
 };
+/**
+ * Middleware per verificare se l'utente ha i privilegi di amministratore.
+ * Da usare SEMPRE dopo protectRoute.
+ */
+const isAdmin = (req, res, next) => {
+    // Verifichiamo che l'utente esista (grazie a protectRoute) e che sia admin
+    if (req.utente && req.utente.role === 'SuperUser') {
+        next(); // È un superuser, procedi!
+    } else {
+        return res.status(403).json({ 
+            errore: 'Accesso negato. Questa operazione è riservata agli amministratori.' 
+        });
+    }
+};
 
-module.exports = protectRoute;
+// Esportiamo entrambi
+module.exports = { protectRoute, isAdmin };
