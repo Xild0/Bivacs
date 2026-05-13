@@ -11,6 +11,7 @@ const connectDB = require('./config/db');
 const bivacchiRoute = require('./routes/bivacchi');
 const recensioniRoute = require('./routes/recensioniRoute');
 const autenticazioneRoute = require('./routes/autenticazione')
+const profiloRoute = require('./routes/profilo');
 // init app con express
 const app = express();
 
@@ -22,6 +23,7 @@ app.use(express.json());
 app.use('/api/v1/bivacchi', bivacchiRoute);
 app.use('/api/v1/recensioni', recensioniRoute);
 app.use('/api/v1/auth', autenticazioneRoute);
+app.use('./api/v1/profilo', profiloRoute);
 // route di test per verificare che il server sia online
 app.get('/', (req, res) => {
     res.send('Server Bivacs online');
