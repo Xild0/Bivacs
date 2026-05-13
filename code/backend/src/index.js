@@ -12,6 +12,8 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
+const connectDB = require('./config/db');
+
 // importazione delle route
 const connectDB = require('./config/db');
 const bivacchiRoute = require('./routes/bivacchi');
@@ -23,6 +25,7 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
+app.use('/uploads', express.static('uploads'));
 
 // registrazione delle route API
 // tutte le richieste a /api/v1/bivacchi vengono gestite da bivacciRouter
