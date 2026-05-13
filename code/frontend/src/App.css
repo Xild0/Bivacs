@@ -620,3 +620,134 @@ textarea::placeholder {
     grid-template-columns: 1fr;
   }
 }
+
+.emergency-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 35, 28, 0.55);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3000;
+  padding: 20px;
+}
+
+.emergency-modal {
+  width: min(460px, 100%);
+  background: white;
+  border-radius: 28px;
+  padding: 30px;
+  box-shadow: 0 28px 80px rgba(30, 55, 40, 0.28);
+  border: 1px solid #f0d0cd;
+  text-align: center;
+  animation: emergencyPop 0.25s ease;
+}
+
+.emergency-modal-icon {
+  width: 70px;
+  height: 70px;
+  border-radius: 22px;
+  background: #fee2e2;
+  color: #c2413b;
+  display: grid;
+  place-items: center;
+  margin: 0 auto 18px;
+}
+
+.emergency-modal h2 {
+  color: #9f2f2a;
+  margin-bottom: 12px;
+  font-size: 30px;
+}
+
+.emergency-modal p {
+  color: #65766b;
+  line-height: 1.6;
+}
+
+.emergency-numbers {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin: 24px 0;
+}
+
+.emergency-numbers div {
+  background: #fff7f6;
+  border: 1px solid #f3c6c2;
+  border-radius: 18px;
+  padding: 18px 12px;
+}
+
+.emergency-numbers strong {
+  display: block;
+  color: #c2413b;
+  font-size: 34px;
+  margin-bottom: 6px;
+}
+
+.emergency-numbers span {
+  color: #65766b;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.close-emergency-button {
+  width: 100%;
+  border: none;
+  border-radius: 16px;
+  padding: 13px 18px;
+  background: #c2413b;
+  color: white;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.close-emergency-button:hover {
+  background: #9f2f2a;
+}
+
+@keyframes emergencyPop {
+  from {
+    opacity: 0;
+    transform: scale(0.94) translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@media (max-width: 600px) {
+  .emergency-numbers {
+    grid-template-columns: 1fr;
+  }
+}
+
+.widget-description {
+  color: var(--muted);
+  line-height: 1.5;
+  margin-bottom: 14px;
+}
+
+.download-gpx-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  text-decoration: none;
+  border-radius: 16px;
+  padding: 13px 18px;
+  background: var(--primary);
+  color: white;
+  font-weight: 900;
+  box-shadow: 0 14px 30px rgba(47, 125, 79, 0.22);
+  transition: 0.2s ease;
+}
+
+.download-gpx-button:hover {
+  background: var(--primary-dark);
+  transform: translateY(-1px);
+}
