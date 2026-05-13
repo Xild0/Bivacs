@@ -6,7 +6,7 @@ const cors = require('cors');
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 const connectDB = require('./config/db');
-app.use('/uploads', express.static('uploads'));
+
 // importazione delle route
 const bivacchiRoute = require('./routes/bivacchi');
 const recensioniRoute = require('./routes/recensioniRoute');
@@ -17,13 +17,14 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
+app.use('/uploads', express.static('uploads'));
 
 // registrazione delle route API
 // tutte le richieste a /api/v1/bivacchi vengono gestite da bivacciRouter
 app.use('/api/v1/bivacchi', bivacchiRoute);
 app.use('/api/v1/recensioni', recensioniRoute);
 app.use('/api/v1/auth', autenticazioneRoute);
-app.use('./api/v1/profilo', profiloRoute);
+app.use('/api/v1/profilo', profiloRoute);
 // route di test per verificare che il server sia online
 app.get('/', (req, res) => {
     res.send('Server Bivacs online');
