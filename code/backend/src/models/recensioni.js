@@ -1,59 +1,51 @@
-const mongoose = require('mongoose');
+const express = require('express');
+const router = express.Router();
+const Recensione = require('../models/recensione');
+const Bivacco = require('../models/bivacco');
 
-const recensioneSchema = new mongoose.Schema({
+router.post('/', async (req, res) => {
+  try {
+    const { bivaccoId, utente, stelle, testo, anonima } = req.body;
 
-    bivaccoId: {
-        type: mongoose.Schema.Types.ObjectId, 
-        ref: 'Bivacco',
-        required: true
-    },
-    utente: {
-        type: String,
-        default: 'Anonimo' 
-    },
-    stelle: {
-        type: Number,
-        required: [true,'La valutazione è obbligatoria'],
-        min: [1, 'Rating non valido'], 
-        max: [5, 'Rating non valido']
-    },
-    testo: {
-        type: String,
-        required: [true, 'Il testo della recensione è obbligatorio'] 
+    const bivacco = await Bivacco.findById(bivaccoId);
+    if (!bivacco) {
+      return res.status(404).json({ message: 'Bivacco non trovato' });
     }
-}, { timestamps: true });
 
-// Questo risolve l'errore "implicitly has type any"
-/**
- * @param {any} bivaccoId 
- */
-/**
- * @this {import('mongoose').Model<any>}
- * @param {any} bivaccoId
- */
-recensioneSchema.statics.calcolaMedia = async function(bivaccoId) {
-    const stats = await this.aggregate([
-        { $match: { bivaccoId: bivaccoId } },
-        {
-            $group: {
-                _id: '$bivaccoId',
-                nRecensioni: { $sum: 1 },
-                mediaVoti: { $avg: '$stelle' }
-            }
-        }
-    ]);
+    const nuovaRecensione = new Recensione({
+      bivaccoId,
+      utente: anonima ? 'Anonimo' : (utente || 'Escursionista'),
+      stelle,
+      testo,
+      anonima: anonima || false
+    });
 
-    if (stats.length > 0) {
-        await mongoose.model('Bivacco').findByIdAndUpdate(bivaccoId, {
-            numRecensioni: stats[0].nRecensioni,
-            mediaStelle: Math.round(stats[0].mediaVoti * 10) / 10
-        });
-    }
-};
+    const recensioneSalvata = await nuovaRecensione.save();
 
-// 3. MIDDLEWARE
-recensioneSchema.post('save', function() {
-    // Usiamo il riferimento al modello per evitare problemi di inizializzazione circolare
-    this.constructor.calcolaMedia(this.bivaccoId);
+    res.status(201).json(recensioneSalvata);
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    res.status(400).json({
+      message: 'Errore creazione recensione',
+      error: errorMessage
+    });
+  }
 });
-module.exports = mongoose.model('Recensione', recensioneSchema);
+
+router.get('/:bivaccoId', async (req, res) => {
+  try {
+    const recensioni = await Recensione
+      .find({ bivaccoId: req.params.bivaccoId })
+      .sort({ createdAt: -1 });
+
+    res.status(200).json(recensioni);
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    res.status(400).json({
+      message: 'Errore nel recupero recensioni',
+      error: errorMessage
+    });
+  }
+});
+
+module.exports = router;

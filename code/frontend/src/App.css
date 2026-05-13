@@ -1,0 +1,128 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #f3f5f1;
+  color: #1f2a24;
+}
+
+.app {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.hero {
+  background: #244033;
+  color: white;
+  padding: 32px;
+  border-radius: 18px;
+  margin-bottom: 24px;
+}
+
+.hero h1 {
+  margin: 0 0 8px;
+  font-size: 42px;
+}
+
+.panel {
+  background: white;
+  border-radius: 18px;
+  padding: 20px;
+  margin-bottom: 24px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+.filters {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 12px;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+.cards {
+  display: grid;
+  gap: 12px;
+}
+
+.card {
+  border: 1px solid #d9dfd7;
+  border-radius: 14px;
+  padding: 16px;
+  background: #fbfcfa;
+}
+
+input,
+select,
+textarea,
+button {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #cfd8cc;
+  border-radius: 10px;
+  font-size: 14px;
+}
+
+textarea {
+  min-height: 90px;
+  resize: vertical;
+}
+
+button {
+  background: #244033;
+  color: white;
+  cursor: pointer;
+  border: none;
+}
+
+button:hover {
+  background: #355f4a;
+}
+
+.message {
+  background: #fff3cd;
+  border: 1px solid #ffe08a;
+  padding: 12px;
+  border-radius: 12px;
+  margin-bottom: 16px;
+}
+
+.alert {
+  background: #b00020;
+  color: white;
+  padding: 12px;
+  border-radius: 12px;
+  margin: 16px 0;
+  font-weight: bold;
+}
+
+.review-form {
+  display: grid;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.checkbox {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.checkbox input {
+  width: auto;
+}
+
+@media (max-width: 900px) {
+  .filters,
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}
