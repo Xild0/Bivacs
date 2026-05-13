@@ -1,0 +1,8 @@
+{
+  "mdb.presetConnections": [
+    {
+      "name": "Bivacs Atlas",
+      "connectionString": "mongodb://giovannagagliardo_db:Giovi2005g@ac-tiqycog-shard-00-00.i9lqzhg.mongodb.net:27017,ac-tiqycog-shard-00-01.i9lqzhg.mongodb.net:27017,ac-tiqycog-shard-00-02.i9lqzhg.mongodb.net:27017/bivacs?ssl=true&authSource=admin&replicaSet=atlas-vqkzqh-shard-0&retryWrites=true&w=majority"
+    }
+  ]
+}
