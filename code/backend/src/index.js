@@ -13,7 +13,7 @@ const cors = require('cors');
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 const connectDB = require('./config/db');
-
+app.use('/uploads', express.static('uploads'));
 // importazione delle route
 const bivacchiRoute = require('./routes/bivacchi');
 const recensioniRoute = require('./routes/recensioniRoute');
