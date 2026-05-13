@@ -14,9 +14,21 @@ import {
   Route
 } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  Popup,
+  Polyline
+} from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import './App.css';
+const demoTrack = [
+  [46.4700, 11.6400],
+  [46.4720, 11.6450],
+  [46.4750, 11.6500],
+  [46.4780, 11.6550]
+];
 
 import { getBivacchi, getBivaccoById, creaRecensione } from './api';
 
@@ -25,6 +37,7 @@ function App() {
   const [selectedBivacco, setSelectedBivacco] = useState(null);
   const [viewMode, setViewMode] = useState('list');
   const [message, setMessage] = useState('');
+  const [showEmergency, setShowEmergency] = useState(false);
 
   const [filters, setFilters] = useState({
     nome: '',
@@ -111,7 +124,10 @@ function App() {
           <span>Recensioni</span>
         </div>
 
-        <button className="sos-button">
+        <button
+          className="sos-button"
+          onClick={() => setShowEmergency(true)}
+        >
           <ShieldAlert size={17} />
           SOS 112
         </button>
@@ -258,6 +274,14 @@ function App() {
                   <TileLayer
                     attribution="&copy; OpenStreetMap contributors"
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  />
+
+                  <Polyline
+                    positions={demoTrack}
+                    pathOptions={{
+                      color: '#2f7d4f',
+                      weight: 5
+                    }}
                   />
 
                   {bivacchi.map((bivacco) => (
@@ -422,6 +446,21 @@ function App() {
                 </section>
 
                 <section className="mini-widget">
+                  <h3><Navigation size={18} /> Download GPX</h3>
+                  <p className="widget-description">
+                    Scarica il tracciato GPX del percorso per consultarlo offline durante l'escursione.
+                  </p>
+
+                  <a
+                    href="/gpx/demo.gpx"
+                    download
+                    className="download-gpx-button"
+                  >
+                    Scarica tracciato GPX
+                  </a>
+                </section>
+
+                <section className="mini-widget">
                   <h3><Camera size={18} /> Segnalazione rapida</h3>
                   <div className="photo-drop">
                     Trascina qui una foto del danno oppure clicca per caricarla.
@@ -475,6 +514,41 @@ function App() {
           </aside>
         </div>
       </main>
+            {showEmergency && (
+        <div className="emergency-overlay">
+          <div className="emergency-modal">
+            <div className="emergency-modal-icon">
+              <ShieldAlert size={34} />
+            </div>
+
+            <h2>Emergenza alpina</h2>
+
+            <p>
+              In caso di emergenza contatta immediatamente i soccorsi e comunica
+              posizione, numero di persone coinvolte e condizioni meteo.
+            </p>
+
+            <div className="emergency-numbers">
+              <div>
+                <strong>112</strong>
+                <span>Numero unico emergenze</span>
+              </div>
+
+              <div>
+                <strong>118</strong>
+                <span>Soccorso sanitario / alpino</span>
+              </div>
+            </div>
+
+            <button
+              className="close-emergency-button"
+              onClick={() => setShowEmergency(false)}
+            >
+              Chiudi
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
