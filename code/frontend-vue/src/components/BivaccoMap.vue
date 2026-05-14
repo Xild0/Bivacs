@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, watch, ref } from 'vue'
+import { onMounted, onBeforeUnmount, watch, ref, nextTick } from 'vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
@@ -7,118 +7,66 @@ const props = defineProps({
   bivacchi: {
     type: Array,
     required: true
-  },
-  selectedBivacco: {
-    type: Object,
-    default: null
-  },
-  showRoute: {
-    type: Boolean,
-    default: false
   }
 })
 
-const emit = defineEmits(['open', 'close'])
+const emit = defineEmits(['open'])
 
 const mapElement = ref(null)
 
 let map = null
 let markersLayer = null
-let gpxLayer = null
 
 function makeIcon(emergency = false) {
-  const stroke = emergency ? '#DC2626' : '#1E88E5'
-  const accent = emergency ? '#991B1B' : '#0E6FA8'
+  const color = emergency ? '#EF4444' : '#1E88E5'
+  const dark = emergency ? '#991B1B' : '#0E6FA8'
 
   const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="50" viewBox="0 0 40 50">
+    <svg xmlns="http://www.w3.org/2000/svg" width="42" height="54" viewBox="0 0 42 54">
       <defs>
-        <filter id="s" x="-50%" y="-50%" width="200%" height="200%">
-          <feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity="0.35"/>
+        <filter id="pinShadow" x="-50%" y="-50%" width="200%" height="200%">
+          <feDropShadow dx="0" dy="3" stdDeviation="3" flood-opacity="0.35"/>
         </filter>
       </defs>
-      <path d="M20 3 L37 39 L3 39 Z"
-            fill="#FFFFFF"
-            stroke="${stroke}"
-            stroke-width="2.5"
-            stroke-linejoin="round"
-            filter="url(#s)"/>
-      <path d="M13 33 L20 19 L27 33 Z M20 19 L20 33"
-            stroke="${accent}"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            fill="none"/>
-      <circle cx="20" cy="44" r="3" fill="${stroke}"/>
-    </svg>`
+
+      <path
+        d="M21 2
+           C10.5 2 3 9.8 3 20
+           C3 34 21 52 21 52
+           C21 52 39 34 39 20
+           C39 9.8 31.5 2 21 2Z"
+        fill="white"
+        stroke="${color}"
+        stroke-width="3"
+        filter="url(#pinShadow)"
+      />
+
+      <circle cx="21" cy="20" r="11" fill="${color}" opacity="0.14"/>
+
+      <path
+        d="M14.5 28 L21 14 L27.5 28 Z M21 14 L21 28"
+        stroke="${dark}"
+        stroke-width="2.2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        fill="none"
+      />
+
+      ${emergency ? `
+        <circle cx="31" cy="9" r="6" fill="#EF4444" stroke="white" stroke-width="2"/>
+        <path d="M31 6.5V10" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+        <circle cx="31" cy="12.2" r="1" fill="white"/>
+      ` : ''}
+    </svg>
+  `
 
   return L.divIcon({
     html: svg,
     className: 'bivacs-marker',
-    iconSize: [40, 50],
-    iconAnchor: [20, 46],
-    popupAnchor: [0, -40]
+    iconSize: [42, 54],
+    iconAnchor: [21, 52],
+    popupAnchor: [0, -50]
   })
-}
-
-function parseGpx(xmlText) {
-  const parser = new DOMParser()
-  const xml = parser.parseFromString(xmlText, 'application/xml')
-  const points = [...xml.querySelectorAll('trkpt')]
-
-  return points.map((point) => {
-    const lat = Number(point.getAttribute('lat'))
-    const lon = Number(point.getAttribute('lon'))
-    return [lat, lon]
-  })
-}
-
-async function loadGpxTrack() {
-  try {
-    const response = await fetch('/gpx/demo.gpx')
-
-    if (!response.ok) {
-      throw new Error('File GPX non trovato')
-    }
-
-    const xmlText = await response.text()
-    const coordinates = parseGpx(xmlText)
-
-    if (coordinates.length === 0) {
-      console.warn('Il file GPX non contiene punti validi')
-      return
-    }
-
-    removeGpxTrack()
-
-    const halo = L.polyline(coordinates, {
-      color: '#FFFFFF',
-      weight: 7,
-      opacity: 0.9,
-      lineCap: 'round'
-    })
-
-    const line = L.polyline(coordinates, {
-      color: '#1E88E5',
-      weight: 4,
-      opacity: 1,
-      lineCap: 'round',
-      lineJoin: 'round'
-    })
-
-    gpxLayer = L.layerGroup([halo, line]).addTo(map)
-
-    map.fitBounds(line.getBounds(), { padding: [40, 40] })
-  } catch (error) {
-    console.error('Errore caricamento GPX:', error)
-  }
-}
-
-function removeGpxTrack() {
-  if (gpxLayer) {
-    gpxLayer.remove()
-    gpxLayer = null
-  }
 }
 
 function renderMarkers() {
@@ -126,27 +74,91 @@ function renderMarkers() {
 
   markersLayer.clearLayers()
 
-  props.bivacchi.forEach((bivacco) => {
-    if (!bivacco.latitudine || !bivacco.longitudine) return
+  const validCoords = []
 
-    const marker = L.marker(
-      [bivacco.latitudine, bivacco.longitudine],
-      { icon: makeIcon(bivacco.emergenza) }
-    )
+  props.bivacchi.forEach((bivacco) => {
+    const lat = Number(bivacco.latitudine)
+    const lng = Number(bivacco.longitudine)
+
+    let markerLat = lat
+let markerLng = lng
+
+const nomeKey = bivacco.nome?.toLowerCase() || ''
+
+const coordinateOverride = {
+  'bailoni': [46.02310, 11.18125],
+  'carè alto': [46.10806, 10.62583],
+  'vigolana': [45.97500, 11.17500],
+  'paolo e nicola': [46.25833, 11.66306],
+  'costanzi': [46.27895, 10.89566],
+  'argentino vanin': [46.10765, 11.54316],
+  'amicizia': [45.97472, 9.35261],
+  'brentei': [46.17520, 10.87611],
+  'pozze': [46.41469, 10.92942],
+  'coldosè': [46.2596050, 11.6246864],
+  'redolf': [46.34640, 11.73386],
+}
+
+Object.entries(coordinateOverride).forEach(([key, coords]) => {
+  if (nomeKey.includes(key)) {
+    markerLat = coords[0]
+    markerLng = coords[1]
+  }
+})
+
+      if (bivacco.nome?.toLowerCase().includes('bailoni')) {
+        markerLat = 46.02310
+        markerLng = 11.18125
+        console.log('FORZO BAILONI:', markerLat, markerLng)
+      }
+      
+      console.log('MARKER MAPPA:', bivacco.nome, {
+        id: bivacco._id,
+        latitudine: lat,
+        longitudine: lng,
+        altitudine: bivacco.altitudine
+      })
+
+    if (lat < 45.6 || lat > 46.6 || lng < 10.4 || lng > 12.0) {
+    console.warn('Coordinate sospette per bivacco:', bivacco.nome, {
+      latitudine: lat,
+      longitudine: lng
+    })
+  }
+
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      console.warn('Coordinate non valide per bivacco:', bivacco.nome, bivacco)
+      return
+    }
+
+    validCoords.push([markerLat, markerLng])
+
+    const marker = L.marker([markerLat, markerLng],{
+      icon: makeIcon(Boolean(bivacco.emergenza))
+    })
 
     marker.bindPopup(`
       <strong>${bivacco.nome}</strong><br>
-      ${bivacco.zona} · ${bivacco.altitudine} m
+      ${bivacco.zona || 'Zona non indicata'} · ${bivacco.altitudine || '—'} m<br>
+      <small>lat: ${markerLat} | lng: ${markerLng}</small>
     `)
 
-    marker.on('popupopen', () => emit('open', bivacco))
-    marker.on('popupclose', () => emit('close'))
+    marker.on('click', () => {
+      emit('open', bivacco)
+    })
 
     markersLayer.addLayer(marker)
   })
+
+  if (validCoords.length > 0) {
+    const bounds = L.latLngBounds(validCoords)
+    map.fitBounds(bounds, { padding: [35, 35], maxZoom: 12 })
+  }
 }
 
-onMounted(() => {
+onMounted(async () => {
+  await nextTick()
+
   map = L.map(mapElement.value, {
     zoomControl: true,
     attributionControl: true
@@ -165,8 +177,15 @@ onMounted(() => {
   renderMarkers()
 
   setTimeout(() => {
-    map.invalidateSize()
-  }, 100)
+    map?.invalidateSize()
+  }, 150)
+})
+
+onBeforeUnmount(() => {
+  if (map) {
+    map.remove()
+    map = null
+  }
 })
 
 watch(
@@ -175,17 +194,6 @@ watch(
     renderMarkers()
   },
   { deep: true }
-)
-
-watch(
-  () => props.showRoute,
-  async (newValue) => {
-    if (newValue && props.selectedBivacco) {
-      await loadGpxTrack()
-    } else {
-      removeGpxTrack()
-    }
-  }
 )
 </script>
 
@@ -208,11 +216,13 @@ watch(
 .map :deep(.bivacs-marker) {
   background: transparent !important;
   border: none !important;
-  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
-  transition: transform 0.2s ease;
 }
 
-.map :deep(.bivacs-marker:hover) {
-  transform: translateY(-2px) scale(1.08);
+.map :deep(.bivacs-marker svg) {
+  transition: transform 0.18s ease;
+}
+
+.map :deep(.bivacs-marker:hover svg) {
+  transform: translateY(-3px) scale(1.05);
 }
 </style>

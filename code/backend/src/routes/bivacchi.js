@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 
 const Bivacco = require('../models/bivacco');
+const Percorso = require('../models/percorso');
 
 /** @param {unknown} err */
 const getErrorMessage = (err) =>
@@ -78,7 +79,8 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
 
-    const bivacco = await Bivacco.findById(req.params.id);
+    const bivacco = await Bivacco.findById(req.params.id)
+  .populate('percorsi');
 
     if (!bivacco) {
       return res.status(404).json({
@@ -218,5 +220,39 @@ router.delete('/:id', async (req, res) => {
     });
   }
 });
+
+/**
+ * GET percorsi associati a un bivacco
+ * /api/v1/bivacchi/:id/percorsi
+ */
+router.get('/:id/percorsi', async (req, res) => {
+  try {
+    const bivacco = await Bivacco.findById(req.params.id)
+
+    if (!bivacco) {
+      return res.status(404).json({
+        message: 'Bivacco non trovato'
+      })
+    }
+
+    const percorsi = await Percorso.find({
+      bivacco: req.params.id
+    })
+
+    res.status(200).json(percorsi)
+
+  } catch (err) {
+    if (err instanceof Error && err.name === 'CastError') {
+      return res.status(400).json({
+        message: 'ID bivacco non valido'
+      })
+    }
+
+    res.status(500).json({
+      message: 'Errore recupero percorsi',
+      error: getErrorMessage(err)
+    })
+  }
+})
 
 module.exports = router;

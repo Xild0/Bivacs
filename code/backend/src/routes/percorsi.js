@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 
 const Percorso = require('../models/percorso');
-
+const path = require('path');
 
 // GET tutti i percorsi
 router.get('/', async (req, res) => {
@@ -52,6 +52,38 @@ router.post('/', async (req, res) => {
     } catch (error) {
         res.status(400).json({
             message: 'Errore creazione percorso',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * DOWNLOAD file GPX
+ * GET /api/v1/percorsi/:id/download
+ */
+router.get('/:id/download', async (req, res) => {
+    try {
+
+        const percorso = await Percorso.findById(req.params.id);
+
+        if (!percorso) {
+            return res.status(404).json({
+                message: 'Percorso non trovato'
+            });
+        }
+
+        const filePath = path.join(
+            __dirname,
+            '../../uploads/gpx',
+            percorso.gpxFile
+        );
+
+        res.download(filePath);
+
+    } catch (error) {
+
+        res.status(500).json({
+            message: 'Errore download GPX',
             error: error.message
         });
     }

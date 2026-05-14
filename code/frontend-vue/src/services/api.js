@@ -290,3 +290,13 @@ function haversine(lat1, lon1, lat2, lon2) {
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
   return R * c
 }
+
+export async function getPercorsiByBivacco(bivaccoId) {
+  const response = await fetch(`${API_URL}/bivacchi/${bivaccoId}/percorsi`)
+
+  if (!response.ok) {
+    throw new Error('Errore caricamento percorsi del bivacco')
+  }
+
+  return await response.json()
+}

@@ -10,13 +10,14 @@ import BivaccoMap from './components/BivaccoMap.vue'
 import EmergencyModal from './components/EmergencyModal.vue'
 import AuthModal from './components/AuthModal.vue'
 import ProfileModal from './components/ProfileModal.vue'
+import RouteModal from './components/RouteModal.vue'
 
-import { getBivacchi, isLoggedIn } from './services/api'
+import { getBivacchi, getBivaccoById, isLoggedIn } from './services/api'
 
 const bivacchi = ref([])
 const viewMode = ref('list')
 const selectedBivacco = ref(null)
-const routeCoords = ref(null)         // coordinate del tragitto calcolato
+const routeModal = ref(null)       // dati del modal del tragitto     // coordinate del tragitto calcolato
 const loading = ref(true)
 
 const showEmergency = ref(false)
@@ -36,9 +37,16 @@ async function loadBivacchi(filters = {}) {
   }
 }
 
-function openDetails(bivacco) {
-  selectedBivacco.value = bivacco
-  routeCoords.value = null
+async function openDetails(bivacco) {
+  routeModal.value = null
+
+  try {
+    selectedBivacco.value = await getBivaccoById(bivacco._id)
+  } catch (error) {
+    console.error('Errore caricamento dettagli bivacco:', error)
+    selectedBivacco.value = bivacco
+  }
+
   if (window.innerWidth < 1100) {
     setTimeout(() => {
       document.querySelector('.details-pane')?.scrollIntoView({
@@ -51,23 +59,18 @@ function openDetails(bivacco) {
 
 function closeDetails() {
   selectedBivacco.value = null
-  routeCoords.value = null
+  routeModal.value = null
 }
 
 function onRouteCalculated(result) {
-  // Il TripPlanner ha calcolato un tragitto: mostralo sulla mappa
-  routeCoords.value = result.coords
-  viewMode.value = 'map'
-  setTimeout(() => {
-    document.querySelector('.results-pane')?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'start'
-    })
-  }, 80)
+  routeModal.value = {
+    result,
+    bivacco: selectedBivacco.value
+  }
 }
 
 function onClearRoute() {
-  routeCoords.value = null
+  routeModal.value = null
 }
 
 function refreshAuth() {
@@ -174,12 +177,10 @@ onMounted(() => {
 
           <!-- Map view -->
           <BivaccoMap
-            v-else
-            :bivacchi="bivacchi"
-            :route-coords="routeCoords"
-            @open="openDetails"
-            @close="closeDetails"
-          />
+          v-else
+          :bivacchi="bivacchi"
+          @open="openDetails"
+        />
         </section>
 
         <!-- RIGHT: details (sticky on desktop) -->
@@ -229,6 +230,13 @@ onMounted(() => {
       @close="showProfile = false"
       @auth-changed="refreshAuth"
     />
+
+    <RouteModal
+          v-if="routeModal"
+          :result="routeModal.result"
+          :bivacco="routeModal.bivacco"
+          @close="routeModal = null"
+        />
   </div>
 </template>
 
