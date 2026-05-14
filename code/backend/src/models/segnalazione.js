@@ -3,7 +3,12 @@ const mongoose = require('mongoose');
 const segnalazioneSchema = new mongoose.Schema({
     utenteId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'User', 
+        ref: 'Utente', 
+        required: true
+    },
+    bivaccoId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'bivacco',
         required: true
     },
     descrizione: { 
@@ -17,12 +22,6 @@ const segnalazioneSchema = new mongoose.Schema({
         required: [true, 'La foto della segnalazione è obbligatoria']
     },
     
-
-    // TO DO: aggiungere obbligo inserimento foto. 
-    // Sistema ibrido? L'utente carica la foto dal frontend, 
-    // la foto viene salvata in locale e nel database viene salvato solo il link alla foto.
-    // Vi convince oppure no? 
-    // Alternativa: salvare la foto direttamente nel database ma è poco efficiente in termine di spazio.
 
     statoSegnalazione: {
         type: String,

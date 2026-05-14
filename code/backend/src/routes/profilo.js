@@ -3,7 +3,7 @@ const bcrypt = require('bcryptjs');
 const Utente = require('../models/utente');
 const UtenteRegistrato = require('../models/utenteRegistrato');
 const proteggiRotta = require('../middlewares/authMiddleware');
-const protectRoute = require('../middlewares/authMiddleware');
+const {protectRoute} = require('../middlewares/authMiddleware');
 
 const router = express.Router();
 

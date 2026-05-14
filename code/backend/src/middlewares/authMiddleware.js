@@ -45,17 +45,17 @@ const protectRoute = (req, res, next) => {
  * Middleware per verificare se l'utente ha i privilegi di amministratore.
  * Da usare SEMPRE dopo protectRoute.
  */
-const isAdmin = (req, res, next) => {
-    // Verifichiamo che l'utente esista (grazie a protectRoute) e che sia admin
-    if (req.utente && req.utente.role === 'SuperUser') {
-        next(); // È un superuser, procedi!
+const isStaff = (req, res, next) => {
+   const tipoUtente = req.utente.discriminator;
+
+    if (tipoUtente === 'SuperUser' || tipoUtente === 'SupportoTecnico') {
+        next(); // Autorizzato
     } else {
         return res.status(403).json({ 
-            errore: 'Accesso negato. Questa operazione è riservata agli amministratori.' 
+            errore: 'Accesso negato. Solo la SAT, gli Enti o il Supporto Tecnico possono accedere.' 
         });
     }
 };
 
 // Esportiamo entrambi
-//module.exports = { protectRoute, isAdmin };
-module.exports = protectRoute;
+module.exports = { protectRoute, isStaff };

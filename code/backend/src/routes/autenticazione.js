@@ -9,7 +9,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const Utente = require('../models/utente');
 const UtenteRegistrato = require('../models/utenteRegistrato');
-const protectRoute = require('../middlewares/authMiddleware');
+const {protectRoute} = require('../middlewares/authMiddleware')
 const inviaEmail = require('../utils/emailService');
 const crypto = require('crypto');
 const router = express.Router();
@@ -132,7 +132,7 @@ router.post('/login', async (req, res) => {
         const Dati = {
             id: utenteTrovato.id, 
             mongoId: utenteTrovato._id, 
-            ruolo: utenteTrovato.discriminator
+            discriminator: utenteTrovato.discriminator
         };
 
         const token = jwt.sign(Dati, process.env.JWT_SECRET, { expiresIn: '2h' });
