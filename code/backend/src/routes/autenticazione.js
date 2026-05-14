@@ -9,7 +9,9 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const Utente = require('../models/utente');
 const UtenteRegistrato = require('../models/utenteRegistrato');
-const {protectRoute} = require('../middlewares/authMiddleware');
+const {protectRoute} = require('../middlewares/authMiddleware')
+const inviaEmail = require('../utils/emailService');
+const crypto = require('crypto');
 const router = express.Router();
 
 /**
@@ -44,6 +46,8 @@ router.post('/register', async (req, res) => {
         const saltRounds = 12;
         const hashedPassword = await bcrypt.hash(password, saltRounds);
 
+        const verificaToken = crypto.randomBytes(32).toString('hex');
+
         // creazione istanza UtenteRegistrato
         const nuovoUtente = new UtenteRegistrato({
             id: id, 
@@ -51,10 +55,26 @@ router.post('/register', async (req, res) => {
             cognome: cognome, 
             email: email, 
             passwordHash: hashedPassword,
-            dataNascita: new Date(dataNascita)  
+            dataNascita: new Date(dataNascita), 
+            emailToken: verificaToken, 
+            isVerified: false
         });
         await nuovoUtente.save();
-        
+
+        /**
+         * creazione della mail da inviare automaticamente
+         * mediante il servizio "inviaEmail"
+         */
+        const linkVerifica = `http://localhost:5000/api/v1/auth/verify-email?token=${verificaToken}`;
+        const htmlContent = `
+            <h1>Benvenuto su Bivacs!</h1>
+            <p>Ciao ${nome}, clicca sul pulsante qui sotto per confermare la tua email:</p>
+            <a href=${linkVerifica}" style="background: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
+                Conferma account
+            </a>
+        `;
+        await inviaEmail(email, "Benvenuto! Conferma la tua email", htmlContent); 
+
         res.status(201).json({
             message: 'Utente registrato con successo', 
             utente: {
@@ -109,13 +129,13 @@ router.post('/login', async (req, res) => {
         }
 
         // generazione token JWT
-        const payloadDati = {
+        const Dati = {
             id: utenteTrovato.id, 
             mongoId: utenteTrovato._id, 
             discriminator: utenteTrovato.discriminator
         };
 
-        const token = jwt.sign(payloadDati, process.env.JWT_SECRET, { expiresIn: '2h' });
+        const token = jwt.sign(Dati, process.env.JWT_SECRET, { expiresIn: '2h' });
 
         res.status(200).json({
             messaggio: 'Login effettuato con successo',
@@ -123,6 +143,50 @@ router.post('/login', async (req, res) => {
         });
     } catch (error) {
         console.error('Errore durante il login:', error);
+        res.status(500).json({ errore: 'Errore interno del server' });
+    }
+});
+
+/**
+ * Verifica l'email dell'utente confrontando il token presente nell'URL:
+ * se il token è valido, imposta l'utente come verificato e rimuove il token dal DB.
+ * @route GET /api/v1/auth/verify-email
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ */
+router.get('/verify-email', async (req, res) => {
+    try {
+        const tokenSporco = req.query.token;
+        const tokenUrl = tokenSporco.replace(/['"]/g, '');
+        console.log("Token ricevuto da URL: ", tokenUrl);
+
+        if (!tokenUrl) {
+            return res.status(400).json({ errore: 'Nessun token di verifica fornito.' });
+        }
+
+        const utente = await UtenteRegistrato.findOne({ emailToken: tokenUrl });
+
+        if (!utente) {
+            return res.status(400).json({ errore: 'Token non valido, scaduto o account già verificato.' });
+        }
+
+        // Account attivato
+        utente.isVerified = true;
+        
+        utente.emailToken = null; 
+
+        await utente.save();
+
+        /**
+         * NOTA PER IL FUTURO (Frontend):
+         * Quando avrete le pagine HTML pronte, invece di rispondere con un JSON
+         * potrai fare un reindirizzamento alla pagina di successo, es:
+         * return res.redirect('http://localhost:3000/login?verificato=true');
+         */
+        res.status(200).json({ messaggio: 'Email verificata con successo! Ora puoi effettuare il login.' });
+
+    } catch (error) {
+        console.error('Errore durante la verifica dell\'email:', error);
         res.status(500).json({ errore: 'Errore interno del server' });
     }
 });
@@ -136,5 +200,66 @@ router.get('/profilo-test',protectRoute, (req, res) =>{
         dati_utente_token: req.utente
     });
 });
+
+/**
+ * Genera un token di reset e invia la mail all'utente.
+ * @route POST /api/v1/auth/forgot-password
+ */
+router.post('/recupero_password', async (req, res) => {
+    const { email } = req.body;
+    try {
+        const utente = await Utente.findOne({ email });
+        if (!utente) return res.status(404).json({ errore: "Email non trovata" });
+
+        const resetToken = crypto.randomBytes(32).toString('hex');
+        utente.resetPassToken = resetToken;
+        utente.resetPassExpires = Date.now() + 3600000; // 1 ora da adesso
+        await utente.save();
+
+        const linkReset = `http://localhost:3000/reset-password/${resetToken}`; // Link che porterà al frontend
+        await inviaEmail(email, "Recupero Password Bivacs", `Clicca qui per resettare: ${linkReset}`);
+
+        res.json({ messaggio: "Email di recupero inviata!" });
+    } catch (error) {
+        res.status(500).json({ errore: "Errore nel reset password" });
+    }
+});
+
+/**
+ * Endpoint per impostare la nuova password usando il token ricevuto via mail
+ * @route POST /api/v1/auth/reset-password/:token
+ */
+router.post('/reset-password/:token', async (req, res) => {
+    try {
+        const { token } = req.params;
+        const { nuovaPassword } = req.body;
+
+        // controllo aggiuntivo: il token su resetPassExpires non deve essere scaduto
+        const utente = await Utente.findOne({
+            resetPassToken: token,
+            resetPassExpires: { $gt: Date.now() }
+        });
+
+        if (!utente) {
+            return res.status(400).json({ errore: "Token non valido o scaduto." });
+        }
+
+        const saltRounds = 12;
+        const hashedPassword = await bcrypt.hash(nuovaPassword, saltRounds);
+
+        // aggiornamento della password e reset dei token
+        utente.passwordHash = hashedPassword;
+        utente.resetPassToken = undefined;
+        utente.resetPassExpires = undefined;
+
+        await utente.save();
+
+        res.status(200).json({ messaggio: "Password aggiornata con successo! Ora puoi effettuare il login." });
+    } catch (error) {
+        console.error("Errore nel reset password:", error);
+        res.status(500).json({ errore: "Errore interno del server" });
+    }
+});
+
 
 module.exports = router;

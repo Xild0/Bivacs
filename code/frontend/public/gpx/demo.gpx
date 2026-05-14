@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="Bivacs">
+  <trk>
+    <name>Percorso Bivacco Demo</name>
+    <trkseg>
+      <trkpt lat="46.4700" lon="11.6400">
+        <ele>1500</ele>
+      </trkpt>
+      <trkpt lat="46.4720" lon="11.6450">
+        <ele>1700</ele>
+      </trkpt>
+      <trkpt lat="46.4750" lon="11.6500">
+        <ele>2000</ele>
+      </trkpt>
+      <trkpt lat="46.4780" lon="11.6550">
+        <ele>2365</ele>
+      </trkpt>
+    </trkseg>
+  </trk>
+</gpx>

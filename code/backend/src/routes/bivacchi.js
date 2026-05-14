@@ -78,9 +78,7 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
 
-    const bivacco = await Bivacco
-      .findById(req.params.id)
-      .populate('percorsi');
+    const bivacco = await Bivacco.findById(req.params.id);
 
     if (!bivacco) {
       return res.status(404).json({

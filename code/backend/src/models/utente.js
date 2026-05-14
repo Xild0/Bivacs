@@ -30,6 +30,19 @@ const utenteSchema = new mongoose.Schema(
         type: String,
         required: true,
         enum: ['UtenteRegistrato', 'SuperUser', 'SupportoTecnico']
+    },
+    isVerified: {
+        type: Boolean, 
+        default: false
+    }, 
+    emailToken: {
+        type: String
+    }, 
+    resetPassToken: {
+        type: String
+    }, 
+    resetPassExpires: {
+        type: Date
     }
 },
 { 
