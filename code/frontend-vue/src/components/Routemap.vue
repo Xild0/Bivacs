@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, onBeforeUnmount, ref, nextTick } from 'vue'
+import { onMounted, onBeforeUnmount, ref, nextTick, watch } from 'vue'
 import L from 'leaflet'
 
 const props = defineProps({
@@ -12,6 +12,7 @@ const props = defineProps({
 
 const mapEl = ref(null)
 let map = null
+let routeLayer = null
 
 function makeStartIcon() {
   const svg = `
@@ -54,6 +55,42 @@ function makeEndIcon() {
   })
 }
 
+function renderRoute() {
+  if (!map || !props.routeCoords || props.routeCoords.length === 0) return
+
+  if (routeLayer) {
+    routeLayer.remove()
+    routeLayer = null
+  }
+
+  routeLayer = L.layerGroup().addTo(map)
+
+  const halo = L.polyline(props.routeCoords, {
+    color: '#FFFFFF',
+    weight: 8,
+    opacity: 0.95,
+    lineCap: 'round'
+  }).addTo(routeLayer)
+
+  L.polyline(props.routeCoords, {
+    color: '#1E88E5',
+    weight: 4,
+    opacity: 1,
+    lineCap: 'round',
+    lineJoin: 'round'
+  }).addTo(routeLayer)
+
+  L.marker(props.startCoord, { icon: makeStartIcon() })
+    .bindPopup(`<strong>Partenza</strong><br>${props.startName}`)
+    .addTo(routeLayer)
+
+  L.marker(props.endCoord, { icon: makeEndIcon() })
+    .bindPopup(`<strong>Arrivo</strong><br>${props.endName}`)
+    .addTo(routeLayer)
+
+  map.fitBounds(halo.getBounds(), { padding: [40, 40] })
+}
+
 onMounted(async () => {
   await nextTick()
 
@@ -67,29 +104,19 @@ onMounted(async () => {
     maxZoom: 19
   }).addTo(map)
 
-  // Linea del tragitto — alone bianco + linea blu
-  const halo = L.polyline(props.routeCoords, {
-    color: '#FFFFFF', weight: 8, opacity: 0.95, lineCap: 'round'
-  }).addTo(map)
-
-  L.polyline(props.routeCoords, {
-    color: '#1E88E5', weight: 4, opacity: 1, lineCap: 'round', lineJoin: 'round'
-  }).addTo(map)
-
-  // Markers partenza + arrivo
-  L.marker(props.startCoord, { icon: makeStartIcon() })
-    .bindPopup(`<strong>Partenza</strong>${props.startName}`)
-    .addTo(map)
-
-  L.marker(props.endCoord, { icon: makeEndIcon() })
-    .bindPopup(`<strong>Arrivo</strong>${props.endName}`)
-    .addTo(map)
-
-  map.fitBounds(halo.getBounds(), { padding: [40, 40] })
+  renderRoute()
 
   // Forza il refresh delle dimensioni dopo l'animazione del modal
   setTimeout(() => map && map.invalidateSize(), 350)
 })
+
+watch(
+  () => props.routeCoords,
+  () => {
+    renderRoute()
+  },
+  { deep: true }
+)
 
 onBeforeUnmount(() => {
   if (map) {
