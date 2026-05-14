@@ -1,6 +1,7 @@
 <script setup>
 import { onMounted, watch, ref } from 'vue'
 import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
 
 const props = defineProps({
   bivacchi: {
@@ -25,31 +26,38 @@ let map = null
 let markersLayer = null
 let gpxLayer = null
 
-// Custom marker icon — alpine peak in glacier blue, matches our logo
 function makeIcon(emergency = false) {
-  const color = emergency ? '#F87171' : '#4FC3F7'
-  const glow  = emergency ? 'rgba(248,113,113,0.55)' : 'rgba(79,195,247,0.55)'
+  const stroke = emergency ? '#DC2626' : '#1E88E5'
+  const accent = emergency ? '#991B1B' : '#0E6FA8'
 
   const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="48" viewBox="0 0 40 48">
+    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="50" viewBox="0 0 40 50">
       <defs>
-        <filter id="g" x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation="2" result="b"/>
-          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        <filter id="s" x="-50%" y="-50%" width="200%" height="200%">
+          <feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity="0.35"/>
         </filter>
       </defs>
-      <path d="M20 4 L36 36 L4 36 Z" fill="${color}" stroke="${color}" stroke-width="1.5" filter="url(#g)" opacity="0.95"/>
-      <path d="M20 4 L36 36 L4 36 Z" fill="#0F1117" transform="translate(0,0) scale(0.7) translate(8.5,5.5)"/>
-      <path d="M14 30 L20 18 L26 30 Z M20 18 L20 30" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-      <circle cx="20" cy="42" r="3" fill="${color}" filter="url(#g)"/>
+      <path d="M20 3 L37 39 L3 39 Z"
+            fill="#FFFFFF"
+            stroke="${stroke}"
+            stroke-width="2.5"
+            stroke-linejoin="round"
+            filter="url(#s)"/>
+      <path d="M13 33 L20 19 L27 33 Z M20 19 L20 33"
+            stroke="${accent}"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            fill="none"/>
+      <circle cx="20" cy="44" r="3" fill="${stroke}"/>
     </svg>`
 
   return L.divIcon({
     html: svg,
     className: 'bivacs-marker',
-    iconSize:   [40, 48],
-    iconAnchor: [20, 44],
-    popupAnchor: [0, -38]
+    iconSize: [40, 50],
+    iconAnchor: [20, 46],
+    popupAnchor: [0, -40]
   })
 }
 
@@ -81,25 +89,24 @@ async function loadGpxTrack() {
       return
     }
 
-    if (gpxLayer) gpxLayer.remove()
+    removeGpxTrack()
 
-    // Glow effect via two stacked polylines
-    const glow = L.polyline(coordinates, {
-      color: '#4FC3F7',
-      weight: 12,
-      opacity: 0.18,
+    const halo = L.polyline(coordinates, {
+      color: '#FFFFFF',
+      weight: 7,
+      opacity: 0.9,
       lineCap: 'round'
     })
 
     const line = L.polyline(coordinates, {
-      color: '#7DD8FF',
+      color: '#1E88E5',
       weight: 4,
-      opacity: 0.95,
+      opacity: 1,
       lineCap: 'round',
       lineJoin: 'round'
     })
 
-    gpxLayer = L.layerGroup([glow, line]).addTo(map)
+    gpxLayer = L.layerGroup([halo, line]).addTo(map)
 
     map.fitBounds(line.getBounds(), { padding: [40, 40] })
   } catch (error) {
@@ -128,11 +135,11 @@ function renderMarkers() {
     )
 
     marker.bindPopup(`
-      <strong>${bivacco.nome}</strong>
+      <strong>${bivacco.nome}</strong><br>
       ${bivacco.zona} · ${bivacco.altitudine} m
     `)
 
-    marker.on('popupopen',  () => emit('open',  bivacco))
+    marker.on('popupopen', () => emit('open', bivacco))
     marker.on('popupclose', () => emit('close'))
 
     markersLayer.addLayer(marker)
@@ -143,23 +150,30 @@ onMounted(() => {
   map = L.map(mapElement.value, {
     zoomControl: true,
     attributionControl: true
-  }).setView([46.07, 11.12], 8)
+  }).setView([46.07, 11.12], 10)
 
-  // CartoDB Dark Matter — beautiful dark tiles
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> · &copy; <a href="https://carto.com/attributions">CARTO</a>',
-    subdomains: 'abcd',
-    maxZoom: 19
-  }).addTo(map)
+  L.tileLayer(
+    'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    {
+      attribution: '&copy; OpenStreetMap contributors',
+      maxZoom: 19
+    }
+  ).addTo(map)
 
   markersLayer = L.layerGroup().addTo(map)
 
   renderMarkers()
+
+  setTimeout(() => {
+    map.invalidateSize()
+  }, 100)
 })
 
 watch(
   () => props.bivacchi,
-  () => renderMarkers(),
+  () => {
+    renderMarkers()
+  },
   { deep: true }
 )
 
@@ -183,19 +197,19 @@ watch(
 .map {
   height: 620px;
   width: 100%;
-  border-radius: var(--r-xl);
-  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-xl, 24px);
+  border: 1px solid var(--border-subtle, #e2e8f0);
   overflow: hidden;
   position: relative;
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow, 0 18px 40px rgba(30, 55, 40, 0.12));
+  background: #f2f0ea;
 }
 
-/* Marker drop animation when added */
 .map :deep(.bivacs-marker) {
   background: transparent !important;
   border: none !important;
-  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.5));
-  transition: transform 0.2s var(--ease-out);
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
+  transition: transform 0.2s ease;
 }
 
 .map :deep(.bivacs-marker:hover) {

@@ -57,4 +57,5 @@ const isAdmin = (req, res, next) => {
 };
 
 // Esportiamo entrambi
-module.exports = { protectRoute, isAdmin };
+//module.exports = { protectRoute, isAdmin };
+module.exports = protectRoute;
