@@ -16,7 +16,7 @@ import { getBivacchi, isLoggedIn } from './services/api'
 const bivacchi = ref([])
 const viewMode = ref('list')
 const selectedBivacco = ref(null)
-const showRoute = ref(false)
+const routeCoords = ref(null)         // coordinate del tragitto calcolato
 const loading = ref(true)
 
 const showEmergency = ref(false)
@@ -38,8 +38,7 @@ async function loadBivacchi(filters = {}) {
 
 function openDetails(bivacco) {
   selectedBivacco.value = bivacco
-  showRoute.value = false
-  // Smooth scroll to details panel on mobile
+  routeCoords.value = null
   if (window.innerWidth < 1100) {
     setTimeout(() => {
       document.querySelector('.details-pane')?.scrollIntoView({
@@ -52,17 +51,23 @@ function openDetails(bivacco) {
 
 function closeDetails() {
   selectedBivacco.value = null
-  showRoute.value = false
+  routeCoords.value = null
 }
 
-function showRouteOnMap(bivacco) {
-  selectedBivacco.value = bivacco
-  showRoute.value = true
+function onRouteCalculated(result) {
+  // Il TripPlanner ha calcolato un tragitto: mostralo sulla mappa
+  routeCoords.value = result.coords
   viewMode.value = 'map'
-  document.querySelector('.results-pane')?.scrollIntoView({
-    behavior: 'smooth',
-    block: 'start'
-  })
+  setTimeout(() => {
+    document.querySelector('.results-pane')?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start'
+    })
+  }, 80)
+}
+
+function onClearRoute() {
+  routeCoords.value = null
 }
 
 function refreshAuth() {
@@ -171,8 +176,7 @@ onMounted(() => {
           <BivaccoMap
             v-else
             :bivacchi="bivacchi"
-            :selected-bivacco="selectedBivacco"
-            :show-route="showRoute"
+            :route-coords="routeCoords"
             @open="openDetails"
             @close="closeDetails"
           />
@@ -183,7 +187,8 @@ onMounted(() => {
           <BivaccoDetails
             v-if="selectedBivacco"
             :bivacco="selectedBivacco"
-            @show-route="showRouteOnMap"
+            @route-calculated="onRouteCalculated"
+            @clear-route="onClearRoute"
           />
 
           <div v-else class="placeholder">
@@ -194,7 +199,7 @@ onMounted(() => {
               </svg>
             </div>
             <h3>Seleziona un bivacco</h3>
-            <p>Clicca su una card o sulla mappa per consultare la scheda completa con percorso, risorse e recensioni.</p>
+            <p>Clicca su una card o sulla mappa per consultare la scheda completa, pianificare il tragitto e leggere le recensioni.</p>
           </div>
         </aside>
       </div>
@@ -240,7 +245,6 @@ onMounted(() => {
   z-index: 2;
 }
 
-/* —— Results layout —— */
 .results {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 420px;
@@ -252,7 +256,6 @@ onMounted(() => {
   .results { grid-template-columns: 1fr; }
 }
 
-/* —— Results header —— */
 .results-head {
   display: flex;
   justify-content: space-between;
@@ -275,7 +278,6 @@ onMounted(() => {
   letter-spacing: 0;
 }
 
-/* —— View toggle —— */
 .view-toggle {
   position: relative;
   display: inline-flex;
@@ -314,18 +316,14 @@ onMounted(() => {
   z-index: 0;
 }
 
-.toggle-indicator.map {
-  transform: translateX(100%);
-}
+.toggle-indicator.map { transform: translateX(100%); }
 
-/* —— Cards grid —— */
 .cards-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 16px;
 }
 
-/* —— Skeleton loader —— */
 .skeleton {
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
@@ -364,7 +362,6 @@ onMounted(() => {
   100% { background-position: -200% 0; }
 }
 
-/* —— Empty state —— */
 .empty {
   text-align: center;
   padding: 60px 30px;
@@ -394,7 +391,6 @@ onMounted(() => {
   color: var(--text-tertiary);
 }
 
-/* —— Details pane (sticky on desktop) —— */
 .details-pane {
   position: sticky;
   top: 92px;
@@ -459,7 +455,6 @@ onMounted(() => {
   position: relative;
 }
 
-/* —— Footer —— */
 .footer {
   border-top: 1px solid var(--border-subtle);
   padding: 30px 0;

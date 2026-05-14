@@ -6,6 +6,8 @@ import {
   getRecensioni
 } from '../services/api'
 
+import TripPlanner from './TripPlanner.vue'
+
 const props = defineProps({
   bivacco: {
     type: Object,
@@ -13,8 +15,7 @@ const props = defineProps({
   }
 })
 
-// FIX: defineEmits mancava nel file originale, "show-route" non veniva mai emesso
-const emit = defineEmits(['show-route'])
+const emit = defineEmits(['route-calculated', 'clear-route'])
 
 const recensioni = ref([])
 const message = ref('')
@@ -57,10 +58,20 @@ async function submitRecensione() {
   }
 }
 
+function onRouteCalculated(res) {
+  emit('route-calculated', res)
+}
+
+function onClearRoute() {
+  emit('clear-route')
+}
+
 watch(
   () => props.bivacco,
   () => {
     loadRecensioni()
+    // Quando cambio bivacco, pulisco un eventuale tragitto precedente
+    emit('clear-route')
   },
   { immediate: true }
 )
@@ -125,61 +136,13 @@ watch(
       </div>
     </section>
 
-    <!-- Profilo altimetrico -->
+    <!-- Pianificatore tragitto: sostituisce profilo altimetrico fisso + sezione GPX -->
     <section class="section">
-      <h3 class="section-title">Profilo altimetrico</h3>
-
-      <div class="elevation">
-        <svg viewBox="0 0 400 120" class="elevation-svg" preserveAspectRatio="none">
-          <defs>
-            <linearGradient id="elevFill" x1="0" x2="0" y1="0" y2="1">
-              <stop offset="0%" stop-color="#4FC3F7" stop-opacity="0.55" />
-              <stop offset="100%" stop-color="#4FC3F7" stop-opacity="0" />
-            </linearGradient>
-            <linearGradient id="elevLine" x1="0" x2="1" y1="0" y2="0">
-              <stop offset="0%" stop-color="#7DD8FF" />
-              <stop offset="100%" stop-color="#4FC3F7" />
-            </linearGradient>
-          </defs>
-
-          <!-- Grid lines -->
-          <line x1="0" y1="30"  x2="400" y2="30"  stroke="#1A1E27" stroke-width="1" stroke-dasharray="2 4" />
-          <line x1="0" y1="60"  x2="400" y2="60"  stroke="#1A1E27" stroke-width="1" stroke-dasharray="2 4" />
-          <line x1="0" y1="90"  x2="400" y2="90"  stroke="#1A1E27" stroke-width="1" stroke-dasharray="2 4" />
-
-          <path
-            d="M0,110 C40,90 70,70 100,80 C130,90 160,40 200,45 C240,50 280,10 320,20 C350,25 380,5 400,15 L400,120 L0,120 Z"
-            fill="url(#elevFill)"
-          />
-          <path
-            d="M0,110 C40,90 70,70 100,80 C130,90 160,40 200,45 C240,50 280,10 320,20 C350,25 380,5 400,15"
-            fill="none"
-            stroke="url(#elevLine)"
-            stroke-width="2"
-            stroke-linecap="round"
-          />
-        </svg>
-
-        <div class="elev-axis mono">
-          <span>1500 m</span>
-          <span>2365 m</span>
-        </div>
-
-        <div class="elev-stats">
-          <div>
-            <strong class="mono">3.6<small> km</small></strong>
-            <span>Lunghezza</span>
-          </div>
-          <div>
-            <strong class="mono">+865<small> m</small></strong>
-            <span>Dislivello</span>
-          </div>
-          <div>
-            <strong>E</strong>
-            <span>Difficoltà</span>
-          </div>
-        </div>
-      </div>
+      <TripPlanner
+        :bivacco="bivacco"
+        @route-calculated="onRouteCalculated"
+        @clear-route="onClearRoute"
+      />
     </section>
 
     <!-- Legenda CAI -->
@@ -190,32 +153,6 @@ watch(
         <div class="cai-row"><span class="cai-code">E</span><span>Escursionistico</span></div>
         <div class="cai-row"><span class="cai-code">EE</span><span>Escursionisti esperti</span></div>
         <div class="cai-row"><span class="cai-code">EEA</span><span>Attrezzatura richiesta</span></div>
-      </div>
-    </section>
-
-    <!-- Tracciato GPX -->
-    <section class="section">
-      <h3 class="section-title">Tracciato GPX</h3>
-      <p class="dim">Scarica il tracciato per la navigazione offline o visualizzalo sulla mappa.</p>
-
-      <div class="gpx-actions">
-        <a href="/gpx/demo.gpx" download class="btn btn-primary btn-block">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="7 10 12 15 17 10" />
-            <line x1="12" y1="15" x2="12" y2="3" />
-          </svg>
-          Scarica GPX
-        </a>
-
-        <button class="btn btn-ghost btn-block" @click="emit('show-route', bivacco)">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21 3 6" />
-            <line x1="9" y1="3" x2="9" y2="18" />
-            <line x1="15" y1="6" x2="15" y2="21" />
-          </svg>
-          Mostra sulla mappa
-        </button>
       </div>
     </section>
 
@@ -379,11 +316,6 @@ watch(
   letter-spacing: -0.01em;
 }
 
-.section .dim {
-  font-size: 13px;
-  margin-bottom: 12px;
-}
-
 /* —— Risorse —— */
 .resource-list {
   display: flex;
@@ -406,60 +338,6 @@ watch(
 
 .res-ok { color: var(--success); font-weight: 600; }
 .res-ko { color: var(--text-tertiary); }
-
-/* —— Elevation —— */
-.elevation-svg {
-  width: 100%;
-  height: 140px;
-  display: block;
-  background: var(--bg-surface-2);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--r-md);
-}
-
-.elev-axis {
-  display: flex;
-  justify-content: space-between;
-  font-size: 11px;
-  color: var(--text-tertiary);
-  margin-top: 6px;
-}
-
-.elev-stats {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  margin-top: 14px;
-}
-
-.elev-stats div {
-  background: var(--bg-surface-2);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--r-md);
-  padding: 12px;
-  text-align: center;
-}
-
-.elev-stats strong {
-  display: block;
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  letter-spacing: -0.02em;
-  margin-bottom: 2px;
-}
-.elev-stats small {
-  color: var(--text-tertiary);
-  font-size: 0.75em;
-  font-weight: 400;
-}
-.elev-stats span {
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-tertiary);
-}
 
 /* —— Legenda CAI —— */
 .cai-grid {
@@ -491,13 +369,6 @@ watch(
   font-family: var(--font-mono);
   font-size: 12px;
   font-weight: 600;
-}
-
-/* —— GPX actions —— */
-.gpx-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
 }
 
 /* —— Review form —— */
