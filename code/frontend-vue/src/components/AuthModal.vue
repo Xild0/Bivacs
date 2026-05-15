@@ -1,7 +1,7 @@
 <script setup>
 import { reactive, ref } from 'vue'
 import Modal from './Modal.vue'
-import { registerUser, loginUser } from '../services/api'
+import { registerUser, loginUser, richiediRecuperoPassword } from '../services/api'
 
 const emit = defineEmits(['close', 'auth-changed'])
 
@@ -15,7 +15,6 @@ const loginForm = reactive({
 })
 
 const registerForm = reactive({
-  id: '',
   nome: '',
   cognome: '',
   email: '',
@@ -37,16 +36,37 @@ async function submitLogin() {
   }
 }
 
-function recoverPassword() {
-  messageType.value = 'info'
-  message.value = 'Ti invieremo un\'email con il link per reimpostare la password.'
+/**
+ * Gestisce la funzione di cambio password: riusa l'email già digitata nel form di login: 
+ * se assente avvisa l'utente, altrimenti il backend genera un token di reset e invia
+ * la mail di recupero. 
+ * @returns {Promise<void>}
+ */
+async function recoverPassword() {
+  message.value = ''
+
+  if (!loginForm.email) {
+    messageType.value = 'info'
+    message.value = 'Inserisci l\'email nel campo qui sopra, poi clicca di nuovo "Password dimenticata?".'
+    return
+  }
+
+  try {
+    messageType.value = 'info'
+    message.value = 'Invio della mail di recupero in corso...'
+    await richiediRecuperoPassword(loginForm.email)
+    messageType.value = 'success'
+    message.value = 'Email di recupero inviata. Controlla la tua casella di posta.'
+  } catch (error) {
+    messageType.value = 'error'
+    message.value = error.message
+  }
 }
 
 async function submitRegister() {
   message.value = ''
   try {
     await registerUser({
-      id: Number(registerForm.id),
       nome: registerForm.nome,
       cognome: registerForm.cognome,
       email: registerForm.email,
@@ -124,11 +144,6 @@ async function submitRegister() {
           <input v-model="registerForm.cognome" class="input" required />
         </label>
       </div>
-
-      <label class="field">
-        <span class="field-label">ID utente</span>
-        <input v-model="registerForm.id" class="input mono" type="number" placeholder="Es. 1024" required />
-      </label>
 
       <label class="field">
         <span class="field-label">Email</span>

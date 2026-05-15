@@ -4,7 +4,8 @@ const utenteSchema = new mongoose.Schema(
 {
     id: {
         type: Number, 
-        required: [true, 'L\'ID dell\'utente è obbligatorio']
+        required: [true, 'L\'ID dell\'utente è obbligatorio'],
+        unique: true
     }, 
     email: {
         type: String, 
