@@ -90,7 +90,10 @@ export async function loginUser(credentials) {
   const data = await response.json()
 
   if (!response.ok) {
-    throw new Error(data.errore || 'Errore durante il login')
+    const error = new Error(data.errore || 'Errore durante il login');
+    error.status = response.status;
+    error.codiceErrore = data.codiceErrore;
+    throw error;
   }
 
   localStorage.setItem('bivacs_token', data.token)
