@@ -16,11 +16,19 @@ const router = express.Router();
  */
 router.get('/', protectRoute, async (req, res) => {
     try {
-        // .select('-passwordHash') esclude l'hash della password dalla risposta per sicurezza
-        const profilo = await Utente.findById(req.utente.mongoId).select('-passwordHash');
+        // Usiamo UtenteRegistrato invece di Utente per essere sicuri che veda il campo 'preferiti'
+        // .populate('preferiti') trasforma gli ID in oggetti completi del Bivacco
+        const profilo = await UtenteRegistrato.findById(req.utente.mongoId)
+            .select('-passwordHash')
+            .populate('preferiti');
         
         if (!profilo) {
-            return res.status(404).json({ errore: 'Utente non trovato' });
+            // Se non lo trova come UtenteRegistrato, cerchiamo nell'Utente base (es. Staff)
+            const profiloBase = await Utente.findById(req.utente.mongoId).select('-passwordHash');
+            if (!profiloBase) {
+                return res.status(404).json({ errore: 'Utente non trovato' });
+            }
+            return res.status(200).json(profiloBase);
         }
 
         res.status(200).json(profilo);
@@ -108,5 +116,57 @@ router.delete('/', protectRoute, async (req, res) => {
         res.status(500).json({ errore: 'Errore interno del server' });
     }
 });
+
+/**
+ * Aggiunge un bivacco ai preferiti dell'utente registrato
+ * @route POST /api/v1/profilo/preferiti/:bivaccoId
+ */
+router.post('/preferiti/:bivaccoId', protectRoute, async (req, res) => {
+    try {
+        const { bivaccoId } = req.params;
+
+        // Usiamo UtenteRegistrato perché il campo 'preferiti' è definito lì
+        const utente = await UtenteRegistrato.findByIdAndUpdate(
+            req.utente.mongoId,
+            { $addToSet: { preferiti: bivaccoId } }, // $addToSet evita duplicati
+            { new: true }
+        );
+
+        if (!utente) {
+            return res.status(403).json({ errore: 'Solo gli utenti registrati possono avere preferiti' });
+        }
+
+        res.status(200).json({
+            messaggio: 'Bivacco aggiunto ai preferiti',
+            preferiti: utente.preferiti
+        });
+    } catch (error) {
+        res.status(500).json({ errore: 'Errore nell\'aggiunta ai preferiti' });
+    }
+});
+
+/**
+ * Rimuove un bivacco dai preferiti
+ * @route DELETE /api/v1/profilo/preferiti/:bivaccoId
+ */
+router.delete('/preferiti/:bivaccoId', protectRoute, async (req, res) => {
+    try {
+        const { bivaccoId } = req.params;
+
+        const utente = await UtenteRegistrato.findByIdAndUpdate(
+            req.utente.mongoId,
+            { $pull: { preferiti: bivaccoId } }, // $pull rimuove l'ID dall'array
+            { new: true }
+        );
+
+        res.status(200).json({
+            messaggio: 'Bivacco rimosso dai preferiti',
+            preferiti: utente.preferiti
+        });
+    } catch (error) {
+        res.status(500).json({ errore: 'Errore nella rimozione dai preferiti' });
+    }
+});
+
 
 module.exports = router;
