@@ -24,6 +24,10 @@ const protectRoute = (req, res, next) => {
 
     // estrazione token
     const token = authHeader.split(' ')[1];
+    // controllo per bloccare token undefined o null
+    if (!token || token === 'undefined' || token === 'null'){
+        return res.status(401).json({ errore: 'Formato token non valido.' });
+    }
 
     try {
         // verifica del token tramite chiave segreta definita nel file .env
@@ -34,7 +38,6 @@ const protectRoute = (req, res, next) => {
          * le rotte successive sapranno chi è l'utente che si sta connettendo
          */
         req.utente = extracted; 
-        
         next(); 
     } catch (error) {
         console.error('Errore validazione token:', error.message);

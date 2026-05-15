@@ -37,11 +37,17 @@ router.post('/register', async (req, res) => {
             return res.status(400).json({ errore: 'Tutti i campi sono obbligatori' });
         }
 
+        // controllo lunghezza password 
+        if (password.length < 8){
+            return res.status(400).json({ errore: 'La password deve contenente almeno 8 carateri'});
+        }
+
         // controllo mail nel Database
         const utenteEsistente = await UtenteRegistrato.findOne({ email: email });
         if (utenteEsistente) { 
             return res.status(409).json({ errore: 'Esiste già un account con questa mail' });
         }
+
 
         // hashing della password 
         const saltRounds = 12;
@@ -116,13 +122,23 @@ router.post('/login', async (req, res) => {
             return res.status(400).json({ errore: 'Email e password obbligatorie' });
         }
         
-        const utenteTrovato = await Utente.findOne({ email: email });
+        const utenteTrovato = await UtenteRegistrato.findOne({ email: email });
         
         if (!utenteTrovato) {
-            return res.status(401).json({ errore: 'Credenziali non valide' }); // Messaggio generico per sicurezza
+            return res.status(404).json({
+                errore: 'Utente non trovato, si prega di registrarsi.',
+                codiceErrore: 'UTENTE_NON_TROVATO' 
+            });
         }
         
         console.log('Email trovata nel Database: ', utenteTrovato.email);
+
+        if (!utenteTrovato.isVerified){
+            return res.status(403).json({
+                errore: 'Devi verificare la tua mail prima di poter accedere',
+                codiceErrore: 'EMAIL_NON_VERIFICATA'
+            });
+        }
 
         // confronto password in chiaro con hashing nel Database
         const verifica = await bcrypt.compare(password, utenteTrovato.passwordHash);
@@ -159,33 +175,29 @@ router.post('/login', async (req, res) => {
 router.get('/verify-email', async (req, res) => {
     try {
         const tokenSporco = req.query.token;
-        const tokenUrl = tokenSporco.replace(/['"]/g, '');
-        console.log("Token ricevuto da URL: ", tokenUrl);
 
-        if (!tokenUrl) {
-            return res.status(400).json({ errore: 'Nessun token di verifica fornito.' });
+        if (!tokenSporco){
+            return res.redirect('http://localhost:5173/?verificato=false&motivo=notoken');
         }
 
+        const tokenUrl = tokenSporco.replace(/['"]/g, '');
+        console.log("Token ricevuto da URL: ", tokenUrl);
         const utente = await UtenteRegistrato.findOne({ emailToken: tokenUrl });
 
         if (!utente) {
-            return res.status(400).json({ errore: 'Token non valido, scaduto o account già verificato.' });
             return res.redirect('http://localhost:5173/?verificato=false');
         }
 
         // Account attivato
         utente.isVerified = true;
-        
         utente.emailToken = null; 
-
         await utente.save();
 
-        res.status(200).json({ messaggio: 'Email verificata con successo! Ora puoi effettuare il login.' });
         return res.redirect('http://localhost:5173/?verificato=true');
 
     } catch (error) {
         console.error('Errore durante la verifica dell\'email:', error);
-        return res.status(500).json({ errore: 'Errore interno del server' });
+        return res.redirect('http://localhost:5173/?verificato=false&motivo=servererror');
     }
 });
 

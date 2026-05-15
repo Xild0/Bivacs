@@ -31,8 +31,16 @@ async function submitLogin() {
     emit('auth-changed')
     setTimeout(() => emit('close'), 700)
   } catch (error) {
-    messageType.value = 'error'
-    message.value = error.message
+    if (error.codiceErrore === 'EMAIL_NON_VERIFICATA'){
+      messageType.value = 'error'
+      message.value = 'Devi prima verificate la tua email! Controlla la tua casella di posta'
+    } else if (error.codiceErrore === 'UTENTE_NON_TROVATO'){
+      messageType.value = 'error'
+      message.value = error.message
+    } else {
+      messageType.value = 'error'
+      message.value = error.message
+    }
   }
 }
 
@@ -75,7 +83,7 @@ async function submitRegister() {
     })
 
     messageType.value = 'success'
-    message.value = 'Registrazione completata. Ora puoi accedere.'
+    message.value = 'Registrazione completata. Verifica la tua email e potrai accedere.'
     mode.value = 'login'
   } catch (error) {
     messageType.value = 'error'
