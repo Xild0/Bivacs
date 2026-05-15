@@ -15,7 +15,11 @@ const utenteRegistratoSchema = new mongoose.Schema(
     dataNascita: {
         type: Date,
         required: [true, 'La data di nascita è obbligatoria']
-    }
+    },
+    preferiti: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Bivacco'
+    }]
 },
 {
     timestamps: true
