@@ -145,6 +145,29 @@ watch(
       />
     </section>
 
+    <!-- Contatti emergenza -->
+    <section class="section">
+      <h3 class="section-title">Contatti di emergenza</h3>
+
+      <div class="emergency-grid">
+        <a href="tel:112" class="emergency-card">
+          <span class="emergency-number mono">112</span>
+          <span>Numero unico emergenze</span>
+        </a>
+
+        <a href="tel:118" class="emergency-card">
+          <span class="emergency-number mono">118</span>
+          <span>Soccorso sanitario e alpino</span>
+        </a>
+
+        <a href="tel:112" class="emergency-card emergency-wide">
+          <span class="emergency-number mono">SOS</span>
+          <span>Soccorso Alpino: comunicare posizione, quota e condizioni meteo</span>
+        </a>
+      </div>
+    </section>
+
+
     <!-- Legenda CAI -->
     <section class="section">
       <h3 class="section-title">Legenda CAI</h3>
@@ -474,4 +497,48 @@ watch(
   .facts { grid-template-columns: 1fr; }
   .cai-grid { grid-template-columns: 1fr; }
 }
+
+.emergency-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.emergency-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
+  border-radius: var(--r);
+  color: var(--text-primary);
+  text-decoration: none;
+  font-size: 13px;
+}
+
+.emergency-card:hover {
+  background: rgba(248, 113, 113, 0.22);
+}
+
+.emergency-number {
+  color: var(--danger);
+  font-weight: 700;
+  font-size: 1.2rem;
+}
+
+.emergency-wide {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 480px) {
+  .emergency-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .emergency-wide {
+    grid-column: auto;
+  }
+}
+
 </style>

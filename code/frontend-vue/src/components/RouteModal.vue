@@ -138,19 +138,17 @@ function formatDurationFromDb(value) {
 
   return m === 0 ? `${h} h` : `${h} h ${m} min`
 }
-
 function parseGpx(xmlText) {
   const parser = new DOMParser()
   const xml = parser.parseFromString(xmlText, 'application/xml')
-  let points = [...xml.querySelectorAll('trkpt')]
 
-    if (points.length === 0) {
-    points = [...xml.querySelectorAll('rtept')]
-    }
+  const allNodes = Array.from(xml.getElementsByTagName('*'))
 
-    if (points.length === 0) {
-    points = [...xml.querySelectorAll('wpt')]
-    }
+  let points = allNodes.filter(node =>
+    node.localName === 'trkpt' ||
+    node.localName === 'rtept' ||
+    node.localName === 'wpt'
+  )
 
   let cumulativeDistance = 0
   let previous = null
@@ -161,8 +159,9 @@ function parseGpx(xmlText) {
   points.forEach((point) => {
     const lat = Number(point.getAttribute('lat'))
     const lng = Number(point.getAttribute('lon'))
-    const eleTag = point.querySelector('ele')
-    const ele = eleTag ? Number(eleTag.textContent) : null
+
+    const eleNode = Array.from(point.children).find(child => child.localName === 'ele')
+    const ele = eleNode ? Number(eleNode.textContent) : null
 
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return
 
