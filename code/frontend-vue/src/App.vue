@@ -11,6 +11,7 @@ import EmergencyModal from './components/EmergencyModal.vue'
 import AuthModal from './components/AuthModal.vue'
 import ProfileModal from './components/ProfileModal.vue'
 import RouteModal from './components/RouteModal.vue'
+import ResetPassword from './components/ResetPassword.vue'
 
 import { getBivacchi, getBivaccoById, isLoggedIn } from './services/api'
 
@@ -24,6 +25,9 @@ const showEmergency = ref(false)
 const showAuth = ref(false)
 const showProfile = ref(false)
 const logged = ref(isLoggedIn())
+
+const resetTokenAttivo = ref(null)
+const notTemp = ref({ visible: false, type: 'info', text: ''})
 
 async function loadBivacchi(filters = {}) {
   loading.value = true
@@ -76,6 +80,65 @@ function onClearRoute() {
 function refreshAuth() {
   logged.value = isLoggedIn()
 }
+
+/**
+ * Mostra una notifica temporanea (notTemp) in sovrimpressione.
+ *
+ * @param {string} text testo da mostrare all'utente
+ * @param {'info'|'success'|'error'} [type='info'] tipo di avviso, condiziona il colore
+ * @param {number} [durata=4000] millisecondi di permanenza a schermo
+ * @returns {void}
+ */
+function mostraNotTemp(text, type = 'info', durata = 4000) {
+  notTemp.value = { visible: true, type, text }
+  setTimeout(() => { notTemp.value.visible = false }, durata)
+}
+
+/**
+ * All'avvio dell'app, ispeziona l'URL e gestisce
+ * i due link che arrivano via email:
+ *   - ?verificato=true|false  → esito verifica email
+ *   - ?reset=<token>          → reset password
+ *
+ * @returns {void}
+ */
+function gestisciQueryString() {
+  const params = new URLSearchParams(window.location.search)
+
+  const verificato = params.get('verificato')
+  if (verificato === 'true') {
+    mostraNotTemp('Email verificata! Ora puoi accedere.', 'success')
+  } else if (verificato === 'false') {
+    mostraNotTemp('Link di verifica non valido o già usato.', 'error')
+  }
+
+  const reset = params.get('reset')
+  if (reset) {
+    resetTokenAttivo.value = reset
+  }
+
+  if (verificato || reset) {
+    window.history.replaceState({}, '', window.location.pathname)
+  }
+}
+
+/**
+ * Handler dell'evento globale 'bivacs:auth-expired' emesso quando il backend risponde 401. 
+ * Aggiorna lo stato locale di login e avvisa l'utente con una notifica temporanea.
+ *
+ * @returns {void}
+ */
+function gestisciSessioneScaduta() {
+  logged.value = false
+  mostraNotTemp('La tua sessione è scaduta. Effettua di nuovo l\'accesso.', 'error', 6000)
+}
+
+onMounted(() => {
+  loadBivacchi()
+  gestisciQueryString()
+  window.addEventListener('bivacs:auth-expired', gestisciSessioneScaduta)
+})
+
 
 onMounted(() => {
   loadBivacchi()
@@ -237,6 +300,18 @@ onMounted(() => {
           :bivacco="routeModal.bivacco"
           @close="routeModal = null"
         />
+    
+    <ResetPasswordModal
+      v-if="resetTokenAttivo"
+      :token="resetTokenAttivo"
+      @close="resetTokenAttivo = null"
+      @reset-success="logged = false"
+    />
+
+    <div v-if="toast.visible" class="toast" :class="`toast-${toast.type}`">
+      {{ toast.text }}
+    </div>
+
   </div>
 </template>
 
@@ -496,4 +571,14 @@ onMounted(() => {
   color: var(--text-dim);
   letter-spacing: 0.06em;
 }
+
+.toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+  padding: 12px 20px; border-radius: var(--r-md); font-size: 14px;
+  z-index: 9999; max-width: 90vw; box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+}
+.toast-info    { background: var(--accent-bg); border: 1px solid var(--accent-border); color: var(--accent-hi); }
+.toast-success { background: var(--success-bg); border: 1px solid rgba(52,211,153,0.28); color: var(--success); }
+.toast-error   { background: var(--danger-bg); border: 1px solid var(--danger-border); color: var(--danger); }
+
 </style>

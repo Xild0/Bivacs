@@ -11,6 +11,7 @@ const Utente = require('../models/utente');
 const UtenteRegistrato = require('../models/utenteRegistrato');
 const {protectRoute} = require('../middlewares/authMiddleware')
 const inviaEmail = require('../utils/emailService');
+const getNewSequence = require('../utils/getNewSequence');
 const crypto = require('crypto');
 const router = express.Router();
 
@@ -29,10 +30,10 @@ router.post('/register', async (req, res) => {
 
     try { 
         // estrazione dati dal body 
-        const { id, nome, cognome, email, password, dataNascita } = req.body;
+        const { nome, cognome, email, password, dataNascita } = req.body;
 
         // controllo dei campi obbligatori
-        if (!id || !nome || !cognome || !email || !password || !dataNascita) {
+        if (!nome || !cognome || !email || !password || !dataNascita) {
             return res.status(400).json({ errore: 'Tutti i campi sono obbligatori' });
         }
 
@@ -45,12 +46,13 @@ router.post('/register', async (req, res) => {
         // hashing della password 
         const saltRounds = 12;
         const hashedPassword = await bcrypt.hash(password, saltRounds);
-
         const verificaToken = crypto.randomBytes(32).toString('hex');
+
+        const idAggiornato = await getNewSequence('utendeId');
 
         // creazione istanza UtenteRegistrato
         const nuovoUtente = new UtenteRegistrato({
-            id: id, 
+            id: idAggiornato, 
             nome: nome, 
             cognome: cognome, 
             email: email, 
@@ -69,7 +71,7 @@ router.post('/register', async (req, res) => {
         const htmlContent = `
             <h1>Benvenuto su Bivacs!</h1>
             <p>Ciao ${nome}, clicca sul pulsante qui sotto per confermare la tua email:</p>
-            <a href=${linkVerifica}" style="background: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
+            <a href="${linkVerifica}" style="background: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
                 Conferma account
             </a>
         `;
@@ -168,6 +170,7 @@ router.get('/verify-email', async (req, res) => {
 
         if (!utente) {
             return res.status(400).json({ errore: 'Token non valido, scaduto o account già verificato.' });
+            return res.redirect('http://localhost:5173/?verificato=false');
         }
 
         // Account attivato
@@ -177,13 +180,8 @@ router.get('/verify-email', async (req, res) => {
 
         await utente.save();
 
-        /**
-         * NOTA PER IL FUTURO (Frontend):
-         * Quando avrete le pagine HTML pronte, invece di rispondere con un JSON
-         * potrai fare un reindirizzamento alla pagina di successo, es:
-         * return res.redirect('http://localhost:3000/login?verificato=true');
-         */
         res.status(200).json({ messaggio: 'Email verificata con successo! Ora puoi effettuare il login.' });
+        return res.redirect('http://localhost:5173/?verificato=true');
 
     } catch (error) {
         console.error('Errore durante la verifica dell\'email:', error);
@@ -216,7 +214,7 @@ router.post('/recupero_password', async (req, res) => {
         utente.resetPassExpires = Date.now() + 3600000; // 1 ora da adesso
         await utente.save();
 
-        const linkReset = `http://localhost:3000/reset-password/${resetToken}`; // Link che porterà al frontend
+        const linkReset = `http://localhost:5173/?reset=${resetToken}`; // Link che porterà al frontend
         await inviaEmail(email, "Recupero Password Bivacs", `Clicca qui per resettare: ${linkReset}`);
 
         res.json({ messaggio: "Email di recupero inviata!" });

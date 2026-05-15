@@ -300,3 +300,125 @@ export async function getPercorsiByBivacco(bivaccoId) {
 
   return await response.json()
 }
+
+/**
+ * Inietta in maniera automatica l'header Authorization con il JWT salvato e, 
+ * se il backend risponde 401 (token scaduto o non valido),effettua il logout locale 
+ * ed emette un evento custom 'bivacs:auth-expired' che i componenti possono ascoltare 
+ * per aggiornare lo stato e mostrare un avviso.
+ *
+ * @param {string} url
+ * @param {RequestInit} [options={}] - opzioni standard fetch
+ * @returns {Promise<Response>} response originale, da consumare con .json() nel chiamante
+ */
+async function fetchAuth(url, options = {}) {
+  const token = getToken()
+
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      ...(options.headers || {}),
+      Authorization: `Bearer ${token}`
+    }
+  })
+
+  if (response.status === 401) {
+    logoutUser()
+    window.dispatchEvent(new CustomEvent('bivacs:auth-expired'))
+  }
+
+  return response
+}
+
+/**
+ * Avvia la procedura di recupero password: invia l'email al backend, 
+ * che genera un token di reset valido un'ora e 
+ * invia all'utente un link via posta elettronica.
+ *
+ * @param {string} email - email dell'account per cui recuperare la password
+ * @returns {Promise<{messaggio: string}>} conferma di invio della mail di recupero
+ * @throws {Error} se l'email non esiste a sistema o se c'è un errore di rete
+ */
+export async function richiediRecuperoPassword(email) {
+  const response = await fetch(`${API_URL}/auth/recupero_password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email })
+  })
+
+  const data = await response.json()
+
+  if (!response.ok) {
+    throw new Error(data.errore || 'Errore durante la richiesta di recupero')
+  }
+
+  return data
+}
+
+/**
+ * Completa la procedura di recupero password settando una nuova password.
+ * Il token monouso arriva all'utente via mail e viene passato come parametro di URL così
+ * il backend lo valida e aggiorna l'hash.
+ *
+ * @param {string} token token di reset via email
+ * @param {string} nuovaPassword nuova password in chiaro (verrà hashata lato server)
+ * @returns {Promise<{messaggio: string}>} conferma di avvenuta modifica
+ * @throws {Error}
+ */
+export async function resetPassword(token, nuovaPassword) {
+  const response = await fetch(`${API_URL}/auth/reset-password/${token}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nuovaPassword })
+  })
+
+  const data = await response.json()
+
+  if (!response.ok) {
+    throw new Error(data.errore || 'Errore durante il reset della password')
+  }
+
+  return data
+}
+
+/**
+ * Aggiunge un bivacco alla lista dei preferiti dell'utente loggato.
+ *
+ * @param {string} bivaccoId id del bivacco da aggiungere
+ * @returns {Promise<{messaggio: string, preferiti: string[]}>} lista aggiornata di ObjectId
+ * @throws {Error}
+ */
+export async function aggiungiPreferito(bivaccoId) {
+  const response = await fetchAuth(`${API_URL}/profilo/preferiti/${bivaccoId}`, {
+    method: 'POST'
+  })
+
+  const data = await response.json()
+
+  if (!response.ok) {
+    throw new Error(data.errore || 'Errore aggiunta ai preferiti')
+  }
+
+  return data
+}
+
+/**
+ * Rimuove un bivacco dalla lista dei preferiti dell'utente loggato.
+ *
+ * @param {string} bivaccoId 
+ * @returns {Promise<{messaggio: string, preferiti: string[]}>} 
+ * @throws {Error} 
+ */
+export async function rimuoviPreferito(bivaccoId) {
+  const response = await fetchAuth(`${API_URL}/profilo/preferiti/${bivaccoId}`, {
+    method: 'DELETE'
+  })
+
+  const data = await response.json()
+
+  if (!response.ok) {
+    throw new Error(data.errore || 'Errore rimozione dai preferiti')
+  }
+
+  return data
+}
