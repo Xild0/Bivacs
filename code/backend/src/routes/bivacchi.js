@@ -3,6 +3,7 @@ const router = express.Router();
 
 const Bivacco = require('../models/bivacco');
 const Percorso = require('../models/percorso');
+const {protectRoute} = require('../middlewares/authMiddleware');
 
 /** @param {unknown} err */
 const getErrorMessage = (err) =>
@@ -254,5 +255,67 @@ router.get('/:id/percorsi', async (req, res) => {
     })
   }
 })
+
+/**
+ * PATCH aggiorna stato risorse (acqua e legna)
+ * Accessibile solo a utenti registrati tramite protectRoute
+ * /api/v1/bivacchi/:id/risorse
+ */
+router.patch('/:id/risorse', protectRoute, async (req, res) => {
+  try {
+    const { acquaPresente, legnaDisponibile } = req.body;
+
+    // Creiamo un oggetto con i soli campi che vogliamo permettere di aggiornare
+    const aggiornamenti = {};
+    
+    if (acquaPresente !== undefined) {
+        aggiornamenti.acquaPresente = acquaPresente;
+    }
+    
+    if (legnaDisponibile !== undefined) {
+        aggiornamenti.legnaDisponibile = legnaDisponibile;
+    }
+
+    // Se l'utente non ha inviato nessuno dei due campi, restituiamo errore
+    if (Object.keys(aggiornamenti).length === 0) {
+      return res.status(400).json({
+        message: 'Fornire almeno uno tra acquaPresente o legnaDisponibile'
+      });
+    }
+
+    // Aggiorniamo anche la data dell'ultimo check (definita nel tuo schema)
+    aggiornamenti.ultimoCheckStato = Date.now();
+
+    const bivaccoAggiornato = await Bivacco.findByIdAndUpdate(
+      req.params.id,
+      { $set: aggiornamenti },
+      { 
+        new: true,           // Restituisce il documento dopo la modifica
+        runValidators: true  // Valida i dati contro lo schema Mongoose
+      }
+    );
+
+    if (!bivaccoAggiornato) {
+      return res.status(404).json({
+        message: 'Bivacco non trovato'
+      });
+    }
+
+    res.status(200).json({
+      message: 'Stato risorse aggiornato con successo',
+      bivacco: bivaccoAggiornato
+    });
+
+  } catch (err) {
+    if (err instanceof Error && err.name === 'CastError') {
+      return res.status(400).json({ message: 'ID bivacco non valido' });
+    }
+
+    res.status(500).json({
+      message: 'Errore aggiornamento risorse',
+      error: getErrorMessage(err)
+    });
+  }
+});
 
 module.exports = router;
