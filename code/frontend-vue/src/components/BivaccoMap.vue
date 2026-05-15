@@ -106,18 +106,6 @@ Object.entries(coordinateOverride).forEach(([key, coords]) => {
   }
 })
 
-      if (bivacco.nome?.toLowerCase().includes('bailoni')) {
-        markerLat = 46.02310
-        markerLng = 11.18125
-        console.log('FORZO BAILONI:', markerLat, markerLng)
-      }
-      
-      console.log('MARKER MAPPA:', bivacco.nome, {
-        id: bivacco._id,
-        latitudine: lat,
-        longitudine: lng,
-        altitudine: bivacco.altitudine
-      })
 
     if (lat < 45.6 || lat > 46.6 || lng < 10.4 || lng > 12.0) {
     console.warn('Coordinate sospette per bivacco:', bivacco.nome, {

@@ -157,8 +157,9 @@ onMounted(() => {
     <Hero :bivacchi="bivacchi" />
 
     <main class="container main">
-      <Filters @search="loadBivacchi" />
-
+      <Filters
+        @search="loadBivacchi"
+      />
       <div class="results">
         <!-- LEFT: cards/map -->
         <section class="results-pane">

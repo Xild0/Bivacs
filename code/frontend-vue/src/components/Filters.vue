@@ -1,5 +1,12 @@
 <script setup>
-import { reactive } from 'vue'
+import { reactive, computed } from 'vue'
+
+const props = defineProps({
+  bivacchi: {
+    type: Array,
+    default: () => []
+  }
+})
 
 const emit = defineEmits(['search'])
 
@@ -10,6 +17,27 @@ const filters = reactive({
   altitudineMax: '',
   postiLetto: ''
 })
+
+const suggerimentiNome = computed(() => {
+  const q = filters.nome.trim().toLowerCase()
+
+  if (q.length === 0) return []
+
+  return props.bivacchi
+    .filter(b => {
+      const nomePulito = (b.nome || '')
+        .replace(/^bivacco\s+/i, '')
+        .toLowerCase()
+
+      return nomePulito.startsWith(q)
+    })
+    .slice(0, 6)
+})
+
+function selezionaNome(nome) {
+  filters.nome = nome
+  submitSearch()
+}
 
 function submitSearch() {
   emit('search', { ...filters })
@@ -47,6 +75,19 @@ function resetFilters() {
           </svg>
         </span>
         <input v-model="filters.nome" class="input field-input" placeholder="Nome bivacco" />
+        
+        <div v-if="suggerimentiNome.length" class="suggestions">
+          <button
+            v-for="b in suggerimentiNome"
+            :key="b._id"
+            type="button"
+            class="suggestion"
+            @click="selezionaNome(b.nome)"
+          >
+            {{ b.nome }}
+          </button>
+        </div>
+
       </label>
 
       <label class="field">
@@ -183,5 +224,33 @@ function resetFilters() {
   .filters-grid {
     grid-template-columns: 1fr;
   }
+}
+
+
+.suggestions {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 50;
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+
+.suggestion {
+  width: 100%;
+  padding: 10px 14px 10px 38px;
+  text-align: left;
+  color: var(--text-secondary);
+  font-size: 13px;
+  background: transparent;
+}
+
+.suggestion:hover {
+  background: var(--bg-surface-3);
+  color: var(--text-primary);
 }
 </style>

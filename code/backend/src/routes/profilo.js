@@ -3,7 +3,6 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const Utente = require('../models/utente');
 const UtenteRegistrato = require('../models/utenteRegistrato');
-const proteggiRotta = require('../middlewares/authMiddleware');
 const {protectRoute} = require('../middlewares/authMiddleware');
 
 const router = express.Router();
@@ -19,19 +18,20 @@ router.get('/', protectRoute, async (req, res) => {
     try {
         // Usiamo UtenteRegistrato invece di Utente per essere sicuri che veda il campo 'preferiti'
         // .populate('preferiti') trasforma gli ID in oggetti completi del Bivacco
-        const profiloDoc = await UtenteRegistrato.findById(req.utente.mongoId)
+        const profilo = await UtenteRegistrato.findById(req.utente.mongoId)
             .select('-passwordHash')
             .populate('preferiti');
         
-        if (!profiloDoc) {
+        if (!profilo) {
             // Se non lo trova come UtenteRegistrato, cerchiamo nell'Utente base (es. Staff)
             const profiloBase = await Utente.findById(req.utente.mongoId).select('-passwordHash');
             if (!profiloBase) {
                 return res.status(404).json({ errore: 'Utente non trovato' });
             }
+
             return res.status(200).json(profiloBase);
         }
-        const profilo = profiloDoc.toObject();
+        const profilo = utente.toObject();
 
         // Per ogni bivacco nei preferiti, recuperiamo l'ultimo dato meteo
         // Usiamo un ciclo for...of per gestire le chiamate asincrone in modo pulito

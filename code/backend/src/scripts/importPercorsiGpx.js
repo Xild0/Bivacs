@@ -47,11 +47,13 @@ function parseGpx(filePath) {
   const validPoints = points
     .map(p => ({
       lat: Number(p.lat),
-      lon: Number(p.lon)
+      lon: Number(p.lon),
+      ele: p.ele !== undefined ? Number(p.ele) : null
     }))
     .filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lon))
 
   let lunghezzaMetri = 0
+  let dislivelloPos = 0
 
   for (let i = 1; i < validPoints.length; i++) {
     lunghezzaMetri += haversine(
@@ -60,6 +62,14 @@ function parseGpx(filePath) {
       validPoints[i].lat,
       validPoints[i].lon
     )
+
+    const prevEle = validPoints[i - 1].ele
+    const currEle = validPoints[i].ele
+
+    if (Number.isFinite(prevEle) && Number.isFinite(currEle)) {
+      const diff = currEle - prevEle
+      if (diff > 0) dislivelloPos += diff
+    }
   }
 
   const firstPoint = validPoints[0] || null
@@ -67,6 +77,7 @@ function parseGpx(filePath) {
 
   return {
     lunghezzaKm: Math.round((lunghezzaMetri / 1000) * 100) / 100,
+    dislivello: Math.round(dislivelloPos),
     punti: validPoints.length,
     firstPoint,
     lastPoint,
@@ -208,7 +219,7 @@ const files = getAllGpxFiles(GPX_FOLDER)
         gpxFile: file,
         lunghezza: dati.lunghezzaKm,
         durataStimata: Math.round(dati.lunghezzaKm * 25),
-        dislivello: 0,
+        dislivello: dati.dislivello,
         difficolta: 'E',
         tipo: 'ottimale'
       }
