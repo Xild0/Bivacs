@@ -5,7 +5,7 @@ import { resetPassword } from '../services/api'
 
 /**
  * Props del componente.
- * @typedef {Object} ResetPasswordModalProps
+ * @typedef {Object} ResetPasswordProps
  * @property {string} token - token monouso ricevuto dalla query string ?reset=...
  */
 const props = defineProps({

@@ -301,15 +301,15 @@ onMounted(() => {
           @close="routeModal = null"
         />
     
-    <ResetPasswordModal
+    <ResetPassword
       v-if="resetTokenAttivo"
       :token="resetTokenAttivo"
       @close="resetTokenAttivo = null"
       @reset-success="logged = false"
     />
 
-    <div v-if="toast.visible" class="toast" :class="`toast-${toast.type}`">
-      {{ toast.text }}
+    <div v-if="notTemp.visible" class="notTemp" :class="`notTemp-${notTemp.type}`">
+      {{ notTemp.text }}
     </div>
 
   </div>
@@ -572,13 +572,13 @@ onMounted(() => {
   letter-spacing: 0.06em;
 }
 
-.toast {
+.notTemp {
   position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
   padding: 12px 20px; border-radius: var(--r-md); font-size: 14px;
   z-index: 9999; max-width: 90vw; box-shadow: 0 8px 24px rgba(0,0,0,0.3);
 }
-.toast-info    { background: var(--accent-bg); border: 1px solid var(--accent-border); color: var(--accent-hi); }
-.toast-success { background: var(--success-bg); border: 1px solid rgba(52,211,153,0.28); color: var(--success); }
-.toast-error   { background: var(--danger-bg); border: 1px solid var(--danger-border); color: var(--danger); }
+.notTemp-info    { background: var(--accent-bg); border: 1px solid var(--accent-border); color: var(--accent-hi); }
+.notTemp-success { background: var(--success-bg); border: 1px solid rgba(52,211,153,0.28); color: var(--success); }
+.notTemp-error   { background: var(--danger-bg); border: 1px solid var(--danger-border); color: var(--danger); }
 
 </style>

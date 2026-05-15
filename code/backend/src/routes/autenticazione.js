@@ -185,7 +185,7 @@ router.get('/verify-email', async (req, res) => {
 
     } catch (error) {
         console.error('Errore durante la verifica dell\'email:', error);
-        res.status(500).json({ errore: 'Errore interno del server' });
+        return res.status(500).json({ errore: 'Errore interno del server' });
     }
 });
 
