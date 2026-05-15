@@ -30,6 +30,18 @@ router.get('/', protectRoute, async (req, res) => {
             }
             return res.status(200).json(profiloBase);
         }
+        const profilo = utente.toObject();
+
+        // Per ogni bivacco nei preferiti, recuperiamo l'ultimo dato meteo
+        // Usiamo un ciclo for...of per gestire le chiamate asincrone in modo pulito
+        for (let bivacco of profilo.preferiti) {
+            const meteo = await mongoose.model('DatoMeteo').findOne({ bivacco: bivacco._id })
+                .sort({ aggiornato: -1 }); // Prende il record più recente
+
+            // Aggiungiamo l'allerta direttamente all'oggetto bivacco nella lista
+            bivacco.allertaAttiva = meteo ? meteo.allertaPAT : false;
+            bivacco.livelloRischio = meteo ? meteo.livelloRischio : null;
+        }
 
         res.status(200).json(profilo);
     } catch (error) {
