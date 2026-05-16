@@ -13,7 +13,7 @@ import ProfileModal from './components/ProfileModal.vue'
 import RouteModal from './components/RouteModal.vue'
 import ResetPassword from './components/ResetPassword.vue'
 
-import { getBivacchi, getBivaccoById, isLoggedIn } from './services/api'
+import { getBivacchi, getBivaccoById, isLoggedIn, getProfile } from './services/api'
 
 const bivacchi = ref([])
 const viewMode = ref('list')
@@ -25,6 +25,8 @@ const showEmergency = ref(false)
 const showAuth = ref(false)
 const showProfile = ref(false)
 const logged = ref(isLoggedIn())
+const currentUser = ref(null)
+const preferitiIds = ref([])
 
 const resetTokenAttivo = ref(null)
 const notTemp = ref({ visible: false, type: 'info', text: ''})
@@ -79,6 +81,36 @@ function onClearRoute() {
 
 function refreshAuth() {
   logged.value = isLoggedIn()
+  loadUserData()
+}
+
+async function loadUserData() {
+  if (!isLoggedIn()) {
+    currentUser.value = null
+    preferitiIds.value = []
+    return
+  }
+
+  try {
+    const data = await getProfile()
+    currentUser.value = data
+    preferitiIds.value = (data.preferiti || []).map(p => p._id || p)
+  } catch (error) {
+    console.error('Errore caricamento dati utente:', error)
+    currentUser.value = null
+    preferitiIds.value = []
+  }
+}
+
+function onFavoriteChanged(preferiti) {
+  preferitiIds.value = preferiti.map(p => p._id || p)
+}
+
+async function refreshSelectedBivacco() {
+  if (!selectedBivacco.value?._id) return
+
+  selectedBivacco.value = await getBivaccoById(selectedBivacco.value._id)
+  await loadBivacchi()
 }
 
 /**
@@ -135,13 +167,9 @@ function gestisciSessioneScaduta() {
 
 onMounted(() => {
   loadBivacchi()
+  loadUserData()
   gestisciQueryString()
   window.addEventListener('bivacs:auth-expired', gestisciSessioneScaduta)
-})
-
-
-onMounted(() => {
-  loadBivacchi()
 })
 </script>
 
@@ -158,6 +186,7 @@ onMounted(() => {
 
     <main class="container main">
       <Filters
+        :bivacchi="bivacchi"
         @search="loadBivacchi"
       />
       <div class="results">
@@ -223,7 +252,10 @@ onMounted(() => {
               v-for="bivacco in bivacchi"
               :key="bivacco._id"
               :bivacco="bivacco"
+              :is-logged="logged"
+              :is-favorite="preferitiIds.includes(bivacco._id)"
               @open="openDetails"
+              @favorite-changed="onFavoriteChanged"
             />
           </div>
 
@@ -252,8 +284,11 @@ onMounted(() => {
           <BivaccoDetails
             v-if="selectedBivacco"
             :bivacco="selectedBivacco"
+            :is-logged="logged"
+            :current-user="currentUser"
             @route-calculated="onRouteCalculated"
             @clear-route="onClearRoute"
+            @bivacco-updated="refreshSelectedBivacco"
           />
 
           <div v-else class="placeholder">
@@ -293,6 +328,7 @@ onMounted(() => {
       v-if="showProfile"
       @close="showProfile = false"
       @auth-changed="refreshAuth"
+      @open-bivacco="openDetails"
     />
 
     <RouteModal

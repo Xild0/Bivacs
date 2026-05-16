@@ -16,32 +16,19 @@ const router = express.Router();
  */
 router.get('/', protectRoute, async (req, res) => {
     try {
-        // Usiamo UtenteRegistrato invece di Utente per essere sicuri che veda il campo 'preferiti'
-        // .populate('preferiti') trasforma gli ID in oggetti completi del Bivacco
         const profilo = await UtenteRegistrato.findById(req.utente.mongoId)
             .select('-passwordHash')
             .populate('preferiti');
-        
+
         if (!profilo) {
-            // Se non lo trova come UtenteRegistrato, cerchiamo nell'Utente base (es. Staff)
-            const profiloBase = await Utente.findById(req.utente.mongoId).select('-passwordHash');
+            const profiloBase = await Utente.findById(req.utente.mongoId)
+                .select('-passwordHash');
+
             if (!profiloBase) {
                 return res.status(404).json({ errore: 'Utente non trovato' });
             }
 
             return res.status(200).json(profiloBase);
-        }
-        const profilo = utente.toObject();
-
-        // Per ogni bivacco nei preferiti, recuperiamo l'ultimo dato meteo
-        // Usiamo un ciclo for...of per gestire le chiamate asincrone in modo pulito
-        for (let bivacco of profilo.preferiti) {
-            const meteo = await mongoose.model('DatoMeteo').findOne({ bivacco: bivacco._id })
-                .sort({ aggiornato: -1 }); // Prende il record più recente
-
-            // Aggiungiamo l'allerta direttamente all'oggetto bivacco nella lista
-            bivacco.allertaAttiva = meteo ? meteo.allertaPAT : false;
-            bivacco.livelloRischio = meteo ? meteo.livelloRischio : null;
         }
 
         res.status(200).json(profilo);

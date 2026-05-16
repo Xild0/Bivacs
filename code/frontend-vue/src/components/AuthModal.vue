@@ -7,7 +7,9 @@ const emit = defineEmits(['close', 'auth-changed'])
 
 const mode = ref('login')
 const message = ref('')
-const messageType = ref('info') // 'info' | 'error' | 'success'
+const messageType = ref('info')
+
+const showPasswords = ref(false)
 
 const loginForm = reactive({
   email: '',
@@ -24,6 +26,7 @@ const registerForm = reactive({
 
 async function submitLogin() {
   message.value = ''
+
   try {
     await loginUser(loginForm)
     messageType.value = 'success'
@@ -31,31 +34,22 @@ async function submitLogin() {
     emit('auth-changed')
     setTimeout(() => emit('close'), 700)
   } catch (error) {
-    if (error.codiceErrore === 'EMAIL_NON_VERIFICATA'){
-      messageType.value = 'error'
-      message.value = 'Devi prima verificate la tua email! Controlla la tua casella di posta'
-    } else if (error.codiceErrore === 'UTENTE_NON_TROVATO'){
-      messageType.value = 'error'
-      message.value = error.message
+    messageType.value = 'error'
+
+    if (error.codiceErrore === 'EMAIL_NON_VERIFICATA') {
+      message.value = 'Devi prima verificare la tua email. Controlla la tua casella di posta.'
     } else {
-      messageType.value = 'error'
       message.value = error.message
     }
   }
 }
 
-/**
- * Gestisce la funzione di cambio password: riusa l'email già digitata nel form di login: 
- * se assente avvisa l'utente, altrimenti il backend genera un token di reset e invia
- * la mail di recupero. 
- * @returns {Promise<void>}
- */
 async function recoverPassword() {
   message.value = ''
 
   if (!loginForm.email) {
     messageType.value = 'info'
-    message.value = 'Inserisci l\'email nel campo qui sopra, poi clicca di nuovo "Password dimenticata?".'
+    message.value = 'Inserisci l’email nel campo qui sopra, poi clicca di nuovo "Password dimenticata?".'
     return
   }
 
@@ -73,6 +67,7 @@ async function recoverPassword() {
 
 async function submitRegister() {
   message.value = ''
+
   try {
     await registerUser({
       nome: registerForm.nome,
@@ -102,16 +97,18 @@ async function submitRegister() {
     <div class="tabs">
       <button
         :class="{ active: mode === 'login' }"
-        @click="mode = 'login'; message = ''"
+        @click="mode = 'login'; message = ''; showPasswords = false"
       >
         Accedi
       </button>
+
       <button
         :class="{ active: mode === 'register' }"
-        @click="mode = 'register'; message = ''"
+        @click="mode = 'register'; message = ''; showPasswords = false"
       >
         Registrati
       </button>
+
       <span class="tab-indicator" :class="mode"></span>
     </div>
 
@@ -123,12 +120,29 @@ async function submitRegister() {
     <form v-if="mode === 'login'" class="form" @submit.prevent="submitLogin">
       <label class="field">
         <span class="field-label">Email</span>
-        <input v-model="loginForm.email" class="input" type="email" placeholder="nome@example.it" required />
+        <input
+          v-model="loginForm.email"
+          class="input"
+          type="email"
+          placeholder="nome@example.it"
+          required
+        />
       </label>
 
       <label class="field">
         <span class="field-label">Password</span>
-        <input v-model="loginForm.password" class="input" type="password" placeholder="••••••••" required />
+        <input
+          v-model="loginForm.password"
+          class="input"
+          :type="showPasswords ? 'text' : 'password'"
+          placeholder="Inserisci la password"
+          required
+        />
+      </label>
+
+      <label class="plain-check">
+        <input v-model="showPasswords" type="checkbox" />
+        <span>Mostra password</span>
       </label>
 
       <button type="submit" class="btn btn-primary btn-block">
@@ -145,27 +159,60 @@ async function submitRegister() {
       <div class="row">
         <label class="field">
           <span class="field-label">Nome</span>
-          <input v-model="registerForm.nome" class="input" required />
+          <input
+            v-model="registerForm.nome"
+            class="input"
+            placeholder="Nome"
+            required
+          />
         </label>
+
         <label class="field">
           <span class="field-label">Cognome</span>
-          <input v-model="registerForm.cognome" class="input" required />
+          <input
+            v-model="registerForm.cognome"
+            class="input"
+            placeholder="Cognome"
+            required
+          />
         </label>
       </div>
 
       <label class="field">
         <span class="field-label">Email</span>
-        <input v-model="registerForm.email" class="input" type="email" placeholder="nome@example.it" required />
+        <input
+          v-model="registerForm.email"
+          class="input"
+          type="email"
+          placeholder="nome@example.it"
+          required
+        />
       </label>
 
       <label class="field">
         <span class="field-label">Password</span>
-        <input v-model="registerForm.password" class="input" type="password" placeholder="Minimo 8 caratteri" required />
+        <input
+          v-model="registerForm.password"
+          class="input"
+          :type="showPasswords ? 'text' : 'password'"
+          placeholder="Minimo 8 caratteri"
+          required
+        />
+      </label>
+
+      <label class="plain-check">
+        <input v-model="showPasswords" type="checkbox" />
+        <span>Mostra password</span>
       </label>
 
       <label class="field">
         <span class="field-label">Data di nascita</span>
-        <input v-model="registerForm.dataNascita" class="input" type="date" required />
+        <input
+          v-model="registerForm.dataNascita"
+          class="input"
+          type="date"
+          required
+        />
       </label>
 
       <button type="submit" class="btn btn-primary btn-block">
@@ -197,7 +244,9 @@ async function submitRegister() {
   transition: color 0.2s var(--ease);
 }
 
-.tabs button.active { color: var(--text-primary); }
+.tabs button.active {
+  color: var(--text-primary);
+}
 
 .tab-indicator {
   position: absolute;
@@ -228,11 +277,13 @@ async function submitRegister() {
   border: 1px solid var(--accent-border);
   color: var(--accent-hi);
 }
+
 .msg-success {
   background: var(--success-bg);
   border: 1px solid rgba(52, 211, 153, 0.28);
   color: var(--success);
 }
+
 .msg-error {
   background: var(--danger-bg);
   border: 1px solid var(--danger-border);
@@ -265,6 +316,24 @@ async function submitRegister() {
   color: var(--text-tertiary);
 }
 
+.plain-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-top: -4px;
+  margin-bottom: 4px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.plain-check input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+}
+
 .link-btn {
   background: transparent;
   color: var(--text-tertiary);
@@ -273,9 +342,13 @@ async function submitRegister() {
   transition: color 0.2s var(--ease);
 }
 
-.link-btn:hover { color: var(--accent); }
+.link-btn:hover {
+  color: var(--accent);
+}
 
 @media (max-width: 420px) {
-  .row { grid-template-columns: 1fr; }
+  .row {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

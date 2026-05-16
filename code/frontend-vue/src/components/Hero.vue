@@ -21,7 +21,6 @@ const stats = computed(() => {
   return [
     { value: count || '—', label: 'Bivacchi catalogati' },
     { value: zones || '—',  label: 'Zone alpine' },
-    { value: avg,           label: 'Rating medio' }
   ]
 })
 </script>

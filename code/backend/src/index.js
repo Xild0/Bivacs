@@ -20,6 +20,7 @@ const recensioniRoute = require('./routes/recensioniRoute');
 const autenticazioneRoute = require('./routes/autenticazione')
 const profiloRoute = require('./routes/profilo');
 const percorsiRoutes = require('./routes/percorsi');
+const segnalazioniRoute = require('./routes/segnalazioniRoute');
 // init app con express
 const app = express();
 
@@ -35,6 +36,7 @@ app.use('/api/v1/recensioni', recensioniRoute);
 app.use('/api/v1/auth', autenticazioneRoute);
 app.use('/api/v1/profilo', profiloRoute);
 app.use('/api/v1/percorsi', percorsiRoutes);
+app.use('/api/v1/segnalazioni', segnalazioniRoute);
 // route di test per verificare che il server sia online
 app.get('/', (req, res) => {
     res.send('Server Bivacs online');

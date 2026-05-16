@@ -1,14 +1,23 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
+import { aggiungiPreferito, rimuoviPreferito } from '../services/api'
 
 const props = defineProps({
   bivacco: {
     type: Object,
     required: true
+  },
+  isLogged: {
+    type: Boolean,
+    default: false
+  },
+  isFavorite: {
+    type: Boolean,
+    default: false
   }
 })
 
-const emit = defineEmits(['open'])
+const emit = defineEmits(['open', 'favorite-changed'])
 
 const initials = computed(() => {
   const words = (props.bivacco.nome || '').trim().split(/\s+/)
@@ -26,6 +35,29 @@ const hue = computed(() => {
 })
 
 const rating = computed(() => Number(props.bivacco.mediaStelle) || 0)
+
+const favoriteLoading = ref(false)
+
+async function toggleFavorite(event) {
+  event.stopPropagation()
+
+  if (!props.isLogged || favoriteLoading.value) return
+
+  favoriteLoading.value = true
+
+  try {
+    const data = props.isFavorite
+      ? await rimuoviPreferito(props.bivacco._id)
+      : await aggiungiPreferito(props.bivacco._id)
+
+    emit('favorite-changed', data.preferiti || [])
+  } catch (error) {
+    console.error('Errore preferiti:', error)
+  } finally {
+    favoriteLoading.value = false
+  }
+}
+
 </script>
 
 <template>
@@ -42,6 +74,17 @@ const rating = computed(() => Number(props.bivacco.mediaStelle) || 0)
       }"
     >
       <div class="bcard-monogram">{{ initials }}</div>
+
+      <button
+        v-if="isLogged"
+        type="button"
+        class="favorite-btn"
+        :class="{ active: isFavorite }"
+        title="Aggiungi/rimuovi dai preferiti"
+        @click="toggleFavorite"
+      >
+        ♥
+      </button>
 
       <!-- Topo lines decoration -->
       <svg class="topo" viewBox="0 0 200 100" preserveAspectRatio="none" aria-hidden="true">
@@ -103,6 +146,10 @@ const rating = computed(() => Number(props.bivacco.mediaStelle) || 0)
             <path d="M9 12l6-6" />
           </svg>
           Legna
+        </span>
+        <span v-if="bivacco.ticketAperti" class="chip chip-warning">
+          Ticket aperti
+          <span v-if="bivacco.numeroTicketAperti">({{ bivacco.numeroTicketAperti }})</span>
         </span>
       </div>
 
@@ -312,5 +359,34 @@ h3 {
 
 .bcard-cta svg {
   transition: transform 0.25s var(--ease-out);
+}
+
+.favorite-btn {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--r-full);
+  background: rgba(15, 17, 23, 0.75);
+  border: 1px solid var(--border);
+  color: var(--text-tertiary);
+  font-size: 18px;
+  display: grid;
+  place-items: center;
+  z-index: 2;
+  transition: all 0.18s var(--ease);
+}
+
+.favorite-btn:hover,
+.favorite-btn.active {
+  color: var(--danger);
+  background: var(--danger-bg);
+  border-color: var(--danger-border);
+}
+
+.chip-warning {
+  background: var(--warning-bg);
+  color: var(--warning);
 }
 </style>

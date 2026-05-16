@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Segnalazione = require('../models/segnalazione');
 const upload = require('../config/multer'); // Importiamo la config sopra
-const {protectRoute,isStaff} = require('../middleware/authMiddleware');
+const {protectRoute,isStaff} = require('../middlewares/authMiddleware');
 // POST /api/v1/segnalazioni
 /**
  * @route POST /api/segnalazioni
@@ -11,11 +11,10 @@ const {protectRoute,isStaff} = require('../middleware/authMiddleware');
 router.post('/', protectRoute, async (req, res) => {
     try {
         const nuovaSegnalazione = new Segnalazione({
-            // req.utente.id o _id a seconda di come lo salvi nel JWT
-            utenteId: req.utente.id, 
+            utenteId: req.utente.mongoId,
+            bivaccoId: req.body.bivaccoId,
             descrizione: req.body.descrizione,
-            foto: req.body.foto,
-            // statoSegnalazione va in default 'inviata'
+            foto: req.body.foto
         });
 
         const reportSalvato = await nuovaSegnalazione.save();
@@ -24,6 +23,8 @@ router.post('/', protectRoute, async (req, res) => {
         res.status(400).json({ errore: error.message });
     }
 });
+
+
 //GET /attive è accessibile a tutti gli utenti loggati
 // Recupera solo le segnalazioni attive (NON archiviate)
 router.get('/attive', protectRoute, async (req, res) => {

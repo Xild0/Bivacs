@@ -8,7 +8,7 @@ const segnalazioneSchema = new mongoose.Schema({
     },
     bivaccoId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'bivacco',
+        ref: 'Bivacco',
         required: true
     },
     descrizione: { 
