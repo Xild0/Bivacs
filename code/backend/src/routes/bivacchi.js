@@ -3,6 +3,7 @@ const router = express.Router();
 
 const Bivacco = require('../models/bivacco');
 const Percorso = require('../models/percorso');
+const Segnalazione = require('../models/segnalazione');
 const {protectRoute} = require('../middlewares/authMiddleware');
 
 /** @param {unknown} err */
@@ -80,16 +81,31 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
 
-    const bivacco = await Bivacco.findById(req.params.id)
-  .populate('percorsi');
+  const bivacco = await Bivacco.findById(req.params.id)
+    .populate('percorsi');
 
-    if (!bivacco) {
-      return res.status(404).json({
-        message: 'Bivacco non trovato'
-      });
+  if (!bivacco) {
+    return res.status(404).json({
+      message: 'Bivacco non trovato'
+    });
+  }
+
+  // Conta segnalazioni NON chiuse
+  const segnalazioniAttive = await Segnalazione.countDocuments({
+    bivaccoId: bivacco._id,
+    statoSegnalazione: {
+      $in: ['inviata', 'presa_in_carico', 'in_corso']
     }
+  });
 
-    res.status(200).json(bivacco);
+  // trasformo il documento mongoose in oggetto modificabile
+  const bivaccoObj = bivacco.toObject();
+
+  // aggiungo campo dinamico
+  bivaccoObj.ticketAperti = segnalazioniAttive > 0;
+  bivaccoObj.numeroTicketAperti = segnalazioniAttive;
+
+  res.status(200).json(bivaccoObj);
 
   } catch (err) {
 

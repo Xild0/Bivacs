@@ -1,15 +1,15 @@
 <script setup>
 import { reactive, ref, onMounted } from 'vue'
 import Modal from './Modal.vue'
-import { getProfile, updateProfile, deleteProfile, logoutUser } from '../services/api'
-
-const emit = defineEmits(['close', 'auth-changed'])
+import { getProfile, updateProfile, deleteProfile, logoutUser, getPreferiti } from '../services/api'
+const emit = defineEmits(['close', 'auth-changed', 'open-bivacco'])
 
 const profile = reactive({
   nome: '',
   cognome: '',
   email: '',
-  password: ''
+  password: '',
+  preferiti: []
 })
 
 const message = ref('')
@@ -23,6 +23,7 @@ async function loadProfile() {
     profile.cognome = data.cognome || ''
     profile.email = data.email || ''
     profile.password = ''
+    profile.preferiti = data.preferiti || []
     loaded.value = true
     message.value = ''
   } catch (error) {
@@ -65,6 +66,11 @@ async function removeAccount() {
 function submitLogout() {
   logoutUser()
   emit('auth-changed')
+  emit('close')
+}
+
+function openPreferito(bivacco) {
+  emit('open-bivacco', bivacco)
   emit('close')
 }
 
@@ -117,6 +123,49 @@ onMounted(() => {
     </div>
 
     <div class="divider"></div>
+
+    <section class="favorites-section">
+  <h3>I miei preferiti</h3>
+<div v-if="profile.preferiti.length" class="favorites-grid">
+  <button
+    v-for="bivacco in profile.preferiti"
+    :key="bivacco._id || bivacco"
+    type="button"
+    class="favorite-card"
+    @click="openPreferito(bivacco)"
+  >
+    <div class="favorite-top">
+      <h4>{{ bivacco.nome }}</h4>
+
+      <span class="favorite-altitude">
+        {{ bivacco.altitudine }} m
+      </span>
+    </div>
+
+    <div class="favorite-meta">
+      <span>{{ bivacco.zona }}</span>
+
+      <span>
+        {{ bivacco.postiLetto }} posti
+      </span>
+    </div>
+
+    <div class="favorite-footer">
+      <span class="open-label">
+        Apri scheda bivacco
+      </span>
+
+      <span class="arrow">→</span>
+    </div>
+  </button>
+</div>
+
+  <p v-else class="empty-favorites">
+    Nessun bivacco salvato nei preferiti.
+  </p>
+</section>
+
+<div class="divider"></div>
 
     <div class="danger-zone">
       <button class="btn btn-ghost btn-block" @click="submitLogout">
@@ -214,5 +263,110 @@ onMounted(() => {
 
 @media (max-width: 420px) {
   .row { grid-template-columns: 1fr; }
+}
+
+.favorites-section h3 {
+  font-size: 1rem;
+  margin-bottom: 10px;
+}
+
+.empty-favorites {
+  font-size: 13px;
+  color: var(--text-tertiary);
+  background: var(--bg-surface-2);
+  border-radius: var(--r);
+  padding: 12px;
+}
+
+.favorites-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.favorite-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  border-radius: var(--r-lg);
+  background:
+    linear-gradient(
+      135deg,
+      rgba(79, 195, 247, 0.08),
+      rgba(255,255,255,0.02)
+    );
+  border: 1px solid var(--border-subtle);
+  text-align: left;
+  transition:
+    transform 0.2s var(--ease),
+    border-color 0.2s var(--ease),
+    background 0.2s var(--ease);
+}
+
+.favorite-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent-border);
+  background:
+    linear-gradient(
+      135deg,
+      rgba(79, 195, 247, 0.14),
+      rgba(255,255,255,0.04)
+    );
+}
+
+.favorite-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.favorite-top h4 {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.35;
+  color: var(--text-primary);
+}
+
+.favorite-altitude {
+  flex-shrink: 0;
+  padding: 4px 8px;
+  border-radius: var(--r-full);
+  background: rgba(79,195,247,0.12);
+  color: var(--accent-hi);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.favorite-meta {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.favorite-meta span {
+  padding: 5px 10px;
+  border-radius: var(--r-full);
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border-subtle);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.favorite-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.open-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.arrow {
+  font-size: 18px;
+  color: var(--accent);
 }
 </style>

@@ -1,58 +1,80 @@
 const express = require('express');
 const router = express.Router();
-const Recensione = require('../models/recensioni');
+
+const Recensione = require('../models/recensione');
 const Bivacco = require('../models/bivacco');
 
-/* POST /api/v1/recensioni
-    Inserisce una nuova recensione (US18, US19, US20)
-*/
+/**
+ * POST /api/v1/recensioni
+ * Inserisce una nuova recensione
+ */
 router.post('/', async (req, res) => {
-    try {
-        const { bivaccoId, autore, stelle, commento } = req.body;
+  try {
 
-        // Verifichiamo prima che il bivacco esista davvero
-        const bivaccoEsiste = await Bivacco.findById(bivaccoId);
-        if (!bivaccoEsiste) {
-            return res.status(404).json({ message: 'Bivacco non trovato' });
-        }
+    const { bivaccoId, utente, stelle, testo, anonima } = req.body;
 
-        const nuovaRecensione = new Recensione({
-            bivaccoId,
-            autore: autore || 'Escursionista Anonimo', // Gestisce US20
-            stelle,
-            commento
-        });
+    // Verifica esistenza bivacco
+    const bivacco = await Bivacco.findById(bivaccoId);
 
-        const recensioneSalvata = await nuovaRecensione.save();
-        res.status(201).json(recensioneSalvata);
-
-    } catch (err) {
-        // Controllo del tipo per evitare l'errore "unknown"
-        const errorMessage = (err instanceof Error) ? err.message : 'Errore sconosciuto';
-        
-        res.status(400).json({ 
-            message: 'Errore creazione recensione', 
-            error: errorMessage 
-        });
+    if (!bivacco) {
+      return res.status(404).json({
+        message: 'Bivacco non trovato'
+      });
     }
+
+    const nuovaRecensione = new Recensione({
+      bivaccoId,
+      utente: anonima
+        ? 'Anonimo'
+        : (utente || 'Escursionista'),
+      stelle,
+      testo,
+      anonima: anonima || false
+    });
+
+    const recensioneSalvata = await nuovaRecensione.save();
+
+    res.status(201).json(recensioneSalvata);
+
+  } catch (err) {
+
+    const errorMessage =
+      err instanceof Error
+        ? err.message
+        : String(err);
+
+    res.status(400).json({
+      message: 'Errore creazione recensione',
+      error: errorMessage
+    });
+  }
 });
 
-/* GET /api/v1/recensioni/:bivaccoId
-    Recupera tutte le recensioni di un bivacco specifico
-*/
+/**
+ * GET recensioni di un bivacco
+ * /api/v1/recensioni/:bivaccoId
+ */
 router.get('/:bivaccoId', async (req, res) => {
-    try {
-        const recensioni = await Recensione.find({ bivaccoId: req.params.bivaccoId }).sort({ createdAt: -1 }); // Le più recenti prima
-        res.status(200).json(recensioni);
-    } catch (err) {
-        
-        const errorMessage = (err instanceof Error) ? err.message : 'Errore sconosciuto';
-        
-        res.status(400).json({ 
-            message: 'Errore nel recupero recensioni', 
-            error: errorMessage 
-        });
-    }
+  try {
+
+    const recensioni = await Recensione
+      .find({ bivaccoId: req.params.bivaccoId })
+      .sort({ createdAt: -1 });
+
+    res.status(200).json(recensioni);
+
+  } catch (err) {
+
+    const errorMessage =
+      err instanceof Error
+        ? err.message
+        : String(err);
+
+    res.status(400).json({
+      message: 'Errore recupero recensioni',
+      error: errorMessage
+    });
+  }
 });
 
 module.exports = router;

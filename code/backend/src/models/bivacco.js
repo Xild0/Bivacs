@@ -55,9 +55,17 @@ const bivaccoSchema = new mongoose.Schema(
         type: Boolean,
         default: true
     },
+    mediaStelle: {
+    type: Number,
+    default: 0
+    },
+    numRecensioni: {
+        type: Number,
+        default: 0
+    },
     ultimoCheckStato: {
-    type: Date,
-    default: Date.now
+        type: Date,
+        default: Date.now
     }
 },
 {

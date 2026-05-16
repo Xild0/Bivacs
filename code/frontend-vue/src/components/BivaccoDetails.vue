@@ -1,5 +1,5 @@
 <script setup>
-import { reactive, ref, watch } from 'vue'
+import { reactive, ref, watch, computed } from 'vue'
 
 import {
   creaRecensione,
@@ -12,16 +12,28 @@ const props = defineProps({
   bivacco: {
     type: Object,
     required: true
+  },
+  isLogged: {
+    type: Boolean,
+    default: false
+  },
+  currentUser: {
+    type: Object,
+    default: null
   }
 })
 
-const emit = defineEmits(['route-calculated', 'clear-route'])
+const emit = defineEmits(['route-calculated', 'clear-route', 'bivacco-updated'])
 
 const recensioni = ref([])
 const message = ref('')
+const nomeUtente = computed(() => {
+  if (!props.currentUser) return 'Escursionista'
+
+  return `${props.currentUser.nome || ''} ${props.currentUser.cognome || ''}`.trim() || 'Escursionista'
+})
 
 const recensioneForm = reactive({
-  utente: '',
   stelle: 5,
   testo: '',
   anonima: false
@@ -36,10 +48,15 @@ async function loadRecensioni() {
 }
 
 async function submitRecensione() {
+  if (!props.isLogged) {
+    message.value = 'Accedi per lasciare una recensione.'
+    return
+  }
+
   try {
     await creaRecensione({
       bivaccoId: props.bivacco._id,
-      utente: recensioneForm.utente,
+      utente: nomeUtente.value,
       stelle: Number(recensioneForm.stelle),
       testo: recensioneForm.testo,
       anonima: recensioneForm.anonima
@@ -47,12 +64,12 @@ async function submitRecensione() {
 
     message.value = 'Recensione inviata correttamente'
 
-    recensioneForm.utente = ''
     recensioneForm.stelle = 5
     recensioneForm.testo = ''
     recensioneForm.anonima = false
 
     await loadRecensioni()
+    emit('bivacco-updated')
   } catch (error) {
     message.value = error.message
   }
@@ -180,61 +197,65 @@ watch(
     </section>
 
     <!-- Recensioni -->
-    <section class="section">
-      <h3 class="section-title">Recensioni</h3>
+    <!-- Recensioni -->
+<section class="section">
+  <h3 class="section-title">Recensioni</h3>
 
-      <form class="review-form" @submit.prevent="submitRecensione">
-        <input
-          v-model="recensioneForm.utente"
-          class="input"
-          placeholder="Nome utente"
-        />
+  <div v-if="!isLogged" class="login-hint">
+    Accedi per lasciare una recensione.
+  </div>
 
-        <select v-model="recensioneForm.stelle" class="select">
-          <option :value="1">★ 1 stella</option>
-          <option :value="2">★★ 2 stelle</option>
-          <option :value="3">★★★ 3 stelle</option>
-          <option :value="4">★★★★ 4 stelle</option>
-          <option :value="5">★★★★★ 5 stelle</option>
-        </select>
+  <form v-else class="review-form" @submit.prevent="submitRecensione">
+    <p class="review-author">
+      Pubblicherai come <strong>{{ nomeUtente }}</strong>
+    </p>
 
-        <textarea
-          v-model="recensioneForm.testo"
-          class="textarea"
-          placeholder="Scrivi una recensione…"
-        />
+    <select v-model="recensioneForm.stelle" class="select">
+      <option :value="1">★ 1 stella</option>
+      <option :value="2">★★ 2 stelle</option>
+      <option :value="3">★★★ 3 stelle</option>
+      <option :value="4">★★★★ 4 stelle</option>
+      <option :value="5">★★★★★ 5 stelle</option>
+    </select>
 
-        <label class="checkbox">
-          <input v-model="recensioneForm.anonima" type="checkbox" />
-          <span class="check-box"></span>
-          Pubblica come anonimo
-        </label>
+    <textarea
+      v-model="recensioneForm.testo"
+      class="textarea"
+      placeholder="Scrivi una recensione…"
+      required
+    />
 
-        <button type="submit" class="btn btn-primary btn-block">
-          Invia recensione
-        </button>
-      </form>
+    <label class="checkbox">
+      <input v-model="recensioneForm.anonima" type="checkbox" />
+      <span class="check-box"></span>
+      Pubblica come anonimo
+    </label>
 
-      <div class="reviews">
-        <div
-          v-for="recensione in recensioni"
-          :key="recensione._id"
-          class="review"
-        >
-          <div class="review-head">
-            <strong>{{ recensione.utente }}</strong>
-            <div class="stars">
-              <span v-for="n in 5" :key="n" :class="{ filled: n <= recensione.stelle }">★</span>
-            </div>
-          </div>
-          <p>{{ recensione.testo }}</p>
+    <button type="submit" class="btn btn-primary btn-block">
+      Invia recensione
+    </button>
+  </form>
+
+  <div class="reviews">
+    <div
+      v-for="recensione in recensioni"
+      :key="recensione._id"
+      class="review"
+    >
+      <div class="review-head">
+        <strong>{{ recensione.utente }}</strong>
+        <div class="stars">
+          <span v-for="n in 5" :key="n" :class="{ filled: n <= recensione.stelle }">★</span>
         </div>
-
-        <p v-if="recensioni.length === 0" class="empty">
-          Nessuna recensione. Sii il primo a recensirlo.
-        </p>
       </div>
-    </section>
+      <p>{{ recensione.testo }}</p>
+    </div>
+
+    <p v-if="recensioni.length === 0" class="empty">
+      Nessuna recensione. Sii il primo a recensirlo.
+    </p>
+  </div>
+</section>
   </aside>
 </template>
 
@@ -539,6 +560,25 @@ watch(
   .emergency-wide {
     grid-column: auto;
   }
+}
+
+.login-hint {
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r);
+  padding: 12px 14px;
+  color: var(--text-tertiary);
+  font-size: 13px;
+  margin-bottom: 18px;
+}
+
+.review-author {
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
+.review-author strong {
+  color: var(--text-primary);
 }
 
 </style>
