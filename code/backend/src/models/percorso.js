@@ -1,3 +1,9 @@
+/**
+ * @file percorso.js
+ * @description Modello Mongoose per i percorsi GPX associati ai bivacchi.
+ * Include file GPX, lunghezza, dislivello, difficoltà CAI e durata stimata.
+ */
+
 const mongoose = require('mongoose');
 
 const percorsoSchema = new mongoose.Schema({

@@ -44,10 +44,18 @@ const protectRoute = (req, res, next) => {
         res.status(401).json({ errore: 'Sessione scaduta o token non valido. Effettua nuovamente il login.' });
     }
 };
+
 /**
- * Middleware per verificare se l'utente ha i privilegi di amministratore.
- * Da usare SEMPRE dopo protectRoute.
+ * Verifica che l'utente autenticato abbia privilegi staff.
+ * Sono autorizzati solo utenti con discriminator `SuperUser` o `SupportoTecnico`.
+ * Deve essere usato dopo `protectRoute`, perché legge `req.utente`.
+ *
+ * @param {import('express').Request} req - Oggetto richiesta Express con dati utente già decodificati.
+ * @param {import('express').Response} res - Oggetto risposta Express.
+ * @param {import('express').NextFunction} next - Funzione per passare al middleware successivo.
+ * @returns {void}
  */
+
 const isStaff = (req, res, next) => {
    const tipoUtente = req.utente.discriminator;
 

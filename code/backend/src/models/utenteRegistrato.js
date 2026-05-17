@@ -1,3 +1,9 @@
+/**
+ * @file utenteRegistrato.js
+ * @description Modello Mongoose per l'utente registrato standard.
+ * Estende il modello Utente e aggiunge dati anagrafici e lista dei bivacchi preferiti.
+ */
+
 const mongoose = require('mongoose');
 
 const Utente = require('./utente');

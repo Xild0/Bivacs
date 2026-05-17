@@ -1,3 +1,9 @@
+/**
+ * @file Modal.vue
+ * @description Componente modale riutilizzabile.
+ * Gestisce apertura, chiusura tramite click esterno e chiusura con tasto Escape.
+ */
+
 <script setup>
 import { onMounted, onUnmounted } from 'vue'
 
@@ -8,6 +14,13 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['close'])
+
+/**
+ * Chiude la modale quando viene premuto il tasto Escape.
+ *
+ * @param {KeyboardEvent} e - Evento tastiera.
+ * @returns {void}
+ */
 
 function onKeyDown(e) {
   if (e.key === 'Escape') emit('close')

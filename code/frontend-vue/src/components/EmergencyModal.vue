@@ -1,3 +1,8 @@
+/**
+ * @file EmergencyModal.vue
+ * @description Modale informativa per emergenze alpine e numeri utili.
+ */
+
 <script setup>
 import Modal from './Modal.vue'
 

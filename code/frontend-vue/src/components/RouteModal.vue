@@ -1,3 +1,9 @@
+/**
+ * @file RouteModal.vue
+ * @description Modale di navigazione che mostra percorso calcolato, tracciato GPX,
+ * avvicinamento al sentiero, dati SAT e profilo altimetrico.
+ */
+
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { getPercorsiByBivacco, calcolaTragitto } from '../services/api'
@@ -69,15 +75,36 @@ const gpxUrl = computed(() => {
   return `/gpx/${percorso.value.gpxFile}`
 })
 
+/**
+ * Formatta una distanza in chilometri proveniente dal database.
+ *
+ * @param {number|string} value - Distanza in chilometri.
+ * @returns {string} Distanza formattata.
+ */
+
 function formatKmFromDb(value) {
   if (!value) return '—'
   return `${Number(value).toFixed(2)} km`
 }
 
+/**
+ * Converte metri in chilometri formattati.
+ *
+ * @param {number} metri - Distanza in metri.
+ * @returns {string} Distanza formattata.
+ */
+
 function formatKmFromMeters(metri) {
   if (!metri && metri !== 0) return '—'
   return `${(Number(metri) / 1000).toFixed(2)} km`
 }
+
+/**
+ * Converte secondi in formato leggibile ore/minuti.
+ *
+ * @param {number} secondi - Durata in secondi.
+ * @returns {string} Durata formattata.
+ */
 
 function formatDurationFromSeconds(secondi) {
   if (!secondi && secondi !== 0) return '—'
@@ -103,6 +130,13 @@ const totalDistanceKm = computed(() => {
   return approachKm + satKm
 })
 
+/**
+ * Converte minuti in formato leggibile ore/minuti.
+ *
+ * @param {number} minutes - Durata in minuti.
+ * @returns {string} Durata formattata.
+ */
+
 function formatDurationFromMinutes(minutes) {
   if (!minutes && minutes !== 0) return '—'
 
@@ -113,6 +147,7 @@ function formatDurationFromMinutes(minutes) {
   if (m === 0) return `${h} h`
   return `${h} h ${m} min`
 }
+
 
 const totalDurationMinutes = computed(() => {
   const approachMinutes = approachResult.value?.duration
@@ -126,6 +161,13 @@ const totalDurationMinutes = computed(() => {
   return approachMinutes + satMinutes
 })
 
+/**
+ * Formatta la durata stimata salvata nel database.
+ *
+ * @param {number|string} value - Durata in minuti.
+ * @returns {string} Durata formattata.
+ */
+
 function formatDurationFromDb(value) {
   if (!value) return '—'
 
@@ -138,6 +180,15 @@ function formatDurationFromDb(value) {
 
   return m === 0 ? `${h} h` : `${h} h ${m} min`
 }
+
+/**
+ * Analizza un file GPX in formato XML.
+ * Estrae coordinate e profilo altimetrico dai punti trkpt, rtept o wpt.
+ *
+ * @param {string} xmlText - Contenuto XML del file GPX.
+ * @returns {{coords: Array<Array<number>>, profile: Array<{distance: number, elevation: number}>}}
+ */
+
 function parseGpx(xmlText) {
   const parser = new DOMParser()
   const xml = parser.parseFromString(xmlText, 'application/xml')
@@ -189,6 +240,16 @@ function parseGpx(xmlText) {
   return { coords, profile }
 }
 
+/**
+ * Calcola la distanza approssimata tra due coordinate geografiche.
+ *
+ * @param {number} lat1 - Latitudine primo punto.
+ * @param {number} lon1 - Longitudine primo punto.
+ * @param {number} lat2 - Latitudine secondo punto.
+ * @param {number} lon2 - Longitudine secondo punto.
+ * @returns {number} Distanza in metri.
+ */
+
 function haversine(lat1, lon1, lat2, lon2) {
   const R = 6371000
   const toRad = (deg) => deg * Math.PI / 180
@@ -207,6 +268,12 @@ function haversine(lat1, lon1, lat2, lon2) {
   return R * c
 }
 
+/**
+ * Calcola il tratto di avvicinamento dalla partenza utente all'inizio del GPX ufficiale.
+ *
+ * @returns {Promise<void>}
+ */
+
 async function loadApproachToGpxStart() {
   if (!gpxCoords.value.length) return
   if (!props.result.coords?.length) return
@@ -221,6 +288,12 @@ async function loadApproachToGpxStart() {
     approachResult.value = null
   }
 }
+
+/**
+ * Carica il file GPX associato al bivacco e ne calcola coordinate e profilo altimetrico.
+ *
+ * @returns {Promise<void>}
+ */
 
 async function loadGpx() {
     if (percorsi.value.length === 0) {

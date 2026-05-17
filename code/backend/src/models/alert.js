@@ -1,3 +1,9 @@
+/**
+ * @file alert.js
+ * @description Modello Mongoose per gli alert associati ai bivacchi.
+ * Un alert rappresenta un avviso attivo o disattivo visibile agli utenti.
+ */
+
 const mongoose = require('mongoose');
 
 const alertSchema = new mongoose.Schema({

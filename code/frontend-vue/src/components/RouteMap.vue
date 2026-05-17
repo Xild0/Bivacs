@@ -1,3 +1,9 @@
+/**
+ * @file RouteMap.vue
+ * @description Mappa Leaflet dedicata alla visualizzazione del tragitto calcolato.
+ * Mostra linea del percorso, marker di partenza e marker di arrivo.
+ */
+
 <script setup>
 import { onMounted, onBeforeUnmount, ref, nextTick, watch } from 'vue'
 import L from 'leaflet'
@@ -13,6 +19,12 @@ const props = defineProps({
 const mapEl = ref(null)
 let map = null
 let routeLayer = null
+
+/**
+ * Crea l'icona Leaflet per il punto di partenza.
+ *
+ * @returns {L.DivIcon} Icona personalizzata per la partenza.
+ */
 
 function makeStartIcon() {
   const svg = `
@@ -34,6 +46,12 @@ function makeStartIcon() {
   })
 }
 
+/**
+ * Crea l'icona Leaflet per il punto di arrivo.
+ *
+ * @returns {L.DivIcon} Icona personalizzata per l'arrivo.
+ */
+
 function makeEndIcon() {
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" width="40" height="50" viewBox="0 0 40 50">
@@ -54,6 +72,12 @@ function makeEndIcon() {
     popupAnchor: [0, -40]
   })
 }
+
+/**
+ * Disegna il percorso sulla mappa e aggiorna i marker di partenza e arrivo.
+ *
+ * @returns {void}
+ */
 
 function renderRoute() {
   if (!map || !props.routeCoords || props.routeCoords.length === 0) return

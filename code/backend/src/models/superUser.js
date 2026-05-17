@@ -1,3 +1,9 @@
+/**
+ * @file superUser.js
+ * @description Modello Mongoose per gli utenti con ruolo SuperUser.
+ * Estende il modello base Utente tramite discriminator Mongoose.
+ */
+
 const mongoose = require('mongoose');
 const Utente = require('./utente');
 

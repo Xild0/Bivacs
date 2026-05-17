@@ -1,3 +1,9 @@
+/**
+ * @file immagine.js
+ * @description Modello Mongoose per le immagini collegate a una segnalazione.
+ * Ogni immagine contiene un URL o path e fa riferimento alla segnalazione associata.
+ */
+
 const mongoose = require('mongoose');
 
 const immagineSchema = new mongoose.Schema({

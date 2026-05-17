@@ -1,4 +1,16 @@
+/**
+ * @file db.js
+ * @description Configurazione della connessione a MongoDB tramite Mongoose.
+ */
+
 const mongoose = require('mongoose');
+
+/**
+ * Stabilisce la connessione al database MongoDB usando la variabile d'ambiente MONGO_URI.
+ * In caso di errore blocca l'avvio del server.
+ *
+ * @returns {Promise<void>}
+ */
 
 const connectDB = async () => {
     try {

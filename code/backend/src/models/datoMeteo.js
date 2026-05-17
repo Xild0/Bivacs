@@ -1,3 +1,9 @@
+/**
+ * @file datoMeteo.js
+ * @description Modello Mongoose per i dati meteo associati a un bivacco.
+ * Memorizza temperatura, vento, precipitazioni, livello di rischio e stato di allerta PAT.
+ */
+
 const mongoose = require('mongoose');
 
 const datoMeteoSchema = new mongoose.Schema({

@@ -1,3 +1,9 @@
+/**
+ * @file segnalazione.js
+ * @description Modello Mongoose per le segnalazioni inviate dagli utenti registrati.
+ * Ogni segnalazione riguarda un bivacco, include descrizione, foto e stato di avanzamento.
+ */
+
 const mongoose = require('mongoose');
 
 const segnalazioneSchema = new mongoose.Schema({

@@ -1,3 +1,9 @@
+/**
+ * @file Navbar.vue
+ * @description Barra di navigazione principale dell'applicazione.
+ * Mostra accesso/profilo, pulsante SOS e cambia stile durante lo scroll.
+ */
+
 <script setup>
 import { onMounted, onUnmounted, ref } from 'vue'
 import Logo from './Logo.vue'
@@ -9,6 +15,12 @@ defineProps({
 const emit = defineEmits(['openEmergency', 'openAuth', 'openProfile'])
 
 const scrolled = ref(false)
+
+/**
+ * Aggiorna lo stato della navbar in base alla posizione di scroll.
+ *
+ * @returns {void}
+ */
 
 function onScroll() {
   scrolled.value = window.scrollY > 12

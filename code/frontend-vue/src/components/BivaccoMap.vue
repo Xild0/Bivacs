@@ -1,3 +1,8 @@
+/**
+ * @file BivaccoMap.vue
+ * @description Visualizzazione mappa interattiva Leaflet dei bivacchi.
+ */
+
 <script setup>
 import { onMounted, onBeforeUnmount, watch, ref, nextTick } from 'vue'
 import L from 'leaflet'
@@ -16,6 +21,13 @@ const mapElement = ref(null)
 
 let map = null
 let markersLayer = null
+
+/**
+ * Crea un marker personalizzato Leaflet.
+ *
+ * @param {boolean} [emergency=false] - Indica se il bivacco è in emergenza.
+ * @returns {L.DivIcon}
+ */
 
 function makeIcon(emergency = false) {
   const color = emergency ? '#EF4444' : '#1E88E5'
@@ -68,6 +80,12 @@ function makeIcon(emergency = false) {
     popupAnchor: [0, -50]
   })
 }
+
+/**
+ * Disegna tutti i marker dei bivacchi sulla mappa.
+ *
+ * @returns {void}
+ */
 
 function renderMarkers() {
   if (!map || !markersLayer) return

@@ -1,13 +1,26 @@
+/**
+ * @file segnalazioniRoute.js
+ * @description Route Express per la gestione delle segnalazioni degli utenti.
+ * Include creazione, consultazione e aggiornamento dello stato delle segnalazioni.
+ */
+
 const express = require('express');
+
 const router = express.Router();
 const Segnalazione = require('../models/segnalazione');
 const upload = require('../config/multer'); // Importiamo la config sopra
 const {protectRoute,isStaff} = require('../middlewares/authMiddleware');
-// POST /api/v1/segnalazioni
+
 /**
- * @route POST /api/segnalazioni
- * @desc  Permette a un utente base (o chiunque loggato) di inviare una segnalazione
+ * Crea una nuova segnalazione per un bivacco.
+ * L'utente viene ricavato dal token JWT tramite middleware protectRoute.
+ *
+ * @route POST /api/v1/segnalazioni
+ * @param {import('express').Request} req - Richiesta HTTP con bivaccoId, descrizione e foto.
+ * @param {import('express').Response} res - Risposta HTTP.
+ * @returns {Promise<void>} Segnalazione creata oppure errore di validazione.
  */
+
 router.post('/', protectRoute, async (req, res) => {
     try {
         const nuovaSegnalazione = new Segnalazione({
@@ -25,8 +38,15 @@ router.post('/', protectRoute, async (req, res) => {
 });
 
 
-//GET /attive è accessibile a tutti gli utenti loggati
-// Recupera solo le segnalazioni attive (NON archiviate)
+/**
+ * Recupera le segnalazioni attive, cioè non archiviate.
+ *
+ * @route GET /api/v1/segnalazioni/attive
+ * @param {import('express').Request} req - Richiesta HTTP autenticata.
+ * @param {import('express').Response} res - Risposta HTTP.
+ * @returns {Promise<void>} Lista delle segnalazioni attive.
+ */
+
 router.get('/attive', protectRoute, async (req, res) => {
     try {
         const segnalazioni = await Segnalazione.find({ 
@@ -34,19 +54,23 @@ router.get('/attive', protectRoute, async (req, res) => {
         });
         res.json(segnalazioni);
     } catch (err) {
-        // Casting a 'any' per leggere il messaggio senza errori
         const errorAsAny = /** @type {any} */ (err);
         res.status(500).json({ message: errorAsAny.message || 'Errore nel recupero delle segnalazioni' });
     }
 });
 
 /**
- * @route GET /api/segnalazioni/storico
- * @desc  Permette solo a SuperUser e SupportoTecnico di vedere tutte le segnalazioni
+ * Recupera lo storico completo delle segnalazioni.
+ * Endpoint riservato a SuperUser e SupportoTecnico.
+ *
+ * @route GET /api/v1/segnalazioni/storico
+ * @param {import('express').Request} req - Richiesta HTTP autenticata.
+ * @param {import('express').Response} res - Risposta HTTP.
+ * @returns {Promise<void>} Lista completa delle segnalazioni.
  */
+
 router.get('/storico', protectRoute, isStaff, async (req, res) => {
     try {
-        // Recuperiamo tutte le segnalazioni e "uniamo" i dati dell'utente che ha segnalato
         const storico = await Segnalazione.find().populate('utenteId', 'email discriminator ente matricola').sort({ createdAt: -1 });
         res.json(storico);
     } catch (error) {
@@ -55,26 +79,27 @@ router.get('/storico', protectRoute, isStaff, async (req, res) => {
 });
 
 /**
- * @route GET /api/segnalazioni/bivacco/:bivaccoId
- * @desc  Visualizza le segnalazioni di un bivacco specifico con filtri basati sul ruolo
+ * Recupera le segnalazioni associate a un bivacco specifico.
+ * Gli utenti standard vedono solo le segnalazioni ancora aperte.
+ *
+ * @route GET /api/v1/segnalazioni/bivacco/:bivaccoId
+ * @param {import('express').Request} req - Richiesta HTTP con id del bivacco.
+ * @param {import('express').Response} res - Risposta HTTP.
+ * @returns {Promise<void>} Lista delle segnalazioni relative al bivacco.
  */
+
 router.get('/bivacco/:bivaccoId', protectRoute, async (req, res) => {
     try {
         const { bivaccoId } = req.params;
-        const { discriminator } = req.utente; // Recuperato dal token JWT
+        const { discriminator } = req.utente; 
 
-        // Definiamo il filtro base: solo per questo bivacco
         let queryFilter = { bivaccoId: bivaccoId };
 
-        // Se l'utente è "standard" (UtenteRegistrato), vede solo quelle "aperte"
-        // Escludiamo 'risolta' e 'archiviata'
         if (discriminator === 'UtenteRegistrato') {
             queryFilter.statoSegnalazione = { 
                 $in: ['inviata', 'presa_in_carico', 'in_corso'] 
             };
         } 
-        // Se è SuperUser o SupportoTecnico, non aggiungiamo altri filtri 
-        // e vedrà tutto (comprese risolte e archiviate)
 
         const segnalazioni = await Segnalazione.find(queryFilter).populate('utenteId', 'email').sort({ createdAt: -1 });
         res.json(segnalazioni);
@@ -83,6 +108,17 @@ router.get('/bivacco/:bivaccoId', protectRoute, async (req, res) => {
         res.status(500).json({ errore: 'Errore nel recupero delle segnalazioni per questo bivacco.' });
     }
 });
+
+
+/**
+ * Aggiorna lo stato di una segnalazione.
+ * Endpoint riservato a SuperUser e SupportoTecnico.
+ *
+ * @route PATCH /api/v1/segnalazioni/:id/stato
+ * @param {import('express').Request} req - Richiesta HTTP con nuovoStato nel body.
+ * @param {import('express').Response} res - Risposta HTTP.
+ * @returns {Promise<void>} Segnalazione aggiornata oppure errore.
+ */
 
 router.patch('/:id/stato', protectRoute, isStaff, async (req, res) => {
     try {
