@@ -1,3 +1,9 @@
+/**
+ * @file risorseUtili.js
+ * @description Modello Mongoose per le informazioni aggiornate dagli utenti sulle risorse utili.
+ * Permette di registrare lo stato di acqua e legna per uno specifico bivacco.
+ */
+
 const mongoose = require('mongoose');
 
 const risorseUtiliSchema = new mongoose.Schema({

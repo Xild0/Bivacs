@@ -1,3 +1,8 @@
+/**
+ * @file Hero.vue
+ * @description Hero section principale della homepage Bivacs.
+ */
+
 <script setup>
 import { computed } from 'vue'
 
@@ -7,6 +12,10 @@ const props = defineProps({
     default: () => []
   }
 })
+
+/**
+ * Calcola statistiche generali sui bivacchi caricati.
+ */
 
 const stats = computed(() => {
   const count = props.bivacchi.length

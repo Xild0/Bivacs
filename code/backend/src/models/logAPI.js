@@ -1,3 +1,9 @@
+/**
+ * @file logAPI.js
+ * @description Modello Mongoose per il tracciamento delle chiamate verso API esterne.
+ * Registra provider, esito della chiamata ed eventuali dettagli di errore.
+ */
+
 const mongoose = require('mongoose');
 
 const logAPISchema = new mongoose.Schema({

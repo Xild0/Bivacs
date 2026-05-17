@@ -1,3 +1,9 @@
+/**
+ * @file BivaccoDetails.vue
+ * @description Visualizza informazioni dettagliate di un bivacco,
+ * recensioni, risorse disponibili e pianificazione tragitto.
+ */
+
 <script setup>
 import { reactive, ref, watch, computed } from 'vue'
 
@@ -39,6 +45,12 @@ const recensioneForm = reactive({
   anonima: false
 })
 
+/**
+ * Recupera le recensioni associate al bivacco corrente.
+ *
+ * @returns {Promise<void>}
+ */
+
 async function loadRecensioni() {
   try {
     recensioni.value = await getRecensioni(props.bivacco._id)
@@ -46,6 +58,12 @@ async function loadRecensioni() {
     console.error(error)
   }
 }
+
+/**
+ * Invia una nuova recensione al backend.
+ *
+ * @returns {Promise<void>}
+ */
 
 async function submitRecensione() {
   if (!props.isLogged) {
@@ -74,6 +92,13 @@ async function submitRecensione() {
     message.value = error.message
   }
 }
+
+/**
+ * Propaga il percorso calcolato al componente padre.
+ *
+ * @param {Object} res - Risultato percorso.
+ * @returns {void}
+ */
 
 function onRouteCalculated(res) {
   emit('route-calculated', res)
@@ -109,6 +134,23 @@ watch(
     </header>
 
     <p v-if="message" class="toast">{{ message }}</p>
+
+    <!-- Banner ticket aperti: visibile se ci sono segnalazioni attive sul bivacco (US24, RF18, RF36) -->
+    <div v-if="bivacco.ticketAperti" class="ticket-banner">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+        <line x1="12" y1="9" x2="12" y2="13" />
+        <line x1="12" y1="17" x2="12.01" y2="17" />
+      </svg>
+
+      <div class="ticket-banner-text">
+        <strong>
+          {{ bivacco.numeroTicketAperti || 0 }}
+          ticket {{ (bivacco.numeroTicketAperti || 0) === 1 ? 'aperto' : 'aperti' }}
+        </strong>
+        <small>Sono stati segnalati problemi su questo bivacco da altri escursionisti</small>
+      </div>
+    </div>
 
     <!-- Quick facts grid -->
     <div class="facts">
@@ -579,6 +621,36 @@ watch(
 
 .review-author strong {
   color: var(--text-primary);
+}
+
+.ticket-banner {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  background: var(--warning-bg);
+  border: 1px solid rgba(251, 191, 36, 0.28);
+  border-radius: var(--r);
+  margin-bottom: 18px;
+  color: var(--warning);
+}
+
+.ticket-banner-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ticket-banner strong {
+  color: var(--warning);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.ticket-banner small {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 </style>

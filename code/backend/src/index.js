@@ -1,3 +1,14 @@
+/**
+ * @file index.js
+ * @description Punto di ingresso principale del backend Bivacs.
+ * Configura Express, connessione MongoDB, middleware globali e registrazione delle route API.
+ */
+
+/**
+ * Configurazione DNS custom per evitare problemi di risoluzione
+ * su alcune reti/università durante le chiamate esterne.
+ */
+
 const dns = require("dns");
 dns.setServers(["8.8.8.8", "1.1.1.1"]);
 
@@ -21,8 +32,19 @@ const autenticazioneRoute = require('./routes/autenticazione')
 const profiloRoute = require('./routes/profilo');
 const percorsiRoutes = require('./routes/percorsi');
 const segnalazioniRoute = require('./routes/segnalazioniRoute');
-// init app con express
+
+/**
+ * Inizializzazione applicazione Express.
+ */
+
 const app = express();
+
+/**
+ * Middleware globali:
+ * - CORS per richieste cross-origin
+ * - parsing JSON
+ * - esposizione statica della cartella uploads
+ */
 
 app.use(cors());
 app.use(express.json());
@@ -37,13 +59,28 @@ app.use('/api/v1/auth', autenticazioneRoute);
 app.use('/api/v1/profilo', profiloRoute);
 app.use('/api/v1/percorsi', percorsiRoutes);
 app.use('/api/v1/segnalazioni', segnalazioniRoute);
-// route di test per verificare che il server sia online
+
+/**
+ * Route di test per verificare che il server sia online.
+ *
+ * @route GET /
+ * @param {import('express').Request} req - Richiesta HTTP.
+ * @param {import('express').Response} res - Risposta HTTP.
+ * @returns {void}
+ */
+
 app.get('/', (req, res) => {
     res.send('Server Bivacs online');
 });
 
 // avvio del server
 const PORT = process.env.PORT || 5000;
+
+/**
+ * Avvio asincrono del server:
+ * - connessione a MongoDB
+ * - apertura server Express sulla porta configurata
+ */
 
 (async () => {
     await connectDB();

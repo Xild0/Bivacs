@@ -1,3 +1,10 @@
+/**
+ * @file App.vue
+ * @description Componente root dell'applicazione Bivacs.
+ * Gestisce caricamento dati, autenticazione, dettagli bivacchi,
+ * modali globali, notifiche e coordinamento tra componenti.
+ */
+
 <script setup>
 import { ref, onMounted } from 'vue'
 
@@ -31,6 +38,13 @@ const preferitiIds = ref([])
 const resetTokenAttivo = ref(null)
 const notTemp = ref({ visible: false, type: 'info', text: ''})
 
+/**
+ * Carica l'elenco dei bivacchi dal backend applicando eventuali filtri.
+ *
+ * @param {Object} [filters={}] - Filtri di ricerca.
+ * @returns {Promise<void>}
+ */
+
 async function loadBivacchi(filters = {}) {
   loading.value = true
   try {
@@ -42,6 +56,13 @@ async function loadBivacchi(filters = {}) {
     loading.value = false
   }
 }
+
+/**
+ * Apre la scheda dettagliata di un bivacco.
+ *
+ * @param {Object} bivacco - Bivacco selezionato.
+ * @returns {Promise<void>}
+ */
 
 async function openDetails(bivacco) {
   routeModal.value = null
@@ -63,10 +84,23 @@ async function openDetails(bivacco) {
   }
 }
 
+/**
+ * Chiude il pannello dettagli del bivacco selezionato.
+ *
+ * @returns {void}
+ */
+
 function closeDetails() {
   selectedBivacco.value = null
   routeModal.value = null
 }
+
+/**
+ * Aggiorna lo stato del tragitto calcolato.
+ *
+ * @param {Object} result - Risultato del percorso generato.
+ * @returns {void}
+ */
 
 function onRouteCalculated(result) {
   routeModal.value = {
@@ -83,6 +117,12 @@ function refreshAuth() {
   logged.value = isLoggedIn()
   loadUserData()
 }
+
+/**
+ * Recupera i dati del profilo dell'utente autenticato.
+ *
+ * @returns {Promise<void>}
+ */
 
 async function loadUserData() {
   if (!isLoggedIn()) {
@@ -101,6 +141,13 @@ async function loadUserData() {
     preferitiIds.value = []
   }
 }
+
+/**
+ * Aggiorna la lista dei bivacchi preferiti.
+ *
+ * @param {Array} preferiti - Lista aggiornata preferiti.
+ * @returns {void}
+ */
 
 function onFavoriteChanged(preferiti) {
   preferitiIds.value = preferiti.map(p => p._id || p)

@@ -1,3 +1,8 @@
+/**
+ * @file BivaccoCard.vue
+ * @description Card riassuntiva di un bivacco mostrata nei risultati ricerca.
+ */
+
 <script setup>
 import { computed, ref } from 'vue'
 import { aggiungiPreferito, rimuoviPreferito } from '../services/api'
@@ -19,12 +24,19 @@ const props = defineProps({
 
 const emit = defineEmits(['open', 'favorite-changed'])
 
+/**
+ * Genera le iniziali del nome del bivacco.
+ */
+
 const initials = computed(() => {
   const words = (props.bivacco.nome || '').trim().split(/\s+/)
   return words.slice(0, 2).map(w => w[0]).join('').toUpperCase() || 'B'
 })
 
-// Deterministic hue from the bivacco name so each card has its own gradient
+/**
+ * Genera un colore deterministico per la card del bivacco.
+ */
+
 const hue = computed(() => {
   const str = props.bivacco.nome || ''
   let h = 0
@@ -37,6 +49,13 @@ const hue = computed(() => {
 const rating = computed(() => Number(props.bivacco.mediaStelle) || 0)
 
 const favoriteLoading = ref(false)
+
+/**
+ * Aggiunge o rimuove un bivacco dai preferiti.
+ *
+ * @param {Event} event - Evento click.
+ * @returns {Promise<void>}
+ */
 
 async function toggleFavorite(event) {
   event.stopPropagation()

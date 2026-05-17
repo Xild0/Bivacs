@@ -1,3 +1,9 @@
+/**
+ * @file ProfileModal.vue
+ * @description Modale per la gestione del profilo utente.
+ * Permette modifica dati personali, logout, eliminazione account e visualizzazione preferiti.
+ */
+
 <script setup>
 import { reactive, ref, onMounted } from 'vue'
 import Modal from './Modal.vue'
@@ -16,6 +22,12 @@ const message = ref('')
 const messageType = ref('info')
 const loaded = ref(false)
 
+/**
+ * Carica i dati del profilo utente dal backend.
+ *
+ * @returns {Promise<void>}
+ */
+
 async function loadProfile() {
   try {
     const data = await getProfile()
@@ -31,6 +43,12 @@ async function loadProfile() {
     message.value = error.message
   }
 }
+
+/**
+ * Salva le modifiche al profilo utente.
+ *
+ * @returns {Promise<void>}
+ */
 
 async function saveProfile() {
   try {
@@ -49,13 +67,19 @@ async function saveProfile() {
   }
 }
 
+/**
+ * Elimina definitivamente l'account utente dopo conferma.
+ *
+ * @returns {Promise<void>}
+ */
 async function removeAccount() {
-  const conferma = confirm('Sei sicura di voler eliminare definitivamente il tuo account?')
+  const conferma = confirm('Sei sicuro/a di voler eliminare definitivamente il tuo account? Le tue recensioni resteranno visibili in forma anonima.')
   if (!conferma) return
 
   try {
     await deleteProfile()
-    emit('auth-changed')
+    logoutUser()              
+    emit('auth-changed')      
     emit('close')
   } catch (error) {
     messageType.value = 'error'
@@ -63,11 +87,24 @@ async function removeAccount() {
   }
 }
 
+/**
+ * Effettua il logout locale dell'utente.
+ *
+ * @returns {void}
+ */
+
 function submitLogout() {
   logoutUser()
   emit('auth-changed')
   emit('close')
 }
+
+/**
+ * Apre la scheda di un bivacco presente nei preferiti.
+ *
+ * @param {Object} bivacco - Bivacco selezionato dalla lista preferiti.
+ * @returns {void}
+ */
 
 function openPreferito(bivacco) {
   emit('open-bivacco', bivacco)

@@ -1,3 +1,9 @@
+/**
+ * @file ticketManutenzione.js
+ * @description Modello Mongoose per i ticket di manutenzione generati da segnalazioni.
+ * Tiene traccia dello stato, priorità, data di apertura, eventuale chiusura e note operative.
+ */
+
 const mongoose = require('mongoose');
 
 const ticketManutenzioneSchema = new mongoose.Schema({

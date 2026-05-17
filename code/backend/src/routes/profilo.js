@@ -1,8 +1,16 @@
+/**
+ * @file profilo.js
+ * @description Route Express per la gestione del profilo utente.
+ * Espone endpoint per visualizzare, aggiornare ed eliminare il profilo,
+ * oltre alla gestione dei bivacchi preferiti.
+ */
+
 const mongoose = require('mongoose');
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const Utente = require('../models/utente');
 const UtenteRegistrato = require('../models/utenteRegistrato');
+const Recensione = require('../models/recensione');
 const {protectRoute} = require('../middlewares/authMiddleware');
 
 const router = express.Router();
@@ -97,15 +105,35 @@ router.patch('/', protectRoute, async (req, res) => {
 
 /**
  * Elimina permanentemente l'account dell'utente loggato.
- * * @route DELETE /api/v1/profilo
- * @param {import('express').Request} req - Richiesta HTTP
- * @param {import('express').Response} res - Risposta HTTP
- * @returns {Promise<void>} Messaggio di conferma eliminazione
+ * Prima della cancellazione, anonimizza tutte le recensioni
+ * dell'utente in conformità al "Diritto all'Oblio" (RF20, RNF12):
+ * il contenuto e il rating restano visibili, ma il legame con
+ * l'autore viene rimosso.
+ *
+ * @route DELETE /api/v1/profilo
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @returns {Promise<void>}
  */
 router.delete('/', protectRoute, async (req, res) => {
     try {
+        // Recupero dell'utente per ottenere il nome con cui sono state firmate le recensioni
+        const utente = await UtenteRegistrato.findById(req.utente.mongoId);
+
+        if (utente) {
+            const nomeCompleto = `${utente.nome || ''} ${utente.cognome || ''}`.trim();
+
+            // Anonimizzazione delle recensioni dell'utente
+            if (nomeCompleto) {
+                await Recensione.updateMany(
+                    { utente: nomeCompleto },
+                    { $set: { utente: 'Anonimo', anonima: true } }
+                );
+            }
+        }
+
         const utenteEliminato = await Utente.findByIdAndDelete(req.utente.mongoId);
-        
+
         if (!utenteEliminato) {
             return res.status(404).json({ errore: 'Utente non trovato o già eliminato' });
         }

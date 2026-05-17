@@ -1,3 +1,9 @@
+/**
+ * @file TripPlanner.vue
+ * @description Componente per pianificare il tragitto verso un bivacco.
+ * Gestisce ricerca luogo di partenza, geolocalizzazione, calcolo percorso e riepilogo altimetrico.
+ */
+
 <script setup>
 import { ref } from 'vue'
 import { geocode, calcolaTragitto } from '../services/api'
@@ -24,6 +30,12 @@ const result  = ref(null)
 
 let searchTimeout = null
 
+/**
+ * Gestisce la digitazione del punto di partenza e carica suggerimenti geocodificati.
+ *
+ * @returns {void}
+ */
+
 function onInput() {
   start.value = null
   clearTimeout(searchTimeout)
@@ -48,12 +60,25 @@ function onInput() {
   }, 400)
 }
 
+/**
+ * Seleziona un punto di partenza dai suggerimenti.
+ *
+ * @param {{nome: string, lat: number, lng: number}} s - Suggerimento selezionato.
+ * @returns {void}
+ */
+
 function pickStart(s) {
   start.value = s
   startQuery.value = s.nome.split(',').slice(0, 2).join(',')
   suggestions.value = []
   showSuggest.value = false
 }
+
+/**
+ * Usa la geolocalizzazione del browser come punto di partenza.
+ *
+ * @returns {void}
+ */
 
 async function useMyLocation() {
   if (!navigator.geolocation) {
@@ -92,6 +117,12 @@ async function useMyLocation() {
   )
 }
 
+/**
+ * Calcola il tragitto dalla partenza selezionata al bivacco.
+ *
+ * @returns {Promise<void>}
+ */
+
 async function calcola() {
   if (!start.value) {
     error.value = 'Seleziona prima un punto di partenza'
@@ -122,6 +153,12 @@ async function calcola() {
   }
 }
 
+/**
+ * Annulla il tragitto calcolato e ripristina il form.
+ *
+ * @returns {void}
+ */
+
 function reset() {
   result.value = null
   start.value = null
@@ -131,11 +168,24 @@ function reset() {
   emit('clear-route')
 }
 
-// Format helpers
+/**
+ * Formatta una distanza in metri o chilometri.
+ *
+ * @param {number} metri - Distanza in metri.
+ * @returns {string} Distanza formattata.
+ */
+
 function formatKm(metri) {
   if (metri < 1000) return `${Math.round(metri)} m`
   return `${(metri / 1000).toFixed(1)} km`
 }
+
+/**
+ * Formatta una durata in secondi.
+ *
+ * @param {number} secondi - Durata in secondi.
+ * @returns {string} Durata formattata.
+ */
 
 function formatDuration(secondi) {
   const h = Math.floor(secondi / 3600)

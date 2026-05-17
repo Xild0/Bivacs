@@ -1,3 +1,8 @@
+/**
+ * @file ResetPassword.vue
+ * @description Modale per impostare una nuova password tramite token di reset.
+ */
+
 <script setup>
 import { reactive, ref } from 'vue'
 import Modal from './Modal.vue'

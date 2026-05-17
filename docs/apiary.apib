@@ -1,0 +1,859 @@
+FORMAT: 1A
+HOST: http://localhost:5000
+
+# Bivacs API
+
+Documentazione REST API del progetto Bivacs, piattaforma per la consultazione, gestione e monitoraggio dei bivacchi nella Provincia Autonoma di Trento.
+
+# Group Autenticazione
+
+## Registrazione utente [POST /api/v1/auth/register]
+
+Registra un nuovo utente e invia una email di verifica.
+
++ Request (application/json)
+
+        {
+            "nome": "Giovanna",
+            "cognome": "Gagliardo",
+            "email": "gg@gmail.com",
+            "password": "password123",
+            "dataNascita": "2005-01-13"
+        }
+
++ Response 201 (application/json)
+
+        {
+            "message": "Utente registrato con successo",
+            "utente": {
+                "id": 6,
+                "nome": "Giovanna",
+                "cognome": "Gagliardo",
+                "email": "gg@gmail.com",
+                "discriminator": "UtenteRegistrato"
+            }
+        }
+
++ Response 400 (application/json)
+
+        {
+            "errore": "Tutti i campi sono obbligatori"
+        }
+
++ Response 409 (application/json)
+
+        {
+            "errore": "Esiste già un account con questa mail"
+        }
+
+
+## Login utente [POST /api/v1/auth/login]
+
+Effettua il login e restituisce un token JWT.
+
++ Request (application/json)
+
+        {
+            "email": "gg@gmail.com",
+            "password": "password123"
+        }
+
++ Response 200 (application/json)
+
+        {
+            "messaggio": "Login effettuato con successo",
+            "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        }
+
++ Response 400 (application/json)
+
+        {
+            "errore": "Email e password obbligatorie"
+        }
+
++ Response 401 (application/json)
+
+        {
+            "errore": "Credenziali non valide"
+        }
+
++ Response 403 (application/json)
+
+        {
+            "errore": "Devi verificare la tua mail prima di poter accedere",
+            "codiceErrore": "EMAIL_NON_VERIFICATA"
+        }
+
++ Response 404 (application/json)
+
+        {
+            "errore": "Utente non trovato, si prega di registrarsi.",
+            "codiceErrore": "UTENTE_NON_TROVATO"
+        }
+
+
+## Verifica email [GET /api/v1/auth/verify-email{?token}]
+
+Verifica l'email tramite token ricevuto via posta elettronica.
+
++ Parameters
+
+    + token: `abc123token` (string) - Token di verifica email.
+
++ Response 302
+
+
+## Recupero password [POST /api/v1/auth/recupero_password]
+
+Invia una email con link per il reset password.
+
++ Request (application/json)
+
+        {
+            "email": "gg@gmail.com"
+        }
+
++ Response 200 (application/json)
+
+        {
+            "messaggio": "Email di recupero inviata!"
+        }
+
++ Response 404 (application/json)
+
+        {
+            "errore": "Email non trovata"
+        }
+
+
+## Reset password [POST /api/v1/auth/reset-password/{token}]
+
+Imposta una nuova password usando il token ricevuto via email.
+
++ Parameters
+
+    + token: `abc123token` (string)
+
++ Request (application/json)
+
+        {
+            "nuovaPassword": "nuovaPassword123"
+        }
+
++ Response 200 (application/json)
+
+        {
+            "messaggio": "Password aggiornata con successo! Ora puoi effettuare il login."
+        }
+
++ Response 400 (application/json)
+
+        {
+            "errore": "Token non valido o scaduto."
+        }
+
+
+# Group Profilo
+
+## Visualizza profilo [GET /api/v1/profilo]
+
+Restituisce i dati del profilo dell'utente autenticato.
+
++ Request
+
+    + Headers
+
+            Authorization: Bearer JWT_TOKEN
+
++ Response 200 (application/json)
+
+        {
+            "_id": "6a0842a207d8b17a91562638",
+            "id": 6,
+            "email": "gg@gmail.com",
+            "nome": "Giovanna",
+            "cognome": "Gagliardo",
+            "preferiti": [
+                {
+                    "_id": "6a057945e53a4acc0f4bf812",
+                    "nome": "Bivacco Marzola Raffaele Bailoni",
+                    "zona": "Marzola",
+                    "altitudine": 1623,
+                    "postiLetto": 6
+                }
+            ]
+        }
+
++ Response 401 (application/json)
+
+        {
+            "errore": "Accesso negato. Token mancante o non valido."
+        }
+
+
+## Aggiorna profilo [PATCH /api/v1/profilo]
+
+Aggiorna i dati dell'utente autenticato.
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: Bearer JWT_TOKEN
+
+    + Body
+
+            {
+                "nome": "Giovanna",
+                "cognome": "Gagliardo",
+                "email": "giovanna@example.it",
+                "password": "nuovaPassword123"
+            }
+
++ Response 200 (application/json)
+
+        {
+            "messaggio": "Profilo aggiornato con successo",
+            "utente": {
+                "id": 6,
+                "nome": "Giovanna",
+                "cognome": "Gagliardo",
+                "email": "giovanna@example.it"
+            }
+        }
+
++ Response 409 (application/json)
+
+        {
+            "errore": "Questa email è già in uso da un altro account"
+        }
+
+
+## Elimina profilo [DELETE /api/v1/profilo]
+
+Elimina l'account dell'utente autenticato.
+
++ Request
+
+    + Headers
+
+            Authorization: Bearer JWT_TOKEN
+
++ Response 200 (application/json)
+
+        {
+            "messaggio": "Account eliminato definitivamente"
+        }
+
+
+## Aggiungi preferito [POST /api/v1/profilo/preferiti/{bivaccoId}]
+
+Aggiunge un bivacco alla lista preferiti dell'utente autenticato.
+
++ Parameters
+
+    + bivaccoId: `6a057945e53a4acc0f4bf812` (string)
+
++ Request
+
+    + Headers
+
+            Authorization: Bearer JWT_TOKEN
+
++ Response 200 (application/json)
+
+        {
+            "messaggio": "Bivacco aggiunto ai preferiti",
+            "preferiti": [
+                "6a057945e53a4acc0f4bf812"
+            ]
+        }
+
+
+## Rimuovi preferito [DELETE /api/v1/profilo/preferiti/{bivaccoId}]
+
+Rimuove un bivacco dalla lista preferiti dell'utente autenticato.
+
++ Parameters
+
+    + bivaccoId: `6a057945e53a4acc0f4bf812` (string)
+
++ Request
+
+    + Headers
+
+            Authorization: Bearer JWT_TOKEN
+
++ Response 200 (application/json)
+
+        {
+            "messaggio": "Bivacco rimosso dai preferiti",
+            "preferiti": []
+        }
+
+
+# Group Bivacchi
+
+## Lista bivacchi [GET /api/v1/bivacchi{?nome,zona,altitudineMin,altitudineMax,postiLetto}]
+
+Restituisce la lista dei bivacchi. Supporta filtri per nome, zona, altitudine e posti letto.
+
++ Parameters
+
+    + nome: `Bailoni` (string, optional)
+    + zona: `Marzola` (string, optional)
+    + altitudineMin: `1000` (number, optional)
+    + altitudineMax: `2500` (number, optional)
+    + postiLetto: `4` (number, optional)
+
++ Response 200 (application/json)
+
+        [
+            {
+                "_id": "6a057945e53a4acc0f4bf812",
+                "id": 2,
+                "nome": "Bivacco Marzola Raffaele Bailoni",
+                "latitudine": 46.0231,
+                "longitudine": 11.18125,
+                "altitudine": 1623,
+                "postiLetto": 6,
+                "dotazioni": "Tavolo, panche, brande, riparo di emergenza",
+                "zona": "Marzola",
+                "emergenza": false,
+                "acquaPresente": false,
+                "legnaDisponibile": true,
+                "mediaStelle": 3.7,
+                "numRecensioni": 3
+            }
+        ]
+
++ Response 500 (application/json)
+
+        {
+            "message": "Errore recupero bivacchi"
+        }
+
+
+## Dettaglio bivacco [GET /api/v1/bivacchi/{id}]
+
+Restituisce la scheda dettagliata di un bivacco.
+
++ Parameters
+
+    + id: `6a057945e53a4acc0f4bf812` (string)
+
++ Response 200 (application/json)
+
+        {
+            "_id": "6a057945e53a4acc0f4bf812",
+            "id": 2,
+            "nome": "Bivacco Marzola Raffaele Bailoni",
+            "latitudine": 46.0231,
+            "longitudine": 11.18125,
+            "altitudine": 1623,
+            "postiLetto": 6,
+            "dotazioni": "Tavolo, panche, brande, riparo di emergenza",
+            "zona": "Marzola",
+            "percorsi": [],
+            "emergenza": false,
+            "acquaPresente": false,
+            "legnaDisponibile": true,
+            "mediaStelle": 3.7,
+            "numRecensioni": 3,
+            "ticketAperti": true,
+            "numeroTicketAperti": 1
+        }
+
++ Response 400 (application/json)
+
+        {
+            "message": "ID bivacco non valido"
+        }
+
++ Response 404 (application/json)
+
+        {
+            "message": "Bivacco non trovato"
+        }
+
+
+## Crea bivacco [POST /api/v1/bivacchi]
+
+Crea un nuovo bivacco.
+
++ Request (application/json)
+
+        {
+            "id": 10,
+            "nome": "Bivacco Test",
+            "latitudine": 46.0,
+            "longitudine": 11.2,
+            "altitudine": 1800,
+            "postiLetto": 4,
+            "dotazioni": "Tavolo, brande",
+            "zona": "Test",
+            "emergenza": false,
+            "acquaPresente": true,
+            "legnaDisponibile": true
+        }
+
++ Response 201 (application/json)
+
+        {
+            "_id": "6a0000000000000000000000",
+            "id": 10,
+            "nome": "Bivacco Test",
+            "latitudine": 46.0,
+            "longitudine": 11.2,
+            "altitudine": 1800,
+            "postiLetto": 4,
+            "zona": "Test"
+        }
+
++ Response 400 (application/json)
+
+        {
+            "message": "Campi obbligatori mancanti"
+        }
+
++ Response 409 (application/json)
+
+        {
+            "message": "Esiste già un bivacco con questo id"
+        }
+
+
+## Elimina bivacco [DELETE /api/v1/bivacchi/{id}]
+
+Elimina un bivacco tramite ObjectId MongoDB.
+
++ Parameters
+
+    + id: `6a057945e53a4acc0f4bf812` (string)
+
++ Response 200 (application/json)
+
+        {
+            "message": "Bivacco eliminato correttamente"
+        }
+
++ Response 404 (application/json)
+
+        {
+            "message": "Bivacco non trovato"
+        }
+
+
+## Percorsi associati a un bivacco [GET /api/v1/bivacchi/{id}/percorsi]
+
+Restituisce i percorsi associati a un bivacco.
+
++ Parameters
+
+    + id: `6a057945e53a4acc0f4bf812` (string)
+
++ Response 200 (application/json)
+
+        [
+            {
+                "_id": "6a0000000000000000000001",
+                "id": 1,
+                "bivacco": "6a057945e53a4acc0f4bf812",
+                "tipo": "ottimale",
+                "gpxFile": "E412.gpx",
+                "dislivello": 450,
+                "difficolta": "E",
+                "lunghezza": 6.8,
+                "durataStimata": 170
+            }
+        ]
+
++ Response 404 (application/json)
+
+        {
+            "message": "Bivacco non trovato"
+        }
+
+
+## Aggiorna risorse bivacco [PATCH /api/v1/bivacchi/{id}/risorse]
+
+Aggiorna la disponibilità di acqua e legna per un bivacco. Richiede autenticazione.
+
++ Parameters
+
+    + id: `6a057945e53a4acc0f4bf812` (string)
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: Bearer JWT_TOKEN
+
+    + Body
+
+            {
+                "acquaPresente": false,
+                "legnaDisponibile": true
+            }
+
++ Response 200 (application/json)
+
+        {
+            "message": "Stato risorse aggiornato con successo",
+            "bivacco": {
+                "_id": "6a057945e53a4acc0f4bf812",
+                "nome": "Bivacco Marzola Raffaele Bailoni",
+                "acquaPresente": false,
+                "legnaDisponibile": true
+            }
+        }
+
++ Response 400 (application/json)
+
+        {
+            "message": "Fornire almeno uno tra acquaPresente o legnaDisponibile"
+        }
+
++ Response 401 (application/json)
+
+        {
+            "errore": "Accesso negato. Token mancante o non valido."
+        }
+
+
+# Group Percorsi
+
+## Lista percorsi [GET /api/v1/percorsi]
+
+Restituisce tutti i percorsi disponibili.
+
++ Response 200 (application/json)
+
+        [
+            {
+                "_id": "6a0000000000000000000001",
+                "id": 1,
+                "tipo": "ottimale",
+                "gpxFile": "E412.gpx",
+                "dislivello": 450,
+                "difficolta": "E",
+                "lunghezza": 6.8,
+                "durataStimata": 170
+            }
+        ]
+
+
+## Dettaglio percorso [GET /api/v1/percorsi/{id}]
+
+Restituisce un percorso specifico.
+
++ Parameters
+
+    + id: `6a0000000000000000000001` (string)
+
++ Response 200 (application/json)
+
+        {
+            "_id": "6a0000000000000000000001",
+            "id": 1,
+            "tipo": "ottimale",
+            "gpxFile": "E412.gpx",
+            "dislivello": 450,
+            "difficolta": "E",
+            "lunghezza": 6.8,
+            "durataStimata": 170
+        }
+
++ Response 404 (application/json)
+
+        {
+            "message": "Percorso non trovato"
+        }
+
+
+## Crea percorso [POST /api/v1/percorsi]
+
+Crea un nuovo percorso associato a un bivacco.
+
++ Request (application/json)
+
+        {
+            "id": 1,
+            "bivacco": "6a057945e53a4acc0f4bf812",
+            "tipo": "ottimale",
+            "gpxFile": "E412.gpx",
+            "dislivello": 450,
+            "difficolta": "E",
+            "lunghezza": 6.8,
+            "durataStimata": 170
+        }
+
++ Response 201 (application/json)
+
+        {
+            "_id": "6a0000000000000000000001",
+            "id": 1,
+            "bivacco": "6a057945e53a4acc0f4bf812",
+            "tipo": "ottimale",
+            "gpxFile": "E412.gpx"
+        }
+
++ Response 400 (application/json)
+
+        {
+            "message": "Errore creazione percorso"
+        }
+
+
+## Download GPX [GET /api/v1/percorsi/{id}/download]
+
+Scarica il file GPX associato a un percorso.
+
++ Parameters
+
+    + id: `6a0000000000000000000001` (string)
+
++ Response 200 (application/gpx+xml)
+
++ Response 404 (application/json)
+
+        {
+            "message": "Percorso non trovato"
+        }
+
+
+# Group Recensioni
+
+## Crea recensione [POST /api/v1/recensioni]
+
+Inserisce una recensione associata a un bivacco.
+
++ Request (application/json)
+
+        {
+            "bivaccoId": "6a057945e53a4acc0f4bf812",
+            "utente": "Giovanna Gagliardo",
+            "stelle": 5,
+            "testo": "Bivacco molto bello e ben tenuto.",
+            "anonima": false
+        }
+
++ Response 201 (application/json)
+
+        {
+            "_id": "6a1111111111111111111111",
+            "bivaccoId": "6a057945e53a4acc0f4bf812",
+            "utente": "Giovanna Gagliardo",
+            "stelle": 5,
+            "testo": "Bivacco molto bello e ben tenuto.",
+            "anonima": false
+        }
+
++ Response 404 (application/json)
+
+        {
+            "message": "Bivacco non trovato"
+        }
+
++ Response 400 (application/json)
+
+        {
+            "message": "Errore creazione recensione"
+        }
+
+
+## Lista recensioni bivacco [GET /api/v1/recensioni/{bivaccoId}]
+
+Restituisce tutte le recensioni di un bivacco.
+
++ Parameters
+
+    + bivaccoId: `6a057945e53a4acc0f4bf812` (string)
+
++ Response 200 (application/json)
+
+        [
+            {
+                "_id": "6a1111111111111111111111",
+                "bivaccoId": "6a057945e53a4acc0f4bf812",
+                "utente": "Giovanna Gagliardo",
+                "stelle": 5,
+                "testo": "Bivacco molto bello e ben tenuto.",
+                "anonima": false
+            },
+            {
+                "_id": "6a2222222222222222222222",
+                "bivaccoId": "6a057945e53a4acc0f4bf812",
+                "utente": "Anonimo",
+                "stelle": 4,
+                "testo": "Esperienza positiva.",
+                "anonima": true
+            }
+        ]
+
+
+# Group Segnalazioni
+
+## Crea segnalazione [POST /api/v1/segnalazioni]
+
+Crea una segnalazione per un bivacco. Richiede autenticazione.
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: Bearer JWT_TOKEN
+
+    + Body
+
+            {
+                "bivaccoId": "6a057945e53a4acc0f4bf812",
+                "descrizione": "Il tavolo interno è rotto e necessita manutenzione urgente.",
+                "foto": "test.jpg"
+            }
+
++ Response 201 (application/json)
+
+        {
+            "_id": "6a3333333333333333333333",
+            "utenteId": "6a0842a207d8b17a91562638",
+            "bivaccoId": "6a057945e53a4acc0f4bf812",
+            "descrizione": "Il tavolo interno è rotto e necessita manutenzione urgente.",
+            "foto": "test.jpg",
+            "statoSegnalazione": "inviata"
+        }
+
++ Response 400 (application/json)
+
+        {
+            "errore": "La descrizione della segnalazione è obbligatoria"
+        }
+
++ Response 401 (application/json)
+
+        {
+            "errore": "Accesso negato. Token mancante o non valido."
+        }
+
+
+## Segnalazioni attive [GET /api/v1/segnalazioni/attive]
+
+Restituisce le segnalazioni non archiviate. Richiede autenticazione.
+
++ Request
+
+    + Headers
+
+            Authorization: Bearer JWT_TOKEN
+
++ Response 200 (application/json)
+
+        [
+            {
+                "_id": "6a3333333333333333333333",
+                "bivaccoId": "6a057945e53a4acc0f4bf812",
+                "descrizione": "Il tavolo interno è rotto e necessita manutenzione urgente.",
+                "statoSegnalazione": "inviata"
+            }
+        ]
+
+
+## Storico segnalazioni staff [GET /api/v1/segnalazioni/storico]
+
+Restituisce lo storico di tutte le segnalazioni. Accessibile solo a SuperUser o Supporto Tecnico.
+
++ Request
+
+    + Headers
+
+            Authorization: Bearer JWT_TOKEN
+
++ Response 200 (application/json)
+
+        [
+            {
+                "_id": "6a3333333333333333333333",
+                "utenteId": {
+                    "email": "gg@gmail.com",
+                    "discriminator": "UtenteRegistrato"
+                },
+                "bivaccoId": "6a057945e53a4acc0f4bf812",
+                "descrizione": "Il tavolo interno è rotto e necessita manutenzione urgente.",
+                "statoSegnalazione": "inviata"
+            }
+        ]
+
++ Response 403 (application/json)
+
+        {
+            "errore": "Accesso negato. Solo la SAT, gli Enti o il Supporto Tecnico possono accedere."
+        }
+
+
+## Segnalazioni per bivacco [GET /api/v1/segnalazioni/bivacco/{bivaccoId}]
+
+Restituisce le segnalazioni associate a un bivacco.
+
++ Parameters
+
+    + bivaccoId: `6a057945e53a4acc0f4bf812` (string)
+
++ Request
+
+    + Headers
+
+            Authorization: Bearer JWT_TOKEN
+
++ Response 200 (application/json)
+
+        [
+            {
+                "_id": "6a3333333333333333333333",
+                "bivaccoId": "6a057945e53a4acc0f4bf812",
+                "descrizione": "Il tavolo interno è rotto e necessita manutenzione urgente.",
+                "statoSegnalazione": "inviata"
+            }
+        ]
+
+
+## Aggiorna stato segnalazione [PATCH /api/v1/segnalazioni/{id}/stato]
+
+Aggiorna lo stato di una segnalazione. Accessibile solo a SuperUser o Supporto Tecnico.
+
++ Parameters
+
+    + id: `6a3333333333333333333333` (string)
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: Bearer JWT_TOKEN
+
+    + Body
+
+            {
+                "nuovoStato": "in_corso"
+            }
+
++ Response 200 (application/json)
+
+        {
+            "messaggio": "Stato aggiornato con successo",
+            "segnalazione": {
+                "_id": "6a3333333333333333333333",
+                "statoSegnalazione": "in_corso"
+            }
+        }
+
++ Response 400 (application/json)
+
+        {
+            "errore": "Stato non valido. Usa uno dei valori permessi."
+        }
+
++ Response 404 (application/json)
+
+        {
+            "errore": "Segnalazione non trovata"
+        }

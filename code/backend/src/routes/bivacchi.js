@@ -1,3 +1,10 @@
+/**
+ * @file bivacchi.js
+ * @description Route Express per la gestione dei bivacchi.
+ * Espone endpoint per ricerca, dettaglio, creazione, eliminazione,
+ * percorsi associati e aggiornamento dello stato delle risorse.
+ */
+
 const express = require('express');
 const router = express.Router();
 
@@ -6,14 +13,26 @@ const Percorso = require('../models/percorso');
 const Segnalazione = require('../models/segnalazione');
 const {protectRoute} = require('../middlewares/authMiddleware');
 
-/** @param {unknown} err */
+/**
+ * Estrae un messaggio leggibile da un errore sconosciuto.
+ *
+ * @param {unknown} err - Errore catturato nel blocco catch.
+ * @returns {string} Messaggio dell'errore.
+ */
+
 const getErrorMessage = (err) =>
   err instanceof Error ? err.message : String(err);
 
 /**
- * GET tutti i bivacchi con filtri
- * /api/v1/bivacchi?nome=care&zona=Adamello&altitudineMin=2000
+ * Recupera la lista dei bivacchi applicando eventuali filtri.
+ * Supporta ricerca per nome, zona, range di altitudine e numero minimo di posti letto.
+ *
+ * @route GET /api/v1/bivacchi
+ * @param {import('express').Request} req - Richiesta HTTP con query params opzionali.
+ * @param {import('express').Response} res - Risposta HTTP.
+ * @returns {Promise<void>} Lista dei bivacchi filtrati.
  */
+
 router.get('/', async (req, res) => {
   try {
     const {
@@ -27,7 +46,6 @@ router.get('/', async (req, res) => {
     /** @type {Record<string, any>} */
     const filtri = {};
 
-    // Ricerca nome case-insensitive
     if (nome) {
       filtri.nome = {
         $regex: nome,
@@ -35,7 +53,6 @@ router.get('/', async (req, res) => {
       };
     }
 
-    // Filtro zona
     if (zona) {
       filtri.zona = {
         $regex: zona,
@@ -43,7 +60,6 @@ router.get('/', async (req, res) => {
       };
     }
 
-    // Filtro altitudine
     if (altitudineMin || altitudineMax) {
       filtri.altitudine = {};
 
@@ -56,7 +72,6 @@ router.get('/', async (req, res) => {
       }
     }
 
-    // Filtro posti letto
     if (postiLetto) {
       filtri.postiLetto = {
         $gte: Number(postiLetto)
@@ -76,8 +91,15 @@ router.get('/', async (req, res) => {
 });
 
 /**
- * GET bivacco per ID Mongo
+ * Recupera la scheda dettagliata di un bivacco tramite ObjectId MongoDB.
+ * Popola anche i percorsi associati al bivacco.
+ *
+ * @route GET /api/v1/bivacchi/:id
+ * @param {import('express').Request} req - Richiesta HTTP con id del bivacco.
+ * @param {import('express').Response} res - Risposta HTTP.
+ * @returns {Promise<void>} Bivacco richiesto oppure errore 400/404.
  */
+
 router.get('/:id', async (req, res) => {
   try {
 
@@ -90,7 +112,6 @@ router.get('/:id', async (req, res) => {
     });
   }
 
-  // Conta segnalazioni NON chiuse
   const segnalazioniAttive = await Segnalazione.countDocuments({
     bivaccoId: bivacco._id,
     statoSegnalazione: {
@@ -98,10 +119,8 @@ router.get('/:id', async (req, res) => {
     }
   });
 
-  // trasformo il documento mongoose in oggetto modificabile
   const bivaccoObj = bivacco.toObject();
 
-  // aggiungo campo dinamico
   bivaccoObj.ticketAperti = segnalazioniAttive > 0;
   bivaccoObj.numeroTicketAperti = segnalazioniAttive;
 
@@ -123,8 +142,15 @@ router.get('/:id', async (req, res) => {
 });
 
 /**
- * POST nuovo bivacco
+ * Crea un nuovo bivacco nel database.
+ * Valida i campi obbligatori e controlla che l'id numerico non sia già presente.
+ *
+ * @route POST /api/v1/bivacchi
+ * @param {import('express').Request} req - Richiesta HTTP contenente i dati del bivacco.
+ * @param {import('express').Response} res - Risposta HTTP.
+ * @returns {Promise<void>} Bivacco creato oppure errore di validazione.
  */
+
 router.post('/', async (req, res) => {
   try {
 
@@ -142,7 +168,6 @@ router.post('/', async (req, res) => {
       legnaDisponibile
     } = req.body;
 
-    // Controllo campi obbligatori
     if (
       id === undefined ||
       !nome ||
@@ -156,7 +181,6 @@ router.post('/', async (req, res) => {
       });
     }
 
-    // Controllo ID duplicato
     const bivaccoEsistente = await Bivacco.findOne({ id });
 
     if (bivaccoEsistente) {
@@ -206,8 +230,14 @@ router.post('/', async (req, res) => {
 });
 
 /**
- * DELETE bivacco
+ * Elimina un bivacco tramite ObjectId MongoDB.
+ *
+ * @route DELETE /api/v1/bivacchi/:id
+ * @param {import('express').Request} req - Richiesta HTTP con id del bivacco.
+ * @param {import('express').Response} res - Risposta HTTP.
+ * @returns {Promise<void>} Messaggio di conferma oppure errore 400/404.
  */
+
 router.delete('/:id', async (req, res) => {
   try {
 
@@ -239,9 +269,15 @@ router.delete('/:id', async (req, res) => {
 });
 
 /**
- * GET percorsi associati a un bivacco
- * /api/v1/bivacchi/:id/percorsi
+ * Recupera tutti i percorsi associati a un bivacco.
+ * Prima verifica che il bivacco esista, poi restituisce i percorsi collegati.
+ *
+ * @route GET /api/v1/bivacchi/:id/percorsi
+ * @param {import('express').Request} req - Richiesta HTTP con id del bivacco.
+ * @param {import('express').Response} res - Risposta HTTP.
+ * @returns {Promise<void>} Lista dei percorsi associati al bivacco.
  */
+
 router.get('/:id/percorsi', async (req, res) => {
   try {
     const bivacco = await Bivacco.findById(req.params.id)
@@ -273,15 +309,20 @@ router.get('/:id/percorsi', async (req, res) => {
 })
 
 /**
- * PATCH aggiorna stato risorse (acqua e legna)
- * Accessibile solo a utenti registrati tramite protectRoute
- * /api/v1/bivacchi/:id/risorse
+ * Aggiorna lo stato delle risorse disponibili per un bivacco.
+ * Permette di modificare acquaPresente e/o legnaDisponibile.
+ * Richiede autenticazione tramite token JWT.
+ *
+ * @route PATCH /api/v1/bivacchi/:id/risorse
+ * @param {import('express').Request} req - Richiesta HTTP con campi acquaPresente e/o legnaDisponibile.
+ * @param {import('express').Response} res - Risposta HTTP.
+ * @returns {Promise<void>} Bivacco aggiornato oppure errore.
  */
+
 router.patch('/:id/risorse', protectRoute, async (req, res) => {
   try {
     const { acquaPresente, legnaDisponibile } = req.body;
 
-    // Creiamo un oggetto con i soli campi che vogliamo permettere di aggiornare
     const aggiornamenti = {};
     
     if (acquaPresente !== undefined) {
@@ -292,22 +333,20 @@ router.patch('/:id/risorse', protectRoute, async (req, res) => {
         aggiornamenti.legnaDisponibile = legnaDisponibile;
     }
 
-    // Se l'utente non ha inviato nessuno dei due campi, restituiamo errore
     if (Object.keys(aggiornamenti).length === 0) {
       return res.status(400).json({
         message: 'Fornire almeno uno tra acquaPresente o legnaDisponibile'
       });
     }
 
-    // Aggiorniamo anche la data dell'ultimo check (definita nel tuo schema)
     aggiornamenti.ultimoCheckStato = Date.now();
 
     const bivaccoAggiornato = await Bivacco.findByIdAndUpdate(
       req.params.id,
       { $set: aggiornamenti },
       { 
-        new: true,           // Restituisce il documento dopo la modifica
-        runValidators: true  // Valida i dati contro lo schema Mongoose
+        new: true,           
+        runValidators: true 
       }
     );
 

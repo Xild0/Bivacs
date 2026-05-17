@@ -1,10 +1,24 @@
+/**
+ * @file percorsi.js
+ * @description Route Express per la gestione dei percorsi associati ai bivacchi.
+ * Espone endpoint per leggere, creare e scaricare percorsi GPX.
+ */
+
 const express = require('express');
 const router = express.Router();
 
 const Percorso = require('../models/percorso');
 const path = require('path');
 
-// GET tutti i percorsi
+/**
+ * Recupera tutti i percorsi presenti nel database.
+ *
+ * @route GET /api/v1/percorsi
+ * @param {import('express').Request} req - Richiesta HTTP.
+ * @param {import('express').Response} res - Risposta HTTP.
+ * @returns {Promise<void>} Lista dei percorsi con bivacco popolato.
+ */
+
 router.get('/', async (req, res) => {
     try {
         const percorsi = await Percorso.find().populate('bivacco');
@@ -19,7 +33,15 @@ router.get('/', async (req, res) => {
 });
 
 
-// GET percorso per ID
+/**
+ * Recupera un percorso specifico tramite ObjectId MongoDB.
+ *
+ * @route GET /api/v1/percorsi/:id
+ * @param {import('express').Request} req - Richiesta HTTP con parametro id.
+ * @param {import('express').Response} res - Risposta HTTP.
+ * @returns {Promise<void>} Percorso richiesto oppure errore 404.
+ */
+
 router.get('/:id', async (req, res) => {
     try {
         const percorso = await Percorso.findById(req.params.id)
@@ -41,7 +63,15 @@ router.get('/:id', async (req, res) => {
 });
 
 
-// POST nuovo percorso
+/**
+ * Crea un nuovo percorso associato a un bivacco.
+ *
+ * @route POST /api/v1/percorsi
+ * @param {import('express').Request} req - Richiesta HTTP contenente i dati del percorso.
+ * @param {import('express').Response} res - Risposta HTTP.
+ * @returns {Promise<void>} Percorso creato oppure errore di validazione.
+ */
+
 router.post('/', async (req, res) => {
     try {
         const nuovoPercorso = new Percorso(req.body);
@@ -58,9 +88,14 @@ router.post('/', async (req, res) => {
 });
 
 /**
- * DOWNLOAD file GPX
- * GET /api/v1/percorsi/:id/download
+ * Scarica il file GPX associato a un percorso.
+ *
+ * @route GET /api/v1/percorsi/:id/download
+ * @param {import('express').Request} req - Richiesta HTTP con id del percorso.
+ * @param {import('express').Response} res - Risposta HTTP con download del file.
+ * @returns {Promise<void>} File GPX oppure errore se il percorso non esiste.
  */
+
 router.get('/:id/download', async (req, res) => {
     try {
 

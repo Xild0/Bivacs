@@ -1,3 +1,9 @@
+/**
+ * @file utente.js
+ * @description Modello Mongoose base per gli utenti del sistema.
+ * Gestisce credenziali, email, lingua, verifica account, token di reset password e discriminator role-based.
+ */
+
 const mongoose = require('mongoose');
 
 const utenteSchema = new mongoose.Schema(

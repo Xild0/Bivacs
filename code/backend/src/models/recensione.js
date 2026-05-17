@@ -1,3 +1,9 @@
+/**
+ * @file recensione.js
+ * @description Modello Mongoose per le recensioni dei bivacchi.
+ * Ogni recensione contiene valutazione a stelle, testo, autore visualizzato e opzione anonima.
+ */
+
 const mongoose = require('mongoose');
 
 const recensioneSchema = new mongoose.Schema({
@@ -26,7 +32,15 @@ const recensioneSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
-/** @param {mongoose.Types.ObjectId|string} bivaccoId */
+
+/**
+ * Calcola il numero totale di recensioni e la media delle stelle per un bivacco.
+ * Aggiorna direttamente il documento Bivacco con i campi `numRecensioni` e `mediaStelle`.
+ *
+ * @param {mongoose.Types.ObjectId|string} bivaccoId - ObjectId del bivacco recensito.
+ * @returns {Promise<void>}
+ */
+
 recensioneSchema.statics.calcolaMedia = async function(bivaccoId) {
   const self = /** @type {import('mongoose').Model<any>} */ (/** @type {unknown} */ (this));
   const stats = /** @type {Array<{ _id: mongoose.Types.ObjectId, nRecensioni: number, mediaVoti: number }> }*/ (await self.aggregate([
