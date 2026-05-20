@@ -30,26 +30,56 @@ Cuore del server Node.js
 0. **Prerequisiti (da fare solo la prima volta)**: assicuratevi di avere installato Git, Node.js e VS Code. Per Node.js installate *NVM-Windows* e, una volta installato, aprite il terminale e digitate `nvm install lts` seguito `nvm use lts` per usare l'ultima versione stabile.
 1. **Clonare la repository**: `git clone https://github.com/Xild0/Bivacs`
 2. **Entrate nella cartella backend per installare le dipendenze**: dentro la cartella code/backend lanciate questo comando `npm install`
+3. Quando creeremo il database o useremo chiavi segrete, ognuno dovrà creare un file chiamato `.env` dentro code/backend. 
+**NON FATE MAI** `git add .env`, questo file deve rimanere strettamente locale sui nostri pc, ma se dalla cartella origin farete `git add .` non ci saranno problemi in quanto ho inserito dentro `.gitignore` un comando per ignorare il file .env
 
 
 --- 
 
-## Regole d'oro
-1. Mai lavorare tutti sul ramo `main`. Quando dobbiamo creare una nuova funzionalità, creiamo un nuovo branch, facciamo i commit li e poi carichiamo il tutto nel main su GitHub: 
+## Workflow di sviluppo Git / GitHub (AGGIORNATO) 
 
-    * Creare un branch e aggiornarsi: 
-        1. `git checkout main` 
-        2. `git pull origin main`
-        3. `git checkout -b <nome_branch>` tramite il comando `git branch`è inoltre possibile vedere una lista dei rami con un asterisco di fianco al branch attuale.
-    * Lavorare e salvare nel branch: 
-        1. `git add .` 
-        2. `git commit -m "descrizione chiara e concisa di cosa si ha fatto"`
-    * Caricare il branch online: 
-        1. `git push -u origin <nome_branch>`
-    * Da qui in poi, la pull request si è creata e uno di noi deve approvarla per unire il branch al main
-    * **Dopo aver accettato la pull request**, dal pc personale in locale bisogna seguire:
-        1. `git checkout main`
-        2. `git pull origin main`
+**Feature Branch Workflow** 
+Non facciamo push diretto sul branch `main`; tutte le modifiche devono passare tramite Pull Request (PR) **solo quando l'implementazione è completa e testata**.
+
+### Nomenclatura dei Branch
+Creiamo sempre un nuovo branch a partire dall'ultima versione di `main` con un titolo pari ad uno dei seguenti prefissi per categorizzare il lavoro:
+* `feature/nome-funzionalita` (per nuove implementazioni)
+* `bugfix/nome-del-bug` (per la risoluzione di problemi)
+
+### Operazioni: 
+
+1. Assicurarsi di avere l'ultima versione stabile prima di modificare il codice:
+* `git checkout main`
+* `git pull origin main`
+
+2. Creare il proprio branch di lavoro:
+* `git checkout -b feature/la-mia-nuova-feature`
+
+3. Sviluppare il codice con **commit locali**:
+* `git add .`
+* `git commit -m "commento"`
+
+4. Apri la pull request **solo a lavoro concluso**: 
+quando la funzionalità è completamente finita e testata (vale a dire nessun errore in esecuzione della webapp), eseguire i seguenti comandi: 
+* `git push origin <nome branch>`
+* Su GitHub aprire una pull request verso il branch `main`.
+* Nel corpo della pull request, descrivere brevemente cosa è stato fatto, come testarlo e se ci sono dipendenze particolari.
+
+5. Revisione e Merge:
+* Una volta approvata la pull request, eseguire il merge su GitHub utilizzando preferibilmente l'opzione **Squash and merge**, questo manterrà il `main` pulito con un solo commit per l'intera funzionalità.
+* **Elimina il branch** dopo il merge: 
+    * **Su GitHub:** subito dopo aver fatto il merge, comparirà automaticamente un pulsante con scritto **"Delete branch"**
+    * **In locale:** scarica il codice appena unito e cancella il vecchio branch di lavoro con questi comandi:
+    ``` bash
+    git checkout main
+    git pull origin main
+    git branch -d <nome branch>
     
-2. File `.env`: quando creeremo il database o useremo chiavi segrete, ognuno dovrà creare un file chiamato `.env` dentro code/backend. 
-**NON FATE MAI** `git add .env`, questo file deve rimanere strettamente locale sui nostri pc, ma se dalla cartella origin farete `git add .` non ci saranno problemi in quanto ho inserito dentro `.gitignore` un comando per ignorare il file .env
+    # Consigliato: pulisce l'elenco dei branch remoti obsoleti sul tuo PC
+    git fetch --prune
+    ```
+
+6. Aggiornamento locale
+Dopo che la pull request è stata unita al `main`, tornare al punto 1 per avere l'ultima versione del codice
+    
+
