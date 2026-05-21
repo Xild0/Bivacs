@@ -32,6 +32,8 @@ const autenticazioneRoute = require('./routes/autenticazione')
 const profiloRoute = require('./routes/profilo');
 const percorsiRoutes = require('./routes/percorsi');
 const segnalazioniRoute = require('./routes/segnalazioniRoute');
+const meteoRoute = require('./routes/meteo');
+const supportoRoute = require('./routes/supporto');
 
 /**
  * Inizializzazione applicazione Express.
@@ -48,7 +50,6 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
-app.use('/uploads', express.static('uploads'));
 
 // registrazione delle route API
 // tutte le richieste a /api/v1/bivacchi vengono gestite da bivacciRouter
@@ -59,7 +60,8 @@ app.use('/api/v1/auth', autenticazioneRoute);
 app.use('/api/v1/profilo', profiloRoute);
 app.use('/api/v1/percorsi', percorsiRoutes);
 app.use('/api/v1/segnalazioni', segnalazioniRoute);
-
+app.use('/api/v1/meteo', meteoRoute);
+app.use('/api/v1/supporto', supportoRoute);
 /**
  * Route di test per verificare che il server sia online.
  *
