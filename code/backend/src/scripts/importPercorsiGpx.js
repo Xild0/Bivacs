@@ -17,8 +17,7 @@ const connectDB = require('../config/db')
 const Percorso = require('../models/percorso')
 const Bivacco = require('../models/bivacco')
 
-const GPX_FOLDER = 'C:/Users/User/Desktop/Ingegneria del software/sentierisat.gpx'
-
+const GPX_FOLDER = path.join(__dirname, '../../uploads/gpx')
 /**
  * Calcola la distanza in metri tra due coordinate geografiche usando la formula di Haversine.
  *

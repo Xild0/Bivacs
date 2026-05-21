@@ -13,6 +13,7 @@ import {
 } from '../services/api'
 
 import TripPlanner from './TripPlanner.vue'
+import MeteoPanel from './MeteoPanel.vue'
 
 const props = defineProps({
   bivacco: {
@@ -174,7 +175,21 @@ watch(
           </span>
         </strong>
       </div>
+
+      <div class="fact">
+        <span class="fact-label">Tipo</span>
+        <strong>
+          <span class="status-pill status-ok">
+            {{ bivacco.tipoStruttura || 'fisso' }}
+          </span>
+        </strong>
+      </div>
     </div>
+
+    <!-- Meteo (US17, US19) -->
+    <section class="section">
+      <MeteoPanel :bivacco="bivacco" />
+    </section>
 
     <!-- Risorse -->
     <section class="section">
@@ -226,7 +241,6 @@ watch(
       </div>
     </section>
 
-
     <!-- Legenda CAI -->
     <section class="section">
       <h3 class="section-title">Legenda CAI</h3>
@@ -239,65 +253,64 @@ watch(
     </section>
 
     <!-- Recensioni -->
-    <!-- Recensioni -->
-<section class="section">
-  <h3 class="section-title">Recensioni</h3>
+    <section class="section">
+      <h3 class="section-title">Recensioni</h3>
 
-  <div v-if="!isLogged" class="login-hint">
-    Accedi per lasciare una recensione.
-  </div>
-
-  <form v-else class="review-form" @submit.prevent="submitRecensione">
-    <p class="review-author">
-      Pubblicherai come <strong>{{ nomeUtente }}</strong>
-    </p>
-
-    <select v-model="recensioneForm.stelle" class="select">
-      <option :value="1">★ 1 stella</option>
-      <option :value="2">★★ 2 stelle</option>
-      <option :value="3">★★★ 3 stelle</option>
-      <option :value="4">★★★★ 4 stelle</option>
-      <option :value="5">★★★★★ 5 stelle</option>
-    </select>
-
-    <textarea
-      v-model="recensioneForm.testo"
-      class="textarea"
-      placeholder="Scrivi una recensione…"
-      required
-    />
-
-    <label class="checkbox">
-      <input v-model="recensioneForm.anonima" type="checkbox" />
-      <span class="check-box"></span>
-      Pubblica come anonimo
-    </label>
-
-    <button type="submit" class="btn btn-primary btn-block">
-      Invia recensione
-    </button>
-  </form>
-
-  <div class="reviews">
-    <div
-      v-for="recensione in recensioni"
-      :key="recensione._id"
-      class="review"
-    >
-      <div class="review-head">
-        <strong>{{ recensione.utente }}</strong>
-        <div class="stars">
-          <span v-for="n in 5" :key="n" :class="{ filled: n <= recensione.stelle }">★</span>
-        </div>
+      <div v-if="!isLogged" class="login-hint">
+        Accedi per lasciare una recensione.
       </div>
-      <p>{{ recensione.testo }}</p>
-    </div>
 
-    <p v-if="recensioni.length === 0" class="empty">
-      Nessuna recensione. Sii il primo a recensirlo.
-    </p>
-  </div>
-</section>
+      <form v-else class="review-form" @submit.prevent="submitRecensione">
+        <p class="review-author">
+          Pubblicherai come <strong>{{ nomeUtente }}</strong>
+        </p>
+
+        <select v-model="recensioneForm.stelle" class="select">
+          <option :value="1">★ 1 stella</option>
+          <option :value="2">★★ 2 stelle</option>
+          <option :value="3">★★★ 3 stelle</option>
+          <option :value="4">★★★★ 4 stelle</option>
+          <option :value="5">★★★★★ 5 stelle</option>
+        </select>
+
+        <textarea
+          v-model="recensioneForm.testo"
+          class="textarea"
+          placeholder="Scrivi una recensione…"
+          required
+        />
+
+        <label class="checkbox">
+          <input v-model="recensioneForm.anonima" type="checkbox" />
+          <span class="check-box"></span>
+          Pubblica come anonimo
+        </label>
+
+        <button type="submit" class="btn btn-primary btn-block">
+          Invia recensione
+        </button>
+      </form>
+
+      <div class="reviews">
+        <div
+          v-for="recensione in recensioni"
+          :key="recensione._id"
+          class="review"
+        >
+          <div class="review-head">
+            <strong>{{ recensione.utente }}</strong>
+            <div class="stars">
+              <span v-for="n in 5" :key="n" :class="{ filled: n <= recensione.stelle }">★</span>
+            </div>
+          </div>
+          <p>{{ recensione.testo }}</p>
+        </div>
+
+        <p v-if="recensioni.length === 0" class="empty">
+          Nessuna recensione. Sii il primo a recensirlo.
+        </p>
+      </div>
+    </section>
   </aside>
 </template>
 
@@ -652,5 +665,4 @@ watch(
   font-size: 12px;
   line-height: 1.4;
 }
-
 </style>

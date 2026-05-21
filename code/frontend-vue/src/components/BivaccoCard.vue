@@ -4,22 +4,15 @@
  */
 
 <script setup>
-import { computed, ref } from 'vue'
+import { ref, computed } from 'vue'
 import { aggiungiPreferito, rimuoviPreferito } from '../services/api'
+import { getMeteoBivacco } from '../services/api'
 
 const props = defineProps({
-  bivacco: {
-    type: Object,
-    required: true
-  },
-  isLogged: {
-    type: Boolean,
-    default: false
-  },
-  isFavorite: {
-    type: Boolean,
-    default: false
-  }
+  bivacco: { type: Object, required: true },
+  isLogged: { type: Boolean, default: false },
+  isFavorite: { type: Boolean, default: false },
+  meteo: { type: Object, default: null }
 })
 
 const emit = defineEmits(['open', 'favorite-changed'])
@@ -130,6 +123,24 @@ async function toggleFavorite(event) {
         </svg>
         {{ bivacco.zona }}
       </p>
+
+      <div v-if="meteo" class="weather-pill">
+  <span>
+    {{
+      meteo.precipitazioni >= 10
+        ? '🌧️'
+        : meteo.vento >= 50
+          ? '💨'
+          : meteo.temperatura <= 0
+            ? '❄️'
+            : '☀️'
+    }}
+  </span>
+
+  <span class="mono">
+    {{ meteo.temperatura }}°C
+  </span>
+</div>
 
       <div class="stats">
         <div class="stat">
@@ -407,5 +418,17 @@ h3 {
 .chip-warning {
   background: var(--warning-bg);
   color: var(--warning);
+}
+
+.weather-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: var(--r-full);
+  background: var(--bg-surface-3);
+  border: 1px solid var(--border-subtle);
+  font-size: 12px;
+  color: var(--text-secondary);
 }
 </style>

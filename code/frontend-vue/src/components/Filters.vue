@@ -20,7 +20,8 @@ const filters = reactive({
   zona: '',
   altitudineMin: '',
   altitudineMax: '',
-  postiLetto: ''
+  postiLetto: '',
+  tipoStruttura: ''
 })
 
 const suggerimentiNome = computed(() => {
@@ -41,11 +42,7 @@ const suggerimentiNome = computed(() => {
 
 /**
  * Seleziona un suggerimento automatico del nome bivacco.
- *
- * @param {string} nome - Nome selezionato.
- * @returns {void}
  */
-
 function selezionaNome(nome) {
   filters.nome = nome
   submitSearch()
@@ -53,20 +50,14 @@ function selezionaNome(nome) {
 
 /**
  * Invia i filtri di ricerca al componente padre.
- *
- * @returns {void}
  */
-
 function submitSearch() {
   emit('search', { ...filters })
 }
 
 /**
  * Ripristina tutti i filtri di ricerca.
- *
- * @returns {void}
  */
-
 function resetFilters() {
   Object.keys(filters).forEach(k => { filters[k] = '' })
   emit('search', {})
@@ -99,7 +90,7 @@ function resetFilters() {
           </svg>
         </span>
         <input v-model="filters.nome" class="input field-input" placeholder="Nome bivacco" />
-        
+
         <div v-if="suggerimentiNome.length" class="suggestions">
           <button
             v-for="b in suggerimentiNome"
@@ -111,7 +102,6 @@ function resetFilters() {
             {{ b.nome }}
           </button>
         </div>
-
       </label>
 
       <label class="field">
@@ -154,6 +144,21 @@ function resetFilters() {
           </svg>
         </span>
         <input v-model="filters.postiLetto" type="number" class="input field-input" placeholder="Posti letto min" />
+      </label>
+
+      <label class="field">
+        <span class="field-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+            <polyline points="9 22 9 12 15 12 15 22" />
+          </svg>
+        </span>
+        <select v-model="filters.tipoStruttura" class="input field-input">
+          <option value="">Tutti i tipi</option>
+          <option value="fisso">Fisso</option>
+          <option value="mobile">Mobile</option>
+          <option value="invernale">Locale invernale</option>
+        </select>
       </label>
 
       <button type="submit" class="btn btn-primary search-btn">
@@ -206,7 +211,7 @@ function resetFilters() {
 
 .filters-grid {
   display: grid;
-  grid-template-columns: 2fr 1.4fr 1fr 1fr 1.2fr auto;
+  grid-template-columns: 1.8fr 1.2fr 1fr 1fr 1.1fr 1.2fr auto;
   gap: 10px;
 }
 
@@ -224,10 +229,20 @@ function resetFilters() {
   pointer-events: none;
   display: grid;
   place-items: center;
+  z-index: 1;
 }
 
 .field-input {
   padding-left: 38px;
+}
+
+select.field-input {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23A6ADB8' stroke-width='2'><polyline points='6 9 12 15 18 9'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 32px;
 }
 
 .search-btn {
@@ -249,7 +264,6 @@ function resetFilters() {
     grid-template-columns: 1fr;
   }
 }
-
 
 .suggestions {
   position: absolute;

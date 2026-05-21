@@ -19,6 +19,7 @@ import AuthModal from './components/AuthModal.vue'
 import ProfileModal from './components/ProfileModal.vue'
 import RouteModal from './components/RouteModal.vue'
 import ResetPassword from './components/ResetPassword.vue'
+import { getMeteoSintetico } from './services/api'
 
 import { getBivacchi, getBivaccoById, isLoggedIn, getProfile } from './services/api'
 
@@ -37,6 +38,7 @@ const preferitiIds = ref([])
 
 const resetTokenAttivo = ref(null)
 const notTemp = ref({ visible: false, type: 'info', text: ''})
+const meteoMap = ref({})  // { bivaccoId: { temperatura, vento, precipitazioni, livelloRischio, allerta } }
 
 /**
  * Carica l'elenco dei bivacchi dal backend applicando eventuali filtri.
@@ -49,11 +51,31 @@ async function loadBivacchi(filters = {}) {
   loading.value = true
   try {
     bivacchi.value = await getBivacchi(filters)
+    await loadMeteoSintetico()
   } catch (error) {
     console.error(error)
     bivacchi.value = []
   } finally {
     loading.value = false
+  }
+}
+
+async function loadMeteoSintetico() {
+  if (bivacchi.value.length === 0) {
+    meteoMap.value = {}
+    return
+  }
+  try {
+    const ids = bivacchi.value.map(b => b._id)
+    const data = await getMeteoSintetico(ids)
+    const newMap = {}
+    for (const m of data.meteoSintetico || []) {
+      newMap[m.bivaccoId] = m
+    }
+    meteoMap.value = newMap
+  } catch (error) {
+    console.error('Errore meteo sintetico:', error)
+    meteoMap.value = {}
   }
 }
 
@@ -299,6 +321,7 @@ onMounted(() => {
               v-for="bivacco in bivacchi"
               :key="bivacco._id"
               :bivacco="bivacco"
+              :meteo="meteoMap[bivacco._id] || null"
               :is-logged="logged"
               :is-favorite="preferitiIds.includes(bivacco._id)"
               @open="openDetails"

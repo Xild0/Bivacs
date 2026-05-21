@@ -7,7 +7,9 @@
 <script setup>
 import { reactive, ref, onMounted } from 'vue'
 import Modal from './Modal.vue'
-import { getProfile, updateProfile, deleteProfile, logoutUser, getPreferiti } from '../services/api'
+import SupportoTecnicoPanel from './SupportoTecnicoPanel.vue'
+import { getProfile, updateProfile, deleteProfile, logoutUser, getPreferiti, getAllertePreferiti } from '../services/api'
+
 const emit = defineEmits(['close', 'auth-changed', 'open-bivacco'])
 
 const profile = reactive({
@@ -15,12 +17,14 @@ const profile = reactive({
   cognome: '',
   email: '',
   password: '',
+  discriminator: '',
   preferiti: []
 })
 
 const message = ref('')
 const messageType = ref('info')
 const loaded = ref(false)
+const allerteMap = ref({})  // bivaccoId -> { temperatura, vento, precipitazioni, livelloRischio, allerta }
 
 /**
  * Carica i dati del profilo utente dal backend.
@@ -34,6 +38,7 @@ async function loadProfile() {
     profile.nome = data.nome || ''
     profile.cognome = data.cognome || ''
     profile.email = data.email || ''
+    profile.discriminator = data.discriminator || ''
     profile.password = ''
     profile.preferiti = data.preferiti || []
     loaded.value = true
@@ -99,6 +104,21 @@ function submitLogout() {
   emit('close')
 }
 
+async function loadAllerte() {
+  try {
+    const data = await getAllertePreferiti()
+    const newMap = {}
+    for (const item of data.allerte || []) {
+      if (item.meteo?.allerta) {
+        newMap[item.bivacco.id] = item.meteo
+      }
+    }
+    allerteMap.value = newMap
+  } catch (error) {
+    console.error('Errore allerte preferiti:', error)
+  }
+}
+
 /**
  * Apre la scheda di un bivacco presente nei preferiti.
  *
@@ -113,6 +133,7 @@ function openPreferito(bivacco) {
 
 onMounted(() => {
   loadProfile()
+  loadAllerte()
 })
 </script>
 
@@ -203,6 +224,17 @@ onMounted(() => {
 </section>
 
 <div class="divider"></div>
+    <section
+  v-if="profile.discriminator === 'SupportoTecnico'"
+  class="support-section"
+>
+  <SupportoTecnicoPanel />
+</section>
+
+<div
+  v-if="profile.discriminator === 'SupportoTecnico'"
+  class="divider"
+></div>
 
     <div class="danger-zone">
       <button class="btn btn-ghost btn-block" @click="submitLogout">
@@ -352,13 +384,6 @@ onMounted(() => {
     );
 }
 
-.favorite-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
-}
-
 .favorite-top h4 {
   margin: 0;
   font-size: 15px;
@@ -405,5 +430,26 @@ onMounted(() => {
 .arrow {
   font-size: 18px;
   color: var(--accent);
+}
+
+.support-section {
+  margin-top: 22px;
+}
+
+.favorite-top-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.alert-badge {
+  padding: 4px 8px;
+  border-radius: var(--r-full);
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
+  font-size: 13px;
+  cursor: help;
+  animation: pulseGlow 2s infinite;
 }
 </style>

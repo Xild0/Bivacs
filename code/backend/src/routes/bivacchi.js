@@ -40,7 +40,8 @@ router.get('/', async (req, res) => {
       zona,
       altitudineMin,
       altitudineMax,
-      postiLetto
+      postiLetto,
+      tipoStruttura
     } = req.query;
 
     /** @type {Record<string, any>} */
@@ -77,6 +78,8 @@ router.get('/', async (req, res) => {
         $gte: Number(postiLetto)
       };
     }
+
+    if (tipoStruttura) { filtri.tipoStruttura = tipoStruttura; }
 
     const bivacchi = await Bivacco.find(filtri);
 
@@ -163,6 +166,7 @@ router.post('/', async (req, res) => {
       postiLetto,
       dotazioni,
       zona,
+      tipoStruttura,
       emergenza,
       acquaPresente,
       legnaDisponibile
@@ -198,6 +202,7 @@ router.post('/', async (req, res) => {
       postiLetto: postiLetto || 0,
       dotazioni: dotazioni || '',
       zona: zona,
+      tipoStruttura: tipoStruttura || 'fisso',
       emergenza: emergenza || false,
       acquaPresente:
         acquaPresente !== undefined

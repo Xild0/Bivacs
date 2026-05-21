@@ -443,3 +443,226 @@ export async function getPreferiti() {
 
   return data.preferiti || []
 }
+
+// ============================================================
+// Meteo - US17, US18, US19, US20
+// ============================================================
+
+export async function getMeteoBivacco(bivaccoId) {
+  const response = await fetch(`${API_URL}/meteo/${bivaccoId}`)
+
+  const data = await response.json()
+
+  if (!response.ok) {
+    throw new Error(data.message || 'Errore caricamento meteo')
+  }
+
+  return data
+}
+
+export async function getPrevisioniBivacco(bivaccoId) {
+  const response = await fetch(`${API_URL}/meteo/${bivaccoId}/previsioni`)
+
+  const data = await response.json()
+
+  if (!response.ok) {
+    throw new Error(data.message || 'Errore caricamento previsioni')
+  }
+
+  return data
+}
+
+export async function getMeteoSintetico(bivacchiIds) {
+  const response = await fetch(`${API_URL}/meteo/sintetico`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ bivacchiIds })
+  })
+
+  const data = await response.json()
+
+  if (!response.ok) {
+    throw new Error(data.message || 'Errore caricamento meteo sintetico')
+  }
+
+  return data
+}
+
+export async function getAllertePreferiti() {
+  const response = await fetchAuth(`${API_URL}/meteo/preferiti/allerte`)
+
+  const data = await response.json()
+
+  if (!response.ok) {
+    throw new Error(data.message || 'Errore caricamento allerte preferiti')
+  }
+
+  return data
+}
+
+// ============================================================
+// Supporto Tecnico - US38, US39, US40
+// ============================================================
+
+export async function getLogApi() {
+  const response = await fetchAuth(`${API_URL}/supporto/log-api`)
+
+  const data = await response.json()
+
+  if (!response.ok) {
+    throw new Error(data.errore || data.message || 'Errore caricamento log API')
+  }
+
+  return data
+}
+
+export async function getConfigApi() {
+  const response = await fetchAuth(`${API_URL}/supporto/config-api`)
+
+  const data = await response.json()
+
+  if (!response.ok) {
+    throw new Error(data.errore || data.message || 'Errore caricamento configurazioni API')
+  }
+
+  return data
+}
+
+export async function creaConfigApi(config) {
+  const response = await fetchAuth(`${API_URL}/supporto/config-api`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(config)
+  })
+
+  const data = await response.json()
+
+  if (!response.ok) {
+    throw new Error(data.errore || data.message || 'Errore creazione configurazione API')
+  }
+
+  return data
+}
+
+export async function modificaConfigApi(configId, aggiornamenti) {
+  const response = await fetchAuth(`${API_URL}/supporto/config-api/${configId}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(aggiornamenti)
+  })
+
+  const data = await response.json()
+
+  if (!response.ok) {
+    throw new Error(data.errore || data.message || 'Errore modifica configurazione API')
+  }
+
+  return data
+}
+
+export async function modificaBivaccoTecnico(bivaccoId, aggiornamenti) {
+  const response = await fetchAuth(`${API_URL}/supporto/bivacchi/${bivaccoId}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(aggiornamenti)
+  })
+
+  const data = await response.json()
+
+  if (!response.ok) {
+    throw new Error(data.errore || data.message || 'Errore modifica bivacco')
+  }
+
+  return data
+}
+
+// ============================================================
+// Percorsi GPX - US14 (visualizzazione) e US16 (download)
+// ============================================================
+
+const API_BASE = API_URL  // alias per chiarezza
+
+/**
+ * Restituisce l'URL pubblico per visualizzare il file GPX di un percorso
+ * (usato dal componente RouteModal per disegnare la polyline sulla mappa).
+ *
+ * @param {string} percorsoId
+ * @returns {string}
+ */
+export function getGpxViewUrl(percorsoId) {
+  return `${API_URL}/percorsi/${percorsoId}/gpx`
+}
+
+/**
+ * Recupera il contenuto testuale del file GPX di un percorso (XML).
+ * Endpoint pubblico, no autenticazione.
+ *
+ * @param {string} percorsoId
+ * @returns {Promise<string>} contenuto XML del file GPX
+ */
+export async function getGpxText(percorsoId) {
+  const response = await fetch(getGpxViewUrl(percorsoId))
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}))
+    throw new Error(data.message || 'Errore caricamento file GPX')
+  }
+
+  return await response.text()
+}
+
+/**
+ * Scarica il file GPX di un percorso tramite API backend autenticata (US16).
+ * Innesca il download del file nel browser.
+ *
+ * @param {string} percorsoId
+ * @param {string} [suggestedName='percorso.gpx'] - nome file da suggerire al browser
+ * @returns {Promise<void>}
+ */
+export async function scaricaGpxAutenticato(percorsoId, suggestedName = 'percorso.gpx') {
+  const response = await fetchAuth(`${API_URL}/percorsi/${percorsoId}/download`)
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('Devi accedere per scaricare il file GPX')
+    }
+    const data = await response.json().catch(() => ({}))
+    throw new Error(data.message || 'Errore download GPX')
+  }
+
+  const blob = await response.blob()
+  const url = URL.createObjectURL(blob)
+
+  const a = document.createElement('a')
+  a.href = url
+  a.download = suggestedName
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
+export async function creaBivaccoTecnico(bivacco) {
+  const response = await fetchAuth(`${API_URL}/supporto/bivacchi`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(bivacco)
+  })
+
+  const data = await response.json()
+
+  if (!response.ok) {
+    throw new Error(data.errore || data.message || 'Errore creazione bivacco')
+  }
+
+  return data
+}

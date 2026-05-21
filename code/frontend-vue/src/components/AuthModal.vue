@@ -1,3 +1,9 @@
+/**
+ * @file AuthModal.vue
+ * @description Modale per autenticazione utenti.
+ * Gestisce login, registrazione e recupero password.
+ */
+
 <script setup>
 import { reactive, ref } from 'vue'
 import Modal from './Modal.vue'
@@ -24,6 +30,12 @@ const registerForm = reactive({
   dataNascita: ''
 })
 
+/**
+ * Effettua il login dell'utente.
+ *
+ * @returns {Promise<void>}
+ */
+
 async function submitLogin() {
   message.value = ''
 
@@ -43,6 +55,12 @@ async function submitLogin() {
     }
   }
 }
+
+/**
+ * Invia la richiesta di recupero password via email.
+ *
+ * @returns {Promise<void>}
+ */
 
 async function recoverPassword() {
   message.value = ''
@@ -64,6 +82,12 @@ async function recoverPassword() {
     message.value = error.message
   }
 }
+
+/**
+ * Registra un nuovo utente.
+ *
+ * @returns {Promise<void>}
+ */
 
 async function submitRegister() {
   message.value = ''

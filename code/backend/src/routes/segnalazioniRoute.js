@@ -21,19 +21,32 @@ const {protectRoute,isStaff} = require('../middlewares/authMiddleware');
  * @returns {Promise<void>} Segnalazione creata oppure errore di validazione.
  */
 
-router.post('/', protectRoute, async (req, res) => {
+router.post('/', protectRoute, upload.single('foto'), async (req, res) => {
     try {
+        if (!req.file) {
+            return res.status(400).json({
+                errore: 'La foto della segnalazione è obbligatoria'
+            });
+        }
+
         const nuovaSegnalazione = new Segnalazione({
             utenteId: req.utente.mongoId,
             bivaccoId: req.body.bivaccoId,
             descrizione: req.body.descrizione,
-            foto: req.body.foto
+            foto: `/uploads/segnalazioni/${req.file.filename}`
         });
 
         const reportSalvato = await nuovaSegnalazione.save();
-        res.status(201).json(reportSalvato);
+
+        res.status(201).json({
+            messaggio: 'Segnalazione creata con successo',
+            segnalazione: reportSalvato
+        });
+
     } catch (error) {
-        res.status(400).json({ errore: error.message });
+        res.status(400).json({
+            errore: error.message
+        });
     }
 });
 
