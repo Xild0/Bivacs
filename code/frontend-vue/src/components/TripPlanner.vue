@@ -5,7 +5,7 @@
  */
 
 <script setup>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { geocode, calcolaTragitto } from '../services/api'
 import ElevationProfile from './ElevationProfile.vue'
 
@@ -194,6 +194,14 @@ function formatDuration(secondi) {
   if (m === 0) return `${h}h`
   return `${h}h ${m}min`
 }
+
+watch(
+  () => props.bivacco._id,
+  () => {
+    reset()
+  }
+)
+
 </script>
 
 <template>

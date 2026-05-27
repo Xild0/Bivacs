@@ -6,12 +6,16 @@ import {
   creaConfigApi,
   modificaConfigApi,
   modificaBivaccoTecnico,
-  getBivacchi
+  creaBivaccoTecnico,
+  getBivacchi,
+  getRichiesteSupporto,
+  approvaRichiestaSupporto
 } from '../services/api'
 
 const logs = ref([])
 const configs = ref([])
 const bivacchi = ref([])
+const richieste = ref([])
 
 const loading = ref(false)
 const message = ref('')
@@ -106,6 +110,23 @@ async function submitNuovoBivacco() {
     message.value = error.message
   }
 }
+const richiesteSupporto = ref([])
+
+async function loadRichiesteSupporto() {
+  richiesteSupporto.value = await getRichiesteSupporto()
+}
+
+async function approvaRichiesta(utenteId) {
+  try {
+    await approvaRichiestaSupporto(utenteId)
+    messageType.value = 'success'
+    message.value = 'Richiesta approvata correttamente'
+    await loadRichiesteSupporto()
+  } catch (error) {
+    messageType.value = 'error'
+    message.value = error.message
+  }
+}
 
 async function loadSupportoData() {
   loading.value = true
@@ -115,6 +136,7 @@ async function loadSupportoData() {
     logs.value = await getLogApi()
     configs.value = await getConfigApi()
     bivacchi.value = await getBivacchi()
+    richiesteSupporto.value = await getRichiesteSupporto()
   } catch (error) {
     messageType.value = 'error'
     message.value = error.message
@@ -212,10 +234,10 @@ onMounted(() => {
 <template>
   <section class="support-panel">
     <header class="support-head">
-      <div>
-        <p class="label">Supporto Tecnico</p>
-        <h3>Pannello API e dati tecnici</h3>
-      </div>
+  <div>
+    <p class="label">Supporto Tecnico</p>
+    <h3>Area gestione tecnica</h3>
+  </div>
 
       <button class="btn btn-ghost" @click="loadSupportoData">
         Aggiorna
@@ -230,7 +252,7 @@ onMounted(() => {
       Caricamento dati supporto tecnico…
     </p>
 
-    <div v-else class="support-grid">
+    <div v-else class="support-layout">
       <!-- US38 -->
       <section class="support-card">
         <h4>Log API esterne</h4>
@@ -256,6 +278,37 @@ onMounted(() => {
           Nessun log API disponibile.
         </p>
       </section>
+      <section class="support-card support-card-wide">
+  <h4>Richieste Supporto Tecnico</h4>
+
+  <div v-if="richiesteSupporto.length" class="log-list">
+    <div
+      v-for="utente in richiesteSupporto"
+      :key="utente._id"
+      class="log-row"
+    >
+      <strong>{{ utente.email }}</strong>
+      <small>
+        {{ utente.richiestaSupportoTecnico?.motivo || 'Nessun motivo indicato' }}
+      </small>
+      <small>
+        Matricola: {{ utente.richiestaSupportoTecnico?.matricolaRichiesta || 'non indicata' }}
+      </small>
+
+      <button
+        class="btn btn-primary"
+        type="button"
+        @click="approvaRichiesta(utente._id)"
+      >
+        Approva
+      </button>
+    </div>
+  </div>
+
+  <p v-else class="empty">
+    Nessuna richiesta in attesa.
+  </p>
+</section>
 
       <!-- US39 -->
       <section class="support-card">
@@ -533,10 +586,46 @@ onMounted(() => {
   color: var(--danger);
 }
 
-.support-grid {
+.support-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.support-card {
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-lg);
+  padding: 20px;
+}
+
+.support-card h4 {
+  font-size: 1.15rem;
+  margin-bottom: 16px;
+}
+
+.bivacco-tabs {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 14px;
+  background: var(--bg-surface-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-md);
+  padding: 4px;
+  margin-bottom: 18px;
+}
+
+.bivacco-tabs button {
+  padding: 10px 14px;
+  border-radius: calc(var(--r-md) - 4px);
+  color: var(--text-tertiary);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.bivacco-tabs button.active {
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
+  color: var(--accent-hi);
 }
 
 .support-card {

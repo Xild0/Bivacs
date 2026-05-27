@@ -50,7 +50,22 @@ const utenteSchema = new mongoose.Schema(
     }, 
     resetPassExpires: {
         type: Date
+    },
+    richiestaSupportoTecnico: {
+    stato: {
+        type: String,
+        enum: ['nessuna', 'in_attesa', 'approvata', 'rifiutata'],
+        default: 'nessuna'
+    },
+    motivo: {
+        type: String,
+        default: ''
+    },
+    matricolaRichiesta: {
+        type: String,
+        default: ''
     }
+}
 },
 { 
     timestamps: true,
