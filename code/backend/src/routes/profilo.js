@@ -196,5 +196,31 @@ router.delete('/preferiti/:bivaccoId', protectRoute, async (req, res) => {
     }
 });
 
+router.post('/richiesta-supporto-tecnico', protectRoute, async (req, res) => {
+    try {
+        const { motivo, matricola } = req.body;
+
+        const utente = await UtenteRegistrato.findById(req.utente.mongoId);
+
+        if (!utente) {
+            return res.status(404).json({ errore: 'Utente registrato non trovato' });
+        }
+
+        utente.richiestaSupportoTecnico = {
+            stato: 'in_attesa',
+            motivo: motivo || '',
+            matricolaRichiesta: matricola || ''
+        };
+
+        await utente.save();
+
+        res.status(200).json({
+            messaggio: 'Richiesta inviata. Attendi approvazione.'
+        });
+    } catch (error) {
+        res.status(500).json({ errore: 'Errore invio richiesta supporto tecnico' });
+    }
+});
+
 
 module.exports = router;

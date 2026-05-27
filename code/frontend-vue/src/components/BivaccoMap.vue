@@ -98,32 +98,6 @@ function renderMarkers() {
     const lat = Number(bivacco.latitudine)
     const lng = Number(bivacco.longitudine)
 
-    let markerLat = lat
-let markerLng = lng
-
-const nomeKey = bivacco.nome?.toLowerCase() || ''
-
-const coordinateOverride = {
-  'bailoni': [46.02310, 11.18125],
-  'carè alto': [46.10806, 10.62583],
-  'vigolana': [45.97500, 11.17500],
-  'paolo e nicola': [46.25833, 11.66306],
-  'costanzi': [46.27895, 10.89566],
-  'argentino vanin': [46.10765, 11.54316],
-  'amicizia': [45.97472, 9.35261],
-  'brentei': [46.17520, 10.87611],
-  'pozze': [46.41469, 10.92942],
-  'coldosè': [46.2596050, 11.6246864],
-  'redolf': [46.34640, 11.73386],
-}
-
-Object.entries(coordinateOverride).forEach(([key, coords]) => {
-  if (nomeKey.includes(key)) {
-    markerLat = coords[0]
-    markerLng = coords[1]
-  }
-})
-
 
     if (lat < 45.6 || lat > 46.6 || lng < 10.4 || lng > 12.0) {
     console.warn('Coordinate sospette per bivacco:', bivacco.nome, {
@@ -137,16 +111,16 @@ Object.entries(coordinateOverride).forEach(([key, coords]) => {
       return
     }
 
-    validCoords.push([markerLat, markerLng])
+    validCoords.push([lat, lng])
 
-    const marker = L.marker([markerLat, markerLng],{
+    const marker = L.marker([lat, lng], {
       icon: makeIcon(Boolean(bivacco.emergenza))
     })
 
     marker.bindPopup(`
       <strong>${bivacco.nome}</strong><br>
       ${bivacco.zona || 'Zona non indicata'} · ${bivacco.altitudine || '—'} m<br>
-      <small>lat: ${markerLat} | lng: ${markerLng}</small>
+      <small>lat: ${lat} | lng: ${lng}</small>
     `)
 
     marker.on('click', () => {

@@ -218,6 +218,7 @@ export async function geocode(query) {
  * @param {[number, number]} end - [lat, lng]
  * @returns {Promise<{coords, distance, duration, ascent, descent, profile}>}
  */
+
 export async function calcolaTragitto(start, end) {
   if (!ORS_API_KEY) {
     throw new Error('API key OpenRouteService non configurata. Aggiungi VITE_ORS_API_KEY al file .env')
@@ -271,14 +272,22 @@ export async function calcolaTragitto(start, end) {
     profile.push({ distance: cumDist, elevation: ele })
   }
 
-  return {
-    coords,
-    distance: summary.distance,     // metri
-    duration: summary.duration,     // secondi
-    ascent:   feature.properties.ascent  || 0,
-    descent:  feature.properties.descent || 0,
-    profile
-  }
+  const distanzaCalcolata = calcolaDistanzaProfilo(raw3d)
+  const dislivelli = calcolaDislivelliPuliti(raw3d)
+  const durataStimata = stimaDurataEscursionistica(
+  distanzaCalcolata,
+  dislivelli.ascent,
+  dislivelli.descent
+)
+
+return {
+  coords,
+  distance: distanzaCalcolata,
+  duration: durataStimata,
+  ascent: dislivelli.ascent,
+  descent: dislivelli.descent,
+  profile
+}
 }
 
 // Distanza in metri tra due punti lat/lng (formula di Haversine)
@@ -292,6 +301,56 @@ function haversine(lat1, lon1, lat2, lon2) {
             Math.sin(dLon / 2) ** 2
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
   return R * c
+}
+
+function calcolaDistanzaProfilo(raw3d) {
+  let totale = 0
+
+  for (let i = 1; i < raw3d.length; i++) {
+    const [lon1, lat1] = raw3d[i - 1]
+    const [lon2, lat2] = raw3d[i]
+
+    totale += haversine(lat1, lon1, lat2, lon2)
+  }
+
+  return totale
+}
+
+function calcolaDislivelliPuliti(raw3d) {
+  let ascent = 0
+  let descent = 0
+
+  const SOGLIA_RUMORE = 3
+
+  for (let i = 1; i < raw3d.length; i++) {
+    const elePrev = Number(raw3d[i - 1][2])
+    const eleNow = Number(raw3d[i][2])
+
+    if (!Number.isFinite(elePrev) || !Number.isFinite(eleNow)) continue
+
+    const diff = eleNow - elePrev
+
+    if (diff > SOGLIA_RUMORE) ascent += diff
+    if (diff < -SOGLIA_RUMORE) descent += Math.abs(diff)
+  }
+
+  return {
+    ascent: Math.round(ascent),
+    descent: Math.round(descent)
+  }
+}
+
+function stimaDurataEscursionistica(distanzaMetri, dislivelloPositivo, dislivelloNegativo = 0) {
+  const km = distanzaMetri / 1000
+
+  // Stima escursionistica prudente:
+  // 4 km/h in piano + 1h ogni 600m salita + piccolo peso sulla discesa
+  const ore =
+    km / 4 +
+    dislivelloPositivo / 600 +
+    dislivelloNegativo / 1200
+
+  return Math.round(ore * 3600)
 }
 
 export async function getPercorsiByBivacco(bivaccoId) {
@@ -665,4 +724,70 @@ export async function creaBivaccoTecnico(bivacco) {
   }
 
   return data
+}
+
+export async function richiediSupportoTecnico(data) {
+  const response = await fetchAuth(`${API_URL}/profilo/richiesta-supporto-tecnico`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  })
+
+  const res = await response.json()
+  if (!response.ok) throw new Error(res.errore || res.message || 'Errore invio richiesta')
+  return res
+}
+
+export async function getRichiesteSupporto() {
+  const response = await fetchAuth(`${API_URL}/supporto/richieste-supporto`)
+  const data = await response.json()
+
+  if (!response.ok) throw new Error(data.errore || data.message || 'Errore caricamento richieste')
+  return data
+}
+
+export async function approvaRichiestaSupporto(utenteId) {
+  const response = await fetchAuth(`${API_URL}/supporto/richieste-supporto/${utenteId}/approva`, {
+    method: 'PATCH'
+  })
+
+  const data = await response.json()
+  if (!response.ok) throw new Error(data.errore || data.message || 'Errore approvazione richiesta')
+  return data
+}
+
+export async function getAutoGpxText(bivaccoId) {
+  const response = await fetch(`${API_URL}/percorsi/bivacco/${bivaccoId}/auto-gpx`)
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}))
+    throw new Error(data.message || 'Nessun GPX SAT automatico trovato')
+  }
+
+  return await response.text()
+}
+
+export async function scaricaAutoGpxBivacco(bivaccoId, suggestedName = 'percorso_sat.gpx') {
+  const response = await fetchAuth(`${API_URL}/percorsi/bivacco/${bivaccoId}/auto-download`)
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('Devi accedere per scaricare il file GPX')
+    }
+
+    const data = await response.json().catch(() => ({}))
+    throw new Error(data.message || 'Errore download GPX SAT')
+  }
+
+  const blob = await response.blob()
+  const url = URL.createObjectURL(blob)
+
+  const a = document.createElement('a')
+  a.href = url
+  a.download = suggestedName
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
 }

@@ -1,86 +1,52 @@
-/**
- * @file RouteMap.vue
- * @description Mappa Leaflet dedicata alla visualizzazione del tragitto calcolato.
- * Mostra linea del percorso, marker di partenza e marker di arrivo.
- */
-
 <script setup>
 import { onMounted, onBeforeUnmount, ref, nextTick, watch } from 'vue'
 import L from 'leaflet'
 
 const props = defineProps({
-  routeCoords: { type: Array, required: true },   // [[lat,lng], …]
-  startCoord:  { type: Array, required: true },   // [lat, lng]
-  endCoord:    { type: Array, required: true },   // [lat, lng]
-  startName:   { type: String, default: 'Partenza' },
-  endName:     { type: String, default: 'Arrivo'   }
+  routeCoords: { type: Array, required: true },
+  officialTrailCoords: { type: Array, default: () => [] },
+  startCoord: { type: Array, required: true },
+  endCoord: { type: Array, required: true },
+  startName: { type: String, default: 'Partenza' },
+  endName: { type: String, default: 'Arrivo' }
 })
 
 const mapEl = ref(null)
 let map = null
 let routeLayer = null
 
-/**
- * Crea l'icona Leaflet per il punto di partenza.
- *
- * @returns {L.DivIcon} Icona personalizzata per la partenza.
- */
-
 function makeStartIcon() {
-  const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
-      <defs>
-        <filter id="ss1" x="-50%" y="-50%" width="200%" height="200%">
-          <feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity="0.4"/>
-        </filter>
-      </defs>
-      <circle cx="16" cy="16" r="12" fill="#22C55E" stroke="white" stroke-width="3" filter="url(#ss1)"/>
-      <circle cx="16" cy="16" r="4" fill="white"/>
-    </svg>`
   return L.divIcon({
-    html: svg,
+    html: `
+      <div style="
+        width:28px;height:28px;border-radius:50%;
+        background:#22C55E;border:3px solid white;
+        box-shadow:0 3px 10px rgba(0,0,0,.35);
+      "></div>
+    `,
     className: 'route-marker',
-    iconSize: [32, 32],
-    iconAnchor: [16, 16],
-    popupAnchor: [0, -14]
+    iconSize: [28, 28],
+    iconAnchor: [14, 14]
   })
 }
-
-/**
- * Crea l'icona Leaflet per il punto di arrivo.
- *
- * @returns {L.DivIcon} Icona personalizzata per l'arrivo.
- */
 
 function makeEndIcon() {
-  const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="50" viewBox="0 0 40 50">
-      <defs>
-        <filter id="se1" x="-50%" y="-50%" width="200%" height="200%">
-          <feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity="0.35"/>
-        </filter>
-      </defs>
-      <path d="M20 3 L37 39 L3 39 Z" fill="#FFFFFF" stroke="#1E88E5" stroke-width="2.5" stroke-linejoin="round" filter="url(#se1)"/>
-      <path d="M13 33 L20 19 L27 33 Z M20 19 L20 33" stroke="#0E6FA8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-      <circle cx="20" cy="44" r="3" fill="#1E88E5"/>
-    </svg>`
   return L.divIcon({
-    html: svg,
+    html: `
+      <div style="
+        width:34px;height:34px;border-radius:50%;
+        background:#1E88E5;border:3px solid white;
+        box-shadow:0 3px 10px rgba(0,0,0,.35);
+      "></div>
+    `,
     className: 'route-marker',
-    iconSize: [40, 50],
-    iconAnchor: [20, 46],
-    popupAnchor: [0, -40]
+    iconSize: [34, 34],
+    iconAnchor: [17, 17]
   })
 }
 
-/**
- * Disegna il percorso sulla mappa e aggiorna i marker di partenza e arrivo.
- *
- * @returns {void}
- */
-
 function renderRoute() {
-  if (!map || !props.routeCoords || props.routeCoords.length === 0) return
+  if (!map) return
 
   if (routeLayer) {
     routeLayer.remove()
@@ -89,30 +55,54 @@ function renderRoute() {
 
   routeLayer = L.layerGroup().addTo(map)
 
-  const halo = L.polyline(props.routeCoords, {
-    color: '#FFFFFF',
-    weight: 8,
-    opacity: 0.95,
-    lineCap: 'round'
-  }).addTo(routeLayer)
+  const boundsCoords = []
 
-  L.polyline(props.routeCoords, {
-    color: '#1E88E5',
-    weight: 4,
-    opacity: 1,
-    lineCap: 'round',
-    lineJoin: 'round'
-  }).addTo(routeLayer)
+  // Overlay GPX SAT: solo riferimento, tratteggiato
+  if (props.officialTrailCoords?.length > 1) {
+    L.polyline(props.officialTrailCoords, {
+      color: '#94A3B8',
+      weight: 4,
+      opacity: 0.55,
+      dashArray: '8 8',
+      lineCap: 'round',
+      lineJoin: 'round'
+    }).addTo(routeLayer)
 
-  L.marker(props.startCoord, { icon: makeStartIcon() })
-    .bindPopup(`<strong>Partenza</strong><br>${props.startName}`)
-    .addTo(routeLayer)
+    boundsCoords.push(...props.officialTrailCoords)
+  }
 
-  L.marker(props.endCoord, { icon: makeEndIcon() })
-    .bindPopup(`<strong>Arrivo</strong><br>${props.endName}`)
-    .addTo(routeLayer)
+  // Percorso principale ORS
+  if (props.routeCoords?.length > 1) {
+    const halo = L.polyline(props.routeCoords, {
+      color: '#FFFFFF',
+      weight: 8,
+      opacity: 0.9,
+      lineCap: 'round',
+      lineJoin: 'round'
+    }).addTo(routeLayer)
 
-  map.fitBounds(halo.getBounds(), { padding: [40, 40] })
+    L.polyline(props.routeCoords, {
+      color: '#1E88E5',
+      weight: 4,
+      opacity: 1,
+      lineCap: 'round',
+      lineJoin: 'round'
+    }).addTo(routeLayer)
+
+    boundsCoords.push(...props.routeCoords)
+
+    L.marker(props.startCoord, { icon: makeStartIcon() })
+      .bindPopup(`<strong>Partenza</strong><br>${props.startName}`)
+      .addTo(routeLayer)
+
+    L.marker(props.endCoord, { icon: makeEndIcon() })
+      .bindPopup(`<strong>Arrivo</strong><br>${props.endName}`)
+      .addTo(routeLayer)
+
+    map.fitBounds(halo.getBounds(), { padding: [40, 40] })
+  } else if (boundsCoords.length > 1) {
+    map.fitBounds(L.latLngBounds(boundsCoords), { padding: [40, 40] })
+  }
 }
 
 onMounted(async () => {
@@ -124,21 +114,18 @@ onMounted(async () => {
   })
 
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    attribution: '&copy; OpenStreetMap contributors',
     maxZoom: 19
   }).addTo(map)
 
   renderRoute()
 
-  // Forza il refresh delle dimensioni dopo l'animazione del modal
-  setTimeout(() => map && map.invalidateSize(), 350)
+  setTimeout(() => map?.invalidateSize(), 300)
 })
 
 watch(
-  () => props.routeCoords,
-  () => {
-    renderRoute()
-  },
+  () => [props.routeCoords, props.officialTrailCoords],
+  () => renderRoute(),
   { deep: true }
 )
 
@@ -161,7 +148,7 @@ onBeforeUnmount(() => {
   border-radius: var(--r-lg);
   border: 1px solid var(--border-subtle);
   overflow: hidden;
-  background: #F2F0EA;
+  background: #f2f0ea;
   box-shadow: var(--shadow);
 }
 
@@ -171,6 +158,8 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 720px) {
-  .route-map { height: 320px; }
+  .route-map {
+    height: 320px;
+  }
 }
 </style>

@@ -9,10 +9,12 @@ const express = require('express');
 const router = express.Router();
 
 const Bivacco = require('../models/bivacco');
+const RisorseUtili = require('../models/risorseUtili');
 const Percorso = require('../models/percorso');
 const Segnalazione = require('../models/segnalazione');
 const {protectRoute} = require('../middlewares/authMiddleware');
 const Alert = require('../models/alert');
+const TicketManutenzione = require('../models/ticketManutenzione');
 
 /**
  * Estrae un messaggio leggibile da un errore sconosciuto.
@@ -151,7 +153,6 @@ router.get('/:id', async (req, res) => {
  * @param {import('express').Response} res - Risposta HTTP.
  * @returns {Promise<void>} Bivacco creato oppure errore di validazione.
  */
-
 router.post('/', async (req, res) => {
   try {
 
@@ -312,67 +313,120 @@ router.get('/:id/percorsi', async (req, res) => {
 })
 
 /**
- * Aggiorna lo stato delle risorse disponibili per un bivacco.
- * Permette di modificare acquaPresente e/o legnaDisponibile.
- * Richiede autenticazione tramite token JWT.
- *
- * @route PATCH /api/v1/bivacchi/:id/risorse
- * @param {import('express').Request} req - Richiesta HTTP con campi acquaPresente e/o legnaDisponibile.
- * @param {import('express').Response} res - Risposta HTTP.
- * @returns {Promise<void>} Bivacco aggiornato oppure errore.
+ * @route   GET /api/bivacchi/:id
+ * @desc    Ottiene i dettagli di un singolo bivacco e lo stato più recente delle sue risorse
+ * @access  Pubblico (Accessibile a tutti)
  */
+router.get('/:id', async (req, res) => {
+    try {
+        // 1. Cerca il bivacco tramite l'ID passato nell'URL
+        const bivacco = await Bivacco.findById(req.params.id).populate('percorsi');
+        
+        if (!bivacco) {
+            return res.status(404).json({ message: 'Bivacco non trovato' });
+        }
+        // 3. Trova tutte le segnalazioni associate a questo bivacco
+      const segnalazioni = await Segnalazione.find({ bivaccoId: bivacco._id });
+      const segnalazioniIds = segnalazioni.map(s => s._id);
+      // 4. Recupera tutti i ticket di manutenzione collegati a quelle segnalazioni
+      const ticketManutenzione = await TicketManutenzione.find({
+        segnalazione: { $in: segnalazioniIds }
+      })
+      .populate('segnalazione', 'descrizione statoSegnalazione')
+      .sort({ createdAt: -1 }); // Dal più recente al più vecchio
 
-router.patch('/:id/risorse', protectRoute, async (req, res) => {
+      // 5. Calcola il conteggio delle segnalazioni ancora attive (per retrocompatibilità)
+      const segnalazioniAttive = segnalazioni.filter(s =>['inviata', 'presa_in_carico', 'in_corso'].includes(s.statoSegnalazione)).length;
+      // 6. Cerca l'ultimo aggiornamento delle risorse inserito per QUESTO bivacco
+      const ultimeRisorse = await RisorseUtili.findOne({ bivacco: bivacco._id })
+      .sort({ createdAt: -1 }) // Ordina per data decrescente (il più recente per primo)
+      .populate('autore', 'email lingua'); // Opzionale: mostra la mail di chi ha aggiornato, escludendo dati sensibili
+
+      // 7. Assembla l'oggetto bivacco con i contatori dei ticket aperti
+      const bivaccoObj = bivacco.toObject();
+      bivaccoObj.ticketAperti = segnalazioniAttive > 0;
+      bivaccoObj.numeroTicketAperti = segnalazioniAttive;
+      // 8. Rispondi al frontend con un unico oggetto contenente tutto il necessario
+      res.status(200).json({
+        bivacco: bivaccoObj,
+        ticketManutenzione: ticketManutenzione, // <-- Array con lo stato di tutti i ticket esistenti
+        risorse: ultimeRisorse || {
+        acqua: 'non_verificata',
+        legna: 'non_verificata',
+        messaggio: 'Nessun aggiornamento recente disponibile'
+      }
+      });
+
+    } catch (error) {
+        if (err instanceof Error && err.name === 'CastError') {
+          return res.status(400).json({message: 'ID bivacco non valido'
+        });
+      }
+      res.status(500).json({
+      message: 'Errore nel recupero della scheda del bivacco',
+      error: getErrorMessage(err)
+      });
+  }
+});
+
+/**
+ * @route   POST /api/v1/bivacchi/:id/risorse
+ * @desc    Crea una nuova segnalazione sullo stato delle risorse (solo utenti registrati)
+ * @access  Privato (Utente Registrato / SuperUser / Supporto)
+ */
+router.post('/:id/risorse', protectRoute, async (req, res) => {
   try {
-    const { acquaPresente, legnaDisponibile } = req.body;
+    const { acqua, legna } = req.body; // Ci aspettiamo stringhe es: 'disponibile', 'scarsa', 'assente'
+    const bivaccoId = req.params.id;
+    const utenteId = req.utente.mongoId; // Estratto dal token JWT grazie a protectRoute
 
-    const aggiornamenti = {};
-    
-    if (acquaPresente !== undefined) {
-        aggiornamenti.acquaPresente = acquaPresente;
-    }
-    
-    if (legnaDisponibile !== undefined) {
-        aggiornamenti.legnaDisponibile = legnaDisponibile;
-    }
-
-    if (Object.keys(aggiornamenti).length === 0) {
+    // Validazione base dell'input
+    if (!acqua || !legna) {
       return res.status(400).json({
-        message: 'Fornire almeno uno tra acquaPresente o legnaDisponibile'
+        message: 'I campi "acqua" e "legna" sono obbligatori.'
       });
     }
 
-    aggiornamenti.ultimoCheckStato = Date.now();
+    // 1. Crea il record dettagliato nel modello RisorseUtili per lo storico
+    const nuovaRisorsa = new RisorseUtili({
+      id: Date.now(), // Genera un ID numerico univoco per il campo richiesto dal tuo schema
+      bivacco: bivaccoId,
+      autore: utenteId,
+      acqua,
+      legna
+    });
+    await nuovaRisorsa.save();
 
+    // 2. Mappa le stringhe in valori booleani per sincronizzare lo stato sul modello Bivacco
+    // Se l'acqua è 'disponibile' o 'scarsa', consideriamo che l'acqua sia fisicamente presente (true)
+    const acquaPresente = (acqua === 'disponibile' || acqua === 'scarsa');
+    const legnaDisponibile = (legna === 'disponibile' || legna === 'scarsa');
+
+    // 3. Aggiorna il Bivacco principale in modo che le ricerche rapide restino coerenti
     const bivaccoAggiornato = await Bivacco.findByIdAndUpdate(
-      req.params.id,
-      { $set: aggiornamenti },
-      { 
-        new: true,           
-        runValidators: true 
-      }
+      bivaccoId,
+      {
+        $set: {
+          acquaPresente,
+          legnaDisponibile,
+          ultimoCheckStato: Date.now()
+        }
+      },
+      { new: true, runValidators: true }
     );
 
     if (!bivaccoAggiornato) {
-      return res.status(404).json({
-        message: 'Bivacco non trovato'
-      });
+      return res.status(404).json({ message: 'Bivacco non trovato' });
     }
 
-    res.status(200).json({
-      message: 'Stato risorse aggiornato con successo',
+    res.status(201).json({
+      message: 'Stato risorse aggiornato con successo e salvato nella cronologia',
+      risorse: nuovaRisorsa,
       bivacco: bivaccoAggiornato
     });
 
   } catch (err) {
-    if (err instanceof Error && err.name === 'CastError') {
-      return res.status(400).json({ message: 'ID bivacco non valido' });
-    }
-
-    res.status(500).json({
-      message: 'Errore aggiornamento risorse',
-      error: getErrorMessage(err)
-    });
+    res.status(500).json({ message: getErrorMessage(err) });
   }
 });
 

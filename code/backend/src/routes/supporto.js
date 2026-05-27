@@ -12,6 +12,7 @@ const Bivacco = require('../models/bivacco');
 
 const { protectRoute } = require('../middlewares/authMiddleware');
 const getNextSequence = require('../utils/getNewSequence');
+const inviaEmail = require('../utils/emailService')
 
 function isSupportoTecnico(req, res, next) {
   if (req.utente.discriminator === 'SupportoTecnico') {
@@ -264,5 +265,112 @@ router.post('/bivacchi', protectRoute, isSupportoTecnico, async (req, res) => {
     });
   }
 });
+
+const Utente = require('../models/utente');
+
+router.get('/richieste-supporto', protectRoute, isSupportoTecnico, async (req, res) => {
+  try {
+    const richieste = await Utente.find({
+      discriminator: 'UtenteRegistrato',
+      'richiestaSupportoTecnico.stato': 'in_attesa'
+    }).select('-passwordHash');
+
+    res.status(200).json(richieste);
+  } catch (error) {
+    res.status(500).json({
+      message: 'Errore recupero richieste supporto tecnico',
+      error: error.message
+    });
+  }
+});
+
+router.patch('/richieste-supporto/:utenteId/approva', protectRoute, isSupportoTecnico, async (req, res) => {
+  try {
+    const utente = await Utente.findById(req.params.utenteId)
+
+    if (!utente) {
+      return res.status(404).json({ message: 'Utente non trovato' })
+    }
+
+    const matricola =
+      utente.richiestaSupportoTecnico?.matricolaRichiesta ||
+      `ST-${utente.id}`
+
+    const aggiornato = await Utente.findByIdAndUpdate(
+      req.params.utenteId,
+      {
+        $set: {
+          discriminator: 'SupportoTecnico',
+          matricola,
+          'richiestaSupportoTecnico.stato': 'approvata'
+        }
+      },
+      {
+        new: true,
+        overwriteDiscriminatorKey: true
+      }
+    ).select('-passwordHash')
+
+    await inviaEmail(
+      utente.email,
+      'Richiesta Supporto Tecnico approvata',
+      `
+        <h2>Richiesta approvata</h2>
+        <p>La tua richiesta per diventare Supporto Tecnico su Bivacs è stata approvata.</p>
+        <p>Effettua nuovamente il login per accedere al pannello tecnico.</p>
+      `
+    )
+
+    res.status(200).json({
+      message: 'Utente promosso a Supporto Tecnico',
+      utente: aggiornato
+    })
+  } catch (error) {
+    res.status(500).json({
+      message: 'Errore approvazione richiesta',
+      error: error.message
+    })
+  }
+})
+
+router.patch('/richieste-supporto/:utenteId/rifiuta', protectRoute, isSupportoTecnico, async (req, res) => {
+  try {
+    const { motivoRifiuto } = req.body
+
+    const utente = await Utente.findByIdAndUpdate(
+      req.params.utenteId,
+      {
+        $set: {
+          'richiestaSupportoTecnico.stato': 'rifiutata'
+        }
+      },
+      { new: true }
+    ).select('-passwordHash')
+
+    if (!utente) {
+      return res.status(404).json({ message: 'Utente non trovato' })
+    }
+
+    await inviaEmail(
+      utente.email,
+      'Richiesta Supporto Tecnico rifiutata',
+      `
+        <h2>Richiesta rifiutata</h2>
+        <p>La tua richiesta per diventare Supporto Tecnico su Bivacs è stata rifiutata.</p>
+        <p>${motivoRifiuto || 'Non è stata indicata una motivazione specifica.'}</p>
+      `
+    )
+
+    res.status(200).json({
+      message: 'Richiesta rifiutata correttamente',
+      utente
+    })
+  } catch (error) {
+    res.status(500).json({
+      message: 'Errore rifiuto richiesta',
+      error: error.message
+    })
+  }
+})
 
 module.exports = router;

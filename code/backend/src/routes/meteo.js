@@ -11,6 +11,7 @@ const DatoMeteo = require('../models/datoMeteo');
 const LogAPI = require('../models/logAPI');
 const getNextSequence = require('../utils/getNewSequence');
 const { protectRoute } = require('../middlewares/authMiddleware');
+const meteoTrentino = require('../utils/meteoTrentino');
 
 const OPEN_METEO_URL = 'https://api.open-meteo.com/v1/forecast';
 
@@ -188,46 +189,20 @@ router.post('/sintetico', async (req, res) => {
   }
 });
 
-/**
- * Meteo realtime per un bivacco.
- * US17.
- */
 router.get('/:bivaccoId', async (req, res) => {
   try {
     const bivacco = await Bivacco.findById(req.params.bivaccoId);
-
     if (!bivacco) {
-      return res.status(404).json({
-        message: 'Bivacco non trovato'
-      });
+      return res.status(404).json({ message: 'Bivacco non trovato' });
     }
 
-    const url =
-      `${OPEN_METEO_URL}?latitude=${bivacco.latitudine}` +
-      `&longitude=${bivacco.longitudine}` +
-      `&current=temperature_2m,wind_speed_10m,precipitation` +
-      `&timezone=Europe%2FRome`;
-
-    const response = await fetch(url);
-
-    if (!response.ok) {
-      await salvaLog('Open-Meteo', false, `HTTP ${response.status}`);
-      return res.status(502).json({
-        message: 'Errore nella chiamata al provider meteo'
-      });
-    }
-
-    const data = await response.json();
-
-    const temperatura = data.current?.temperature_2m ?? 0;
-    const vento = data.current?.wind_speed_10m ?? 0;
-    const precipitazioni = data.current?.precipitation ?? 0;
+    const { temperatura, vento, precipitazioni, provider, stazione } =
+      await getOsservazioni(bivacco.latitudine, bivacco.longitudine);
 
     const livelloRischio = calcolaLivelloRischio(vento, precipitazioni);
     const allertaPAT = isMeteoAvverso(vento, precipitazioni);
 
     const idMeteo = await getNextSequence('datoMeteoId');
-
     const datoMeteo = await DatoMeteo.create({
       id: idMeteo,
       bivacco: bivacco._id,
@@ -239,23 +214,14 @@ router.get('/:bivaccoId', async (req, res) => {
       aggiornato: new Date()
     });
 
-    await salvaLog('Open-Meteo', true);
-
     res.status(200).json({
-      bivacco: {
-        id: bivacco._id,
-        nome: bivacco.nome
-      },
+      bivacco: { id: bivacco._id, nome: bivacco.nome },
+      provider,
+      stazione: stazione || null,
       meteo: datoMeteo
     });
-
   } catch (error) {
-    await salvaLog('Open-Meteo', false, error.message);
-
-    res.status(500).json({
-      message: 'Errore recupero meteo',
-      error: error.message
-    });
+    res.status(500).json({ message: 'Errore recupero meteo', error: error.message });
   }
 });
 
@@ -325,5 +291,45 @@ router.get('/:bivaccoId/previsioni', async (req, res) => {
     });
   }
 });
+
+/**
+ * Recupera osservazioni meteo per una coordinata.
+ * Prova prima MeteoTrentino (stazione più vicina), poi ripiega su Open-Meteo.
+ *
+ * @returns {Promise<{temperatura, vento, precipitazioni, provider, stazione?}>}
+ */
+async function getOsservazioni(lat, lon) {
+  // 1) MeteoTrentino
+  try {
+    const dati = await meteoTrentino.getOsservazioniVicine(lat, lon);
+    await salvaLog('MeteoTrentino', true);
+    return { ...dati, provider: 'MeteoTrentino' };
+  } catch (errMT) {
+    await salvaLog('MeteoTrentino', false, errMT.message);
+  }
+
+  // 2) Fallback Open-Meteo
+  const url =
+    `${OPEN_METEO_URL}?latitude=${lat}&longitude=${lon}` +
+    `&current=temperature_2m,wind_speed_10m,precipitation` +
+    `&timezone=Europe%2FRome`;
+
+  const response = await fetch(url);
+  if (!response.ok) {
+    await salvaLog('Open-Meteo', false, `HTTP ${response.status}`);
+    throw new Error('Nessun provider meteo disponibile');
+  }
+
+  const data = await response.json();
+  await salvaLog('Open-Meteo', true);
+
+  return {
+    temperatura: data.current?.temperature_2m ?? 0,
+    vento: data.current?.wind_speed_10m ?? 0,
+    precipitazioni: data.current?.precipitation ?? 0,
+    provider: 'Open-Meteo'
+  };
+}
+
 
 module.exports = router;
