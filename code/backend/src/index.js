@@ -37,8 +37,8 @@ const supportoRoute = require('./routes/supporto');
  * Inizializzazione applicazione Express.
  */
 const app = express();
-const server = http.createServer(app);
-const socketServer = new Server(server, {
+const httpServer = http.createServer(app);
+const socketServer = new Server(httpServer, {
     cors: {
         origin: "http://localhost:5173", 
         methods: ["GET", "POST", "DELETE"]
@@ -93,7 +93,7 @@ const PORT = process.env.PORT || 5000;
  */
 (async () => {
     await connectDB();
-    server.listen(PORT, () => {
+    httpServer.listen(PORT, () => {
         console.log('Server avviato sulla porta ' + PORT);
     });
 })();

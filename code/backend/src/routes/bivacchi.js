@@ -464,12 +464,7 @@ router.post('/:id/emergenza', async (req,res) => {
 
     const socketServer = req.app.get('socketServer');
     if(socketServer){
-      socketServer.emit('nuovoBanner', {
-        alertId: newAlert.id, 
-        bivaccoId: bivacco.id, 
-        nomeBivacco: bivacco.nome, 
-        messaggio: msg
-      });
+      socketServer.emit('nuovoBanner', newAlert);
     }
 
     res.status(201).json({success: true, alert: newAlert});

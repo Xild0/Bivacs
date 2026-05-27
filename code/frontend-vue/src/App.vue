@@ -243,20 +243,41 @@ onMounted(async () => {
   gestisciQueryString()
   window.addEventListener('bivacs:auth-expired', gestisciSessioneScaduta)
   
+  socketServer = io('http://localhost:5000')
+
+  socketServer.on('connessione', () => {
+    console.log('Connesso al server socket.io con ID:', socketServer.id);
+  })
+
+  socketServer.on('erroreConnessione', (err) => {
+    console.log('Errore di connessione socket:', err)
+  })
+
+  socketServer.on('nuovoBanner', (datiAllerta) => {
+    allerteAttive.value.push(datiAllerta)
+  })
+
+  socketServer.on('bannerRevocato', (dati) => {
+    console.log('Evento ricevuto, rimuovo:', dati)
+    console.log('Prima del filtro:', JSON.parse(JSON.stringify(allerteAttive.value)))
+
+    allerteAttive.value = allerteAttive.value.filter((a) => {
+      const idDaRimuovere = dati.bivaccoId || dati.id 
+      const idCorrente = a.bivaccoId || (a.bivacco ? a.bivacco.id : NULL);
+      return idCorrente != idDaRimuovere
+    })
+    console.log('Dopo il filtro:', JSON.parse(JSON.stringify(allerteAttive.value)))
+  })
+
   try {
     const res = await api.get('/api/v1/bivacchi/emergenze_attive')
     allerteAttive.value = res.data || []
   } catch (error) {
     console.error('Errore durante il caricamento delle allerte di emergenza:', error)
   }
-  socketServer = io('http://localhost:5000')
-  socketServer,on('nuovobanner', (datiAllerta) => {
-    allerteAttive.value.push(datiAllerta)
-  })
-  socketServer.on('bannerRevocato', (dati) =>{
-    allerteAttive.value = allerteAttive.value.filter(
-      (a) => a.bivaccoId !== dati.bivaccoId && (a.bivacco && a.bivacco.id !== dati.bivaccoId)
-    )
+
+  socketServer.onAny((event, ...args) => {
+    console.log('Ricevuto evento socket: ${event}', args)
   })
 })
 
