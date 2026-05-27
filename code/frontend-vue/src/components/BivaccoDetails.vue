@@ -94,6 +94,138 @@ async function submitRecensione() {
   }
 }
 
+// —— STATO PER LA GESTIONE DELLA SEGNALAZIONE ——
+const mostrandoFormSegnalazione = ref(false)
+const segnalazioneDescrizione = ref('')
+const segnalazioneFoto = ref(null)
+const segnalazioneLoading = ref(false)
+const segnalazioneErrore = ref('')
+const segnalazioneSuccesso = ref('')
+
+/**
+ * Gestisce la selezione del file immagine per la segnalazione
+ */
+const handleSegnalazioneFileChange = (e) => {
+  const file = e.target.files[0]
+  if (file) {
+    segnalazioneFoto.value = file
+  }
+}
+
+/**
+ * Esegue la chiamata multipart/form-data al backend
+ */
+const inviaSegnalazione = async () => {
+  segnalazioneErrore.value = ''
+  segnalazioneSuccesso.value = ''
+
+  // Validazione locale (coerente con i vincoli del modello Mongoose)
+  if (segnalazioneDescrizione.value.trim().length < 20) {
+    segnalazioneErrore.value = 'La descrizione deve avere almeno 20 caratteri per essere specifica.'
+    return
+  }
+  if (!segnalazioneFoto.value) {
+    segnalazioneErrore.value = 'La foto della segnalazione è obbligatoria.'
+    return
+  }
+  segnalazioneLoading.value = true
+
+  try {
+    // Recupera il token JWT salvato durante l'autenticazione
+    const token = localStorage.getItem('token')
+    if (!token) {
+      throw new Error('Devi effettuare il login per inviare una segnalazione.')
+    }
+
+    const formData = new FormData()
+    formData.append('bivaccoId', props.bivacco._id) // Utilizza la prop esistente del bivacco
+    formData.append('descrizione', segnalazioneDescrizione.value)
+    formData.append('foto', segnalazioneFoto.value)
+
+    const response = await fetch('/api/v1/segnalazioni', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
+        // Nota: Nessun Content-Type manuale, ci pensa il browser con FormData
+      },
+      body: formData
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      throw new Error(data.errore || "Impossibile inviare la segnalazione.")
+    }
+
+    // Successo: reset dei campi del modulo
+    segnalazioneSuccesso.value = 'Segnalazione inviata con successo al team di supporto!'
+    segnalazioneDescrizione.value = ''
+    segnalazioneFoto.value = null
+    
+    // Svuota l'input file nel DOM
+    const fileInput = document.getElementById('segnalazione-file-input')
+    if (fileInput) fileInput.value = ''
+
+    // Sfrutta l'emit già dichiarato nel tuo file per notificare che il bivacco ha subito modifiche/aggiornamenti
+    emit('bivacco-updated')
+
+  } catch (err) {
+    segnalazioneErrore.value = err.message
+    } finally {
+    segnalazioneLoading.value = false
+    }
+}
+
+/**
+ * Storico Segnalazioni per SuperUser e Supporto Tecnico
+ */
+
+const mostrandoStoricoStaff = ref(false)
+const storicoSegnalazioni = ref([])
+const storicoLoading = ref(false)
+
+/**
+ * Computed property per verificare se l'utente corrente fa parte dello staff
+ */
+const isStaff = computed(() => {
+  if (!props.isLogged || !props.currentUser) return false
+  const role = props.currentUser.discriminator
+  return role === 'SuperUser' || role === 'SupportoTecnico'
+})
+
+/**
+ * Recupera le segnalazioni del bivacco corrente (endpoint protetto)
+ */
+const loadStoricoSegnalazioni = async () => {
+  if (!isStaff.value) return
+  storicoLoading.value = true
+  try {
+    const token = localStorage.getItem('token')
+    const response = await fetch(`/api/v1/segnalazioni/bivacco/${props.bivacco._id}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    })
+    if (response.ok) {
+      storicoSegnalazioni.value = await response.json()
+    }
+  } catch (error) {
+    console.error("Errore nel caricamento dello storico segnalazioni:", error)
+  } finally {
+    storicoLoading.value = false
+  }
+}
+
+/**
+ * Formatta la stringa dello stato rendendola leggibile
+ */
+const formattaStato = (stato) => {
+  if (!stato) return 'Inviata'
+  return stato.replace(/_/g, ' ').toUpperCase()
+}
+
 /**
  * Propaga il percorso calcolato al componente padre.
  *
@@ -113,6 +245,10 @@ watch(
   () => props.bivacco,
   () => {
     loadRecensioni()
+    //Carico storico segnalazioni se utente è parte dello Staff
+    if (isStaff.value) {
+      loadStoricoSegnalazioni()
+    }
     // Quando cambio bivacco, pulisco un eventuale tragitto precedente
     emit('clear-route')
   },
@@ -252,9 +388,72 @@ watch(
       </div>
     </section>
 
+    <!-- Segnalazione problemi -->
+    <section class="section">
+      <h3 class="section-title">Segnala un problema o un guasto</h3>
+      
+      <div v-if="!isLogged" class="login-hint">
+        Accedi per poter inviare una segnalazione sullo stato di questo bivacco.
+      </div>
+
+      <div v-else>
+        <button 
+          type="button" 
+          @click="mostrandoFormSegnalazione = !mostrandoFormSegnalazione" 
+          class="btn btn-block"
+          style="background: var(--bg-surface-2); border: 1px solid var(--border-subtle); color: var(--text-secondary); text-align: left; display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; margin-bottom: 12px;"
+        >
+          <span>{{ mostrandoFormSegnalazione ? 'Chiudi modulo' : 'Invia una segnalazione per questo bivacco' }}</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" :style="{ transform: mostrandoFormSegnalazione ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }">
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+        </button>
+
+        <div v-if="mostrandoFormSegnalazione" style="margin-top: 14px; display: flex; flex-direction: column; gap: 14px;">
+          
+          <p v-if="segnalazioneErrore" class="toast" style="background: var(--danger-bg); border-color: var(--danger-border); color: var(--danger); margin-bottom: 0;">
+            {{ segnalazioneErrore }}
+          </p>
+          <p v-if="segnalazioneSuccesso" class="toast" style="background: var(--success-bg); border-color: var(--success-border); color: var(--success); margin-bottom: 0;">
+            {{ segnalazioneSuccesso }}
+          </p>
+
+          <form class="review-form" @submit.prevent="inviaSegnalazione">
+            <div>
+              <textarea
+                v-model="segnalazioneDescrizione"
+                class="textarea"
+                placeholder="Descrivi dettagliatamente il problema (es: infiltrazioni dal tetto, finestra rotta, rifiuti accumulati...). Minimo 20 caratteri."
+                required
+              />
+              <div style="font-size: 11px; text-align: right; color: var(--text-tertiary); margin-top: 4px;">
+                Caratteri: {{ segnalazioneDescrizione.trim().length }}/20
+              </div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 6px; background: var(--bg-surface-2); padding: 12px; border-radius: var(--r); border: 1px solid var(--border-subtle);">
+              <span style="font-size: 13px; color: var(--text-secondary); font-weight: 500;">Foto prova del danno (Obbligatoria) *</span>
+              <input 
+                id="segnalazione-file-input"
+                type="file" 
+                accept="image/*" 
+                @change="handleSegnalazioneFileChange"
+                style="font-size: 13px; color: var(--text-primary); cursor: pointer;"
+                required
+              />
+            </div>
+
+            <button type="submit" :disabled="segnalazioneLoading" class="btn btn-primary btn-block" style="margin-top: 6px;">
+              {{ segnalazioneLoading ? 'Invio in corso...' : 'Invia Segnalazione' }}
+            </button>
+          </form>
+        </div>
+      </div>
+    </section>
+
     <!-- Recensioni -->
     <section class="section">
-      <h3 class="section-title">Recensioni</h3>
+      <h3 class="section-title">Recensioni ({{ recensioni.length }})</h3>
 
       <div v-if="!isLogged" class="login-hint">
         Accedi per lasciare una recensione.
