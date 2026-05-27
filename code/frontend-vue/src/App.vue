@@ -269,6 +269,16 @@ onUnmounted(() => {
 
 <template>
   <div class="app">
+    <div v-if="allerteAttive.length > 0" class="emergencyBanner">
+      <div
+        v-for="allerta in allerteAttive"
+        :key="allerta.allertaId || allerta.id"
+        class="emergencyBanner"
+      >
+        <strong>⚠️ EMERGENZA - {{ allerta.nomeBivacco || allerta.bivacco?.nome }}:</strong>
+        {{ allerta.messaggio }}
+      </div>
+    </div>
     <Navbar
       :is-logged="logged"
       @openEmergency="showEmergency = true"
@@ -712,5 +722,23 @@ onUnmounted(() => {
 .notTemp-info    { background: var(--accent-bg); border: 1px solid var(--accent-border); color: var(--accent-hi); }
 .notTemp-success { background: var(--success-bg); border: 1px solid rgba(52,211,153,0.28); color: var(--success); }
 .notTemp-error   { background: var(--danger-bg); border: 1px solid var(--danger-border); color: var(--danger); }
+
+.emergencyBannerContainer{
+  position: sticky; 
+  top: 0; 
+  z-index: 9999;
+  width: 100%;
+}
+
+.emergencyBanner{
+  background-color: #dc2626;
+  color: #ffffff;
+  text-align: center;
+  padding: 15px 20px;
+  font-size: 1.15rem;
+  font-weight: bold;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  border-bottom: 2px solid #991b1b;
+}
 
 </style>
