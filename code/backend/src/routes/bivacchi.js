@@ -13,6 +13,7 @@ const RisorseUtili = require('../models/risorseUtili');
 const Percorso = require('../models/percorso');
 const Segnalazione = require('../models/segnalazione');
 const {protectRoute} = require('../middlewares/authMiddleware');
+const TicketManutenzione = require('../models/ticketManutenzione');
 
 /**
  * Estrae un messaggio leggibile da un errore sconosciuto.
@@ -102,7 +103,7 @@ router.get('/', async (req, res) => {
  * @param {import('express').Request} req - Richiesta HTTP con id del bivacco.
  * @param {import('express').Response} res - Risposta HTTP.
  * @returns {Promise<void>} Bivacco richiesto oppure errore 400/404.
- */
+ *
 
 router.get('/:id', async (req, res) => {
   try {
@@ -144,7 +145,7 @@ router.get('/:id', async (req, res) => {
     });
   }
 });
-
+*/
 /**
  * Crea un nuovo bivacco nel database.
  * Valida i campi obbligatori e controlla che l'id numerico non sia già presente.
@@ -321,32 +322,54 @@ router.get('/:id/percorsi', async (req, res) => {
  */
 router.get('/:id', async (req, res) => {
     try {
-        // 2. Cerca il bivacco tramite l'ID passato nell'URL
-        const bivacco = await Bivacco.findById(req.params.id);
+        // 1. Cerca il bivacco tramite l'ID passato nell'URL
+        const bivacco = await Bivacco.findById(req.params.id).populate('percorsi');
         
         if (!bivacco) {
             return res.status(404).json({ message: 'Bivacco non trovato' });
         }
+        // 3. Trova tutte le segnalazioni associate a questo bivacco
+      const segnalazioni = await Segnalazione.find({ bivaccoId: bivacco._id });
+      const segnalazioniIds = segnalazioni.map(s => s._id);
+      // 4. Recupera tutti i ticket di manutenzione collegati a quelle segnalazioni
+      const ticketManutenzione = await TicketManutenzione.find({
+        segnalazione: { $in: segnalazioniIds }
+      })
+      .populate('segnalazione', 'descrizione statoSegnalazione')
+      .sort({ createdAt: -1 }); // Dal più recente al più vecchio
 
-        // 3. Cerca l'ultimo aggiornamento delle risorse inserito per QUESTO bivacco
-        const ultimeRisorse = await RisorseUtili.findOne({ bivacco: bivacco._id })
-            .sort({ createdAt: -1 }) // Ordina per data decrescente (il più recente per primo)
-            .populate('autore', 'email lingua'); // Opzionale: mostra la mail di chi ha aggiornato, escludendo dati sensibili
+      // 5. Calcola il conteggio delle segnalazioni ancora attive (per retrocompatibilità)
+      const segnalazioniAttive = segnalazioni.filter(s =>['inviata', 'presa_in_carico', 'in_corso'].includes(s.statoSegnalazione)).length;
+      // 6. Cerca l'ultimo aggiornamento delle risorse inserito per QUESTO bivacco
+      const ultimeRisorse = await RisorseUtili.findOne({ bivacco: bivacco._id })
+      .sort({ createdAt: -1 }) // Ordina per data decrescente (il più recente per primo)
+      .populate('autore', 'email lingua'); // Opzionale: mostra la mail di chi ha aggiornato, escludendo dati sensibili
 
-        // 4. Rispondi al frontend con un unico oggetto contenente tutto il necessario
-        res.status(200).json({
-            bivacco,
-            risorse: ultimeRisorse || {
-                acqua: 'non_verificata',
-                legna: 'non_verificata',
-                messaggio: 'Nessun aggiornamento recente disponibile'
-            }
-        });
+      // 7. Assembla l'oggetto bivacco con i contatori dei ticket aperti
+      const bivaccoObj = bivacco.toObject();
+      bivaccoObj.ticketAperti = segnalazioniAttive > 0;
+      bivaccoObj.numeroTicketAperti = segnalazioniAttive;
+      // 8. Rispondi al frontend con un unico oggetto contenente tutto il necessario
+      res.status(200).json({
+        bivacco: bivaccoObj,
+        ticketManutenzione: ticketManutenzione, // <-- Array con lo stato di tutti i ticket esistenti
+        risorse: ultimeRisorse || {
+        acqua: 'non_verificata',
+        legna: 'non_verificata',
+        messaggio: 'Nessun aggiornamento recente disponibile'
+      }
+      });
 
     } catch (error) {
-        console.error('Errore nel recupero del bivacco:', error);
-        res.status(500).json({ message: 'Errore interno del server' });
-    }
+        if (err instanceof Error && err.name === 'CastError') {
+          return res.status(400).json({message: 'ID bivacco non valido'
+        });
+      }
+      res.status(500).json({
+      message: 'Errore nel recupero della scheda del bivacco',
+      error: getErrorMessage(err)
+      });
+  }
 });
 
 /**
