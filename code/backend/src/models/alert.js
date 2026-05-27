@@ -27,7 +27,7 @@ const alertSchema = new mongoose.Schema({
     }
 }, { timestamps: true });
 
-alertSchema.revoca = async function(){
+alertSchema.methods.revoca = async function(){
     this.attivo = false;
     return await this.save()
 };

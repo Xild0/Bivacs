@@ -249,7 +249,7 @@ onMounted(async () => {
   } catch (error) {
     console.error('Errore durante il caricamento delle allerte di emergenza:', error)
   }
-  socketServer = io('http://localhost:3000')
+  socketServer = io('http://localhost:5000')
   socketServer,on('nuovobanner', (datiAllerta) => {
     allerteAttive.value.push(datiAllerta)
   })

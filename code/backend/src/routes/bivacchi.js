@@ -15,6 +15,7 @@ const Segnalazione = require('../models/segnalazione');
 const {protectRoute} = require('../middlewares/authMiddleware');
 const Alert = require('../models/alert');
 const TicketManutenzione = require('../models/ticketManutenzione');
+const getNextSequence = require ('../utils/getNewSequence');
 
 /**
  * Estrae un messaggio leggibile da un errore sconosciuto.
@@ -444,12 +445,18 @@ router.post('/:id/emergenza', async (req,res) => {
   try {
     const {msg} = req.body;
     const bivaccoId = req.params.id;
-    const bivacco = await Bivacco.findByIdAndUpdate(bivaccoId, {emergenza:true}, {new:true});
+    const bivacco = await Bivacco.findOneAndUpdate(
+      { id: Number(bivaccoId) }, 
+      { emergenza: true }, 
+      { new:true }
+    );
     if (!bivacco){
       return res.status(404).json({error:'Bivacco non trovato'});
     }
+    const newAlertId = await getNextSequence('alertId');
     const newAlert = new Alert ({
-      bivacco: bivacco.id,
+      id : newAlertId,
+      bivacco: bivacco._id,
       messaggio: msg,
       attivo: true
     });
@@ -467,6 +474,7 @@ router.post('/:id/emergenza', async (req,res) => {
 
     res.status(201).json({success: true, alert: newAlert});
   } catch(error){
+    console.error("Errore attivazione emergenza:", error);
     res.status(500).json({error: 'Errore interno del server'});
   }
 });
@@ -483,23 +491,28 @@ router.post('/:id/emergenza', async (req,res) => {
 router.delete('/:id/emergenza', async (req, res) => {
   try {
     const bivaccoId = req.params.id;
-    const bivacco = await Bivacco.findByIdAndUpdate(bivaccoId, {emergenza:false});
+    const bivacco = await Bivacco.findOneAndUpdate(
+      { id: Number(bivaccoId) }, 
+      { emergenza: false }, 
+      { returnDocument: 'after' }
+    );
     if(!bivacco){
       return res.status(404).json({error:'Bivacco non trovato'});
     }
 
-    const alertTrue = await Alert.findOne({bivacco:bivaccoId, attivo: true});
+    const alertTrue = await Alert.findOne({bivacco:bivacco._id, attivo: true});
     if(alertTrue){
       await alertTrue.revoca();
     }
 
     const socketServer = req.app.get('socketServer');
     if(socketServer){
-      socketServer.e,it('bannerRevocato', {bivaccoId});
+      socketServer.emit('bannerRevocato', {bivaccoId: bivacco.id});
     }
 
     res.status(200).json({success:true, message:'Banner revocato con successo'});
   } catch(error){
+    console.error('Errore revoca emergenza:', error);
     res.status(500).json({error:'Errore interno del server'});
   }
 });
