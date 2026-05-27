@@ -27,4 +27,9 @@ const alertSchema = new mongoose.Schema({
     }
 }, { timestamps: true });
 
-module.exports = mongoose.model('Alert', alertSchema);
+alertSchema.revoca = async function(){
+    this.attivo = false;
+    return await this.save()
+};
+
+module.exports = mongoose.model('Alert', alertSchema);      

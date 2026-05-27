@@ -2,13 +2,9 @@
  * @file index.js
  * @description Punto di ingresso principale del backend Bivacs.
  * Configura Express, connessione MongoDB, middleware globali e registrazione delle route API.
- */
-
-/**
  * Configurazione DNS custom per evitare problemi di risoluzione
  * su alcune reti/università durante le chiamate esterne.
  */
-
 const dns = require("dns");
 dns.setServers(["8.8.8.8", "1.1.1.1"]);
 
@@ -24,6 +20,8 @@ const cors = require('cors');
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 const connectDB = require('./config/db');
+const http = require ('http');
+const {server} = require('socket.io');          // necessario per l'invio di dati in tempo reale
 
 // importazione delle route
 const bivacchiRoute = require('./routes/bivacchi');
@@ -38,8 +36,19 @@ const supportoRoute = require('./routes/supporto');
 /**
  * Inizializzazione applicazione Express.
  */
-
 const app = express();
+const server = http.createServer(app);
+const socketServer = new Server(server, {
+    cors: {
+        origin: "http://localhost:5173", 
+        methods: ["GET", "POST", "DELETE"]
+    }
+});
+app.set('socketServer', socketServer);
+
+socketServer.on('connection', (socket) => {
+    console.log('Nuovo  utente connesso (Socket ID:', socket.id, ')');
+});
 
 /**
  * Middleware globali:
@@ -47,7 +56,6 @@ const app = express();
  * - parsing JSON
  * - esposizione statica della cartella uploads
  */
-
 app.use(cors());
 app.use(express.json());
 
@@ -62,6 +70,7 @@ app.use('/api/v1/percorsi', percorsiRoutes);
 app.use('/api/v1/segnalazioni', segnalazioniRoute);
 app.use('/api/v1/meteo', meteoRoute);
 app.use('/api/v1/supporto', supportoRoute);
+
 /**
  * Route di test per verificare che il server sia online.
  *
@@ -70,7 +79,6 @@ app.use('/api/v1/supporto', supportoRoute);
  * @param {import('express').Response} res - Risposta HTTP.
  * @returns {void}
  */
-
 app.get('/', (req, res) => {
     res.send('Server Bivacs online');
 });
@@ -83,10 +91,9 @@ const PORT = process.env.PORT || 5000;
  * - connessione a MongoDB
  * - apertura server Express sulla porta configurata
  */
-
 (async () => {
     await connectDB();
-    app.listen(PORT, () => {
+    server.listen(PORT, () => {
         console.log('Server avviato sulla porta ' + PORT);
     });
 })();

@@ -6,7 +6,8 @@
  */
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted} from 'vue'
+import { io } from 'socket.io-client'
 
 import Navbar from './components/Navbar.vue'
 import Hero from './components/Hero.vue'
@@ -39,6 +40,8 @@ const preferitiIds = ref([])
 const resetTokenAttivo = ref(null)
 const notTemp = ref({ visible: false, type: 'info', text: ''})
 const meteoMap = ref({})  // { bivaccoId: { temperatura, vento, precipitazioni, livelloRischio, allerta } }
+const allerteAttive = ref([])
+let socketServer = null
 
 /**
  * Carica l'elenco dei bivacchi dal backend applicando eventuali filtri.
@@ -234,11 +237,33 @@ function gestisciSessioneScaduta() {
   mostraNotTemp('La tua sessione è scaduta. Effettua di nuovo l\'accesso.', 'error', 6000)
 }
 
-onMounted(() => {
+onMounted(async () => {
   loadBivacchi()
   loadUserData()
   gestisciQueryString()
   window.addEventListener('bivacs:auth-expired', gestisciSessioneScaduta)
+  
+  try {
+    const res = await api.get('/api/v1/bivacchi/emergenze_attive')
+    allerteAttive.value = res.data || []
+  } catch (error) {
+    console.error('Errore durante il caricamento delle allerte di emergenza:', error)
+  }
+  socketServer = io('http://localhost:3000')
+  socketServer,on('nuovobanner', (datiAllerta) => {
+    allerteAttive.value.push(datiAllerta)
+  })
+  socketServer.on('bannerRevocato', (dati) =>{
+    allerteAttive.value = allerteAttive.value.filter(
+      (a) => a.bivaccoId !== dati.bivaccoId && (a.bivacco && a.bivacco.id !== dati.bivaccoId)
+    )
+  })
+})
+
+onUnmounted(() => {
+  if(socketServer){
+    socketServer.disconnect()
+  }
 })
 </script>
 
