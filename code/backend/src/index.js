@@ -21,7 +21,7 @@ const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 const connectDB = require('./config/db');
 const http = require ('http');
-const {server} = require('socket.io');          // necessario per l'invio di dati in tempo reale
+const {Server} = require('socket.io');          // necessario per l'invio di dati in tempo reale
 
 // importazione delle route
 const bivacchiRoute = require('./routes/bivacchi');
