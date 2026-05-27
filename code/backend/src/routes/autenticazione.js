@@ -122,7 +122,7 @@ router.post('/login', async (req, res) => {
             return res.status(400).json({ errore: 'Email e password obbligatorie' });
         }
         
-        const utenteTrovato = await UtenteRegistrato.findOne({ email: email });
+        const utenteTrovato = await Utente.findOne({ email: email });
         
         if (!utenteTrovato) {
             return res.status(404).json({

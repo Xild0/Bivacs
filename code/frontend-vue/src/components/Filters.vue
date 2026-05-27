@@ -175,6 +175,7 @@ function resetFilters() {
 <style scoped>
 .filters {
   padding: 28px;
+  overflow: visible;
 }
 
 .filters-head {
@@ -213,6 +214,7 @@ function resetFilters() {
   display: grid;
   grid-template-columns: 1.8fr 1.2fr 1fr 1fr 1.1fr 1.2fr auto;
   gap: 10px;
+  overflow: visible;
 }
 
 .field {
@@ -270,12 +272,11 @@ select.field-input {
   top: calc(100% + 6px);
   left: 0;
   right: 0;
-  z-index: 50;
+  z-index: 9999;
   background: var(--bg-surface-2);
   border: 1px solid var(--border);
   border-radius: var(--r);
   box-shadow: var(--shadow-md);
-  overflow: hidden;
 }
 
 .suggestion {
