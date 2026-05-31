@@ -81,5 +81,12 @@ quando la funzionalità è completamente finita e testata (vale a dire nessun er
 
 6. Aggiornamento locale
 Dopo che la pull request è stata unita al `main`, tornare al punto 1 per avere l'ultima versione del codice
-    
+
+--- 
+
+## Docker (Tollo)
+1. **Avvio:** ```docker compose up``` 
+    * Usare flag ```--build``` se ci sono nuove librerie da installare
+2. **Spegnimento:** ```docker compose down ```
+3. **Pulizia Totale:** ```docker system prune -a --volumes -f``` **ATTENZIONE:** con questo comando si cancella completamente tutto il docker
 

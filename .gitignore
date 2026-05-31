@@ -1,2 +1,32 @@
+# DIPENDENZE E SEGRETI (FONDAMENTALI PER TUTTI)
+# =======================================
 **/node_modules/
 **/.env
+
+# CONFIGURAZIONE DOCKER LOCALE TOLLO 
+# NON RIMUOVERE ALTRIMENTI MI SI ROMPE TUTTO IL CODICE
+# ======================================= 
+docker-compose.yaml
+docker-compose.yml
+**/Dockerfile
+
+# BUILD FRONTEND 
+# =======================================
+**/dist/
+
+# LOG DI ERRORE NODE.JS
+=======================================
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# SPAZZATURA SISTEMI OPERATIVI
+# SICCOME ABBIAMO SIA WINDOWS CHE LINUX SU CUI FAR GIRARE IL CODICE
+# =======================================
+Thumbs.db
+
+# EDITOR E IDE
+# =======================================
+.idea/
+*.suo
+*.sln
