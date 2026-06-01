@@ -7,7 +7,12 @@
 <script setup>
 import { reactive, ref } from 'vue'
 import Modal from './Modal.vue'
-import { registerUser, loginUser, richiediRecuperoPassword } from '../services/api'
+import {
+  registerUser,
+  loginUser,
+  richiediRecuperoPassword,
+  resendVerificationEmail
+} from '../services/api'
 
 const emit = defineEmits(['close', 'auth-changed'])
 
@@ -16,6 +21,10 @@ const message = ref('')
 const messageType = ref('info')
 
 const showPasswords = ref(false)
+
+const emailNonVerificata = ref('')
+const resendCooldown = ref(0)
+let resendTimer = null
 
 const loginForm = reactive({
   email: '',
@@ -49,9 +58,8 @@ async function submitLogin() {
     messageType.value = 'error'
 
     if (error.codiceErrore === 'EMAIL_NON_VERIFICATA') {
+      emailNonVerificata.value = loginForm.email
       message.value = 'Devi prima verificare la tua email. Controlla la tua casella di posta.'
-    } else {
-      message.value = error.message
     }
   }
 }
@@ -77,6 +85,32 @@ async function recoverPassword() {
     await richiediRecuperoPassword(loginForm.email)
     messageType.value = 'success'
     message.value = 'Email di recupero inviata. Controlla la tua casella di posta.'
+  } catch (error) {
+    messageType.value = 'error'
+    message.value = error.message
+  }
+}
+
+async function resendVerification() {
+  if (!emailNonVerificata.value || resendCooldown.value > 0) return
+
+  try {
+    await resendVerificationEmail(emailNonVerificata.value)
+
+    messageType.value = 'success'
+    message.value = 'Email di verifica inviata nuovamente. Controlla la tua casella di posta.'
+
+    resendCooldown.value = 120
+
+    clearInterval(resendTimer)
+    resendTimer = setInterval(() => {
+      resendCooldown.value--
+
+      if (resendCooldown.value <= 0) {
+        clearInterval(resendTimer)
+        resendTimer = null
+      }
+    }, 1000)
   } catch (error) {
     messageType.value = 'error'
     message.value = error.message
@@ -139,6 +173,20 @@ async function submitRegister() {
     <p v-if="message" class="msg" :class="`msg-${messageType}`">
       {{ message }}
     </p>
+
+    <button
+  v-if="emailNonVerificata && mode === 'login'"
+  type="button"
+  class="link-btn resend-btn"
+  :disabled="resendCooldown > 0"
+  @click="resendVerification"
+>
+  {{
+    resendCooldown > 0
+      ? `Puoi rimandare la mail tra ${resendCooldown}s`
+      : 'Rimanda email di verifica'
+  }}
+</button>
 
     <!-- LOGIN -->
     <form v-if="mode === 'login'" class="form" @submit.prevent="submitLogin">
@@ -374,5 +422,16 @@ async function submitRegister() {
   .row {
     grid-template-columns: 1fr;
   }
+}
+
+.resend-btn {
+  width: 100%;
+  margin-bottom: 14px;
+  color: var(--accent);
+}
+
+.resend-btn:disabled {
+  color: var(--text-tertiary);
+  cursor: not-allowed;
 }
 </style>

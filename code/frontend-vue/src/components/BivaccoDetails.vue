@@ -9,7 +9,8 @@ import { reactive, ref, watch, computed } from 'vue'
 
 import {
   creaRecensione,
-  getRecensioni
+  getRecensioni, 
+  getToken
 } from '../services/api'
 
 import TripPlanner from './TripPlanner.vue'
@@ -132,7 +133,7 @@ const inviaSegnalazione = async () => {
 
   try {
     // Recupera il token JWT salvato durante l'autenticazione
-    const token = localStorage.getItem('token')
+    const token = getToken()
     if (!token) {
       throw new Error('Devi effettuare il login per inviare una segnalazione.')
     }
@@ -142,7 +143,7 @@ const inviaSegnalazione = async () => {
     formData.append('descrizione', segnalazioneDescrizione.value)
     formData.append('foto', segnalazioneFoto.value)
 
-    const response = await fetch('/api/v1/segnalazioni', {
+    const response = await fetch('http://localhost:5000/api/v1/segnalazioni', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`
@@ -151,10 +152,11 @@ const inviaSegnalazione = async () => {
       body: formData
     })
 
-    const data = await response.json()
+        const text = await response.text()
+    const data = text ? JSON.parse(text) : {}
 
     if (!response.ok) {
-      throw new Error(data.errore || "Impossibile inviare la segnalazione.")
+      throw new Error(data.errore || data.message || 'Impossibile inviare la segnalazione.')
     }
 
     // Successo: reset dei campi del modulo
@@ -200,7 +202,7 @@ const loadStoricoSegnalazioni = async () => {
   if (!isStaff.value) return
   storicoLoading.value = true
   try {
-    const token = localStorage.getItem('token')
+    const token = localStorage.getItem('bivacs_token')
     const response = await fetch(`/api/v1/segnalazioni/bivacco/${props.bivacco._id}`, {
       method: 'GET',
       headers: {
