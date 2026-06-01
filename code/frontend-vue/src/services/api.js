@@ -791,3 +791,41 @@ export async function scaricaAutoGpxBivacco(bivaccoId, suggestedName = 'percorso
 
   setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
+
+/**
+ * @description Attiva lo stato di emergenza per un bivacco
+ * @param {string|number} bivaccoId - ID del bivacco
+ * @param {string} note - Motivazione dell'emergenza
+ * @returns {Promise<Object>} - Risposta del server
+ */
+export const attivaEmergenza = async (bivaccoId, note) => {
+  const token = localStorage.getItem('token')
+  const response = await fetch('${API_URL}/bivacchi/${bivaccoId}/emergenza', {
+    method: 'POST', 
+    headers:{
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ${token}'
+    }, 
+    body: JSON.stringify({note})
+  })
+  if(!response.ok) throw new Error('Impossibile attivare l\'emergenza')
+  return response.json()
+}
+
+/**
+ * @description Revoca lo stato di emergenza per un bivacco
+ * @param {string|number} bivaccoId - ID del bivacco
+ * @returns {Promise<Object>} - Risposta del server
+ */
+export const revocaEmergenza = async (bivaccoId) => {
+  const token = localStorage.getItem('token')
+  const response = await fetch('${API_URL}/bivacchi/${bivaccoId}/revoca-emergenza', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer ${token}'
+    }
+  })
+
+  if (!response.ok) throw new Error('Impossibile revocare l\'emergenza')
+  return response.json()
+}

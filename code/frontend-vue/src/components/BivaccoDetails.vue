@@ -6,12 +6,8 @@
 
 <script setup>
 import { reactive, ref, watch, computed } from 'vue'
-
-import {
-  creaRecensione,
-  getRecensioni
-} from '../services/api'
-
+import { useStore } from 'vuex'
+import * as api from '../services/api.js'
 import TripPlanner from './TripPlanner.vue'
 import MeteoPanel from './MeteoPanel.vue'
 
@@ -54,7 +50,7 @@ const recensioneForm = reactive({
 
 async function loadRecensioni() {
   try {
-    recensioni.value = await getRecensioni(props.bivacco._id)
+    recensioni.value = await api.getRecensioni(props.bivacco._id)
   } catch (error) {
     console.error(error)
   }
@@ -73,7 +69,7 @@ async function submitRecensione() {
   }
 
   try {
-    await creaRecensione({
+    await api.creaRecensione({
       bivaccoId: props.bivacco._id,
       utente: nomeUtente.value,
       stelle: Number(recensioneForm.stelle),

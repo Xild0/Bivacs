@@ -68,5 +68,25 @@ const isStaff = (req, res, next) => {
     }
 };
 
+/**
+ * Verifica che l'utente autenticato abbia i privilegi di SuperUser.
+ * 
+ * @param {import('express').Request} req - Oggetto richiesta Express con dati utente già decodificati.
+ * @param {import('express').Response res - Oggetto risposta Express.
+ * @param {import('express').NextFunction next - Funzione per passare al middleware successivo.
+ * @returns {void}
+ */
+const isSuperUser = (req, res, next) => {
+    const tipoUtente = req.utente.discriminator;
+
+    if (tipoUtente === 'SuperUser') {
+        next();
+    } else {
+        return res.status(403).json({ 
+            errore: 'Accesso negato. Funzione riservata solo ai SuperUser.'
+        });
+    }
+};
+
 // Esportiamo entrambi
-module.exports = { protectRoute, isStaff };
+module.exports = { protectRoute, isStaff, isSuperUser };

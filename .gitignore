@@ -11,8 +11,7 @@ yarn-error.log*
 pnpm-debug.log*
 
 # BUILD FRONTEND
-code/frontend-vue/dist/
-code/frontend-vue/dist-ssr/
+**/dist 
 
 # FILE SPECIFICI DEI SISTEMI OPERATIVI
 # Windows
@@ -27,6 +26,7 @@ $RECYCLE.BIN/
 *.suo
 *.sln
 
-# DOCKER
+# DOCKER TOLLO
+# NON RIMUOVERE O MI SI ROMPE TUTTO
 docker-data/
 db-data/

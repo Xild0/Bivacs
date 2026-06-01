@@ -12,7 +12,7 @@ const Bivacco = require('../models/bivacco');
 const RisorseUtili = require('../models/risorseUtili');
 const Percorso = require('../models/percorso');
 const Segnalazione = require('../models/segnalazione');
-const {protectRoute} = require('../middlewares/authMiddleware');
+const {protectRoute, isSuperUser} = require('../middlewares/authMiddleware');
 const Alert = require('../models/alert');
 const TicketManutenzione = require('../models/ticketManutenzione');
 const getNextSequence = require ('../utils/getNewSequence');
@@ -441,41 +441,51 @@ router.post('/:id/risorse', protectRoute, async (req, res) => {
  * @param {import('express').Response} res - oggetto della risposta Express
  * @returns {Promise<void>} risponde con stato 201 e oggetto Alert creato in caso di successo, 500 in caso di errore
  */
-router.post('/:id/emergenza', async (req,res) => {
+router.post('/:id/emergenza', protectRoute, isSuperUser, async (req,res) => {
   try {
-    const {msg} = req.body;
+    const {note} = req.body;
     const bivaccoId = req.params.id;
+
     const bivacco = await Bivacco.findOneAndUpdate(
       { id: Number(bivaccoId) }, 
       { emergenza: true }, 
-      { new:true }
+      { new: true }
     );
+
     if (!bivacco){
       return res.status(404).json({error:'Bivacco non trovato'});
     }
+    
     const newAlertId = await getNextSequence('alertId');
     const newAlert = new Alert ({
       id : newAlertId,
       bivacco: bivacco._id,
-      messaggio: msg,
+      messaggio: note || 'Allerta di emergenza attiva! Prestare attenzione.',
       attivo: true
     });
     await newAlert.save();
 
     const socketServer = req.app.get('socketServer');
     if(socketServer){
-      socketServer.emit('nuovoBanner', newAlert);
+      socketServer.emit('BannerAttivato', {
+        bivaccoId: bivacco.id,
+        messaggio: newAlert.messaggio
+      });
     }
 
-    res.status(201).json({success: true, alert: newAlert});
+    res.status(201).json({
+      success: true, 
+      message: 'Stato di emergenza attivato con successo',
+      bivacco
+    });
   } catch(error){
-    console.error("Errore attivazione emergenza:", error);
+    console.error("Errore attivazione emergenza:", getErrorMessage(error));
     res.status(500).json({error: 'Errore interno del server'});
   }
 });
 
 /**
- * @route DELETE /api/v1/bivacchi/:id/emergenza
+ * @route DELETE /api/v1/bivacchi/:id/revoca-emergenza
  * @description Imposta il campo emergenza del bivacco a false e chiama il metodo revoca() sull'istanza Alert attiva 
  * per rimuovere il banner dall'interfaccia utente.
  * @param {import('express').Request} req - oggetto della richiesta Express
@@ -483,14 +493,15 @@ router.post('/:id/emergenza', async (req,res) => {
  * @param {import('express').Response} res - oggetto della risposta Express
  * @returns {Promise<void>} risponde con stato 200 in caso di avvenuta revoca, 500 in caso di errore
  */
-router.delete('/:id/emergenza', async (req, res) => {
+router.delete('/:id/revoca-emergenza', protectRoute, isSuperUser, async (req, res) => {
   try {
     const bivaccoId = req.params.id;
     const bivacco = await Bivacco.findOneAndUpdate(
       { id: Number(bivaccoId) }, 
       { emergenza: false }, 
-      { returnDocument: 'after' }
+      { new: true }
     );
+
     if(!bivacco){
       return res.status(404).json({error:'Bivacco non trovato'});
     }
@@ -507,7 +518,7 @@ router.delete('/:id/emergenza', async (req, res) => {
 
     res.status(200).json({success:true, message:'Banner revocato con successo'});
   } catch(error){
-    console.error('Errore revoca emergenza:', error);
+    console.error('Errore revoca emergenza:', getErrorMessage(error));
     res.status(500).json({error:'Errore interno del server'});
   }
 });
