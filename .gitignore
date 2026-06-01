@@ -1,2 +1,32 @@
+# DIPENDENZE E VARIABILI D'AMBIENTE
 **/node_modules/
 **/.env
+**/.env.*
+!**/.env.example
+
+# FILE LOG
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# BUILD FRONTEND
+code/frontend-vue/dist/
+code/frontend-vue/dist-ssr/
+
+# FILE SPECIFICI DEI SISTEMI OPERATIVI
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# IDE
+.vscode/.history/
+.idea/
+*.suo
+*.sln
+
+# DOCKER
+docker-data/
+db-data/

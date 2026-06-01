@@ -16,8 +16,9 @@ services:
     container_name: bivacs-backend
     ports:
       - "3000:3000"
+    env_file:
+      - ./code/backend/.env
     environment:
-      - MONGO_URI=mongodb://mongo:27017/bivacs
       - PORT=3000
     volumes:
       - ./code/backend:/app
