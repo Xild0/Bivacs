@@ -271,5 +271,46 @@ router.post('/reset-password/:token', async (req, res) => {
     }
 });
 
+router.post('/resend-verification', async (req, res) => {
+    try {
+        const { email } = req.body;
+
+        if (!email) {
+            return res.status(400).json({ errore: 'Email obbligatoria' });
+        }
+
+        const utente = await Utente.findOne({ email });
+
+        if (!utente) {
+            return res.status(404).json({ errore: 'Utente non trovato' });
+        }
+
+        if (utente.isVerified) {
+            return res.status(400).json({ errore: 'Account già verificato' });
+        }
+
+        const nuovoToken = crypto.randomBytes(32).toString('hex');
+        utente.emailToken = nuovoToken;
+        await utente.save();
+
+        const linkVerifica = `http://localhost:5000/api/v1/auth/verify-email?token=${nuovoToken}`;
+
+        await inviaEmail(
+            email,
+            'Conferma email Bivacs',
+            `
+            <h1>Conferma il tuo account Bivacs</h1>
+            <p>Clicca sul pulsante per verificare la tua email:</p>
+            <a href="${linkVerifica}" style="background:#4CAF50;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;">
+                Conferma account
+            </a>
+            `
+        );
+
+        res.status(200).json({ messaggio: 'Email di verifica inviata nuovamente' });
+    } catch (error) {
+        res.status(500).json({ errore: 'Errore invio nuova email di verifica' });
+    }
+});
 
 module.exports = router;

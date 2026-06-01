@@ -104,7 +104,7 @@ router.get('/', async (req, res) => {
  * @param {import('express').Response} res - Risposta HTTP.
  * @returns {Promise<void>} Bivacco richiesto oppure errore 400/404.
  *
-
+*/
 router.get('/:id', async (req, res) => {
   try {
 
@@ -131,21 +131,21 @@ router.get('/:id', async (req, res) => {
 
   res.status(200).json(bivaccoObj);
 
-  } catch (err) {
+  } catch (error) {
+        if (error instanceof Error && error.name === 'CastError') {
+          return res.status(400).json({
+            message: 'ID bivacco non valido'
+          });
+        }
 
-    if (err instanceof Error && err.name === 'CastError') {
-      return res.status(400).json({
-        message: 'ID bivacco non valido'
-      });
+        res.status(500).json({
+          message: 'Errore nel recupero della scheda del bivacco',
+          error: getErrorMessage(error)
+        });
     }
-
-    res.status(500).json({
-      message: 'Errore recupero bivacco',
-      error: getErrorMessage(err)
-    });
-  }
 });
-*/
+
+
 /**
  * Crea un nuovo bivacco nel database.
  * Valida i campi obbligatori e controlla che l'id numerico non sia già presente.

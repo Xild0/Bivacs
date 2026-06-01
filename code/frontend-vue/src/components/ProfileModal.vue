@@ -13,7 +13,8 @@ import {
   deleteProfile,
   logoutUser,
   getAllertePreferiti,
-  richiediSupportoTecnico
+  richiediSupportoTecnico,
+  getMieSegnalazioni
 } from '../services/api'
 
 const emit = defineEmits(['close', 'auth-changed', 'open-bivacco'])
@@ -37,6 +38,8 @@ const message = ref('')
 const messageType = ref('info')
 const loaded = ref(false)
 const allerteMap = ref({})
+const mieSegnalazioni = ref([])
+const segnalazioniLoading = ref(false)
 
 async function loadProfile() {
   try {
@@ -73,6 +76,19 @@ async function saveProfile() {
   } catch (error) {
     messageType.value = 'error'
     message.value = error.message
+  }
+}
+
+async function loadMieSegnalazioni() {
+  segnalazioniLoading.value = true
+
+  try {
+    mieSegnalazioni.value = await getMieSegnalazioni()
+  } catch (error) {
+    console.error('Errore caricamento mie segnalazioni:', error)
+    mieSegnalazioni.value = []
+  } finally {
+    segnalazioniLoading.value = false
   }
 }
 
@@ -142,6 +158,7 @@ function openPreferito(bivacco) {
 onMounted(() => {
   loadProfile()
   loadAllerte()
+  loadMieSegnalazioni()
 })
 </script>
 
@@ -270,6 +287,47 @@ onMounted(() => {
 
       <p v-else class="empty-favorites">
         Nessun bivacco salvato nei preferiti.
+      </p>
+    </section>
+
+        <div class="divider"></div>
+
+    <section class="segnalazioni-section">
+      <h3>Le mie segnalazioni</h3>
+
+      <p v-if="segnalazioniLoading" class="empty-favorites">
+        Caricamento segnalazioni…
+      </p>
+
+      <div v-else-if="mieSegnalazioni.length" class="favorites-grid">
+        <div
+          v-for="segnalazione in mieSegnalazioni"
+          :key="segnalazione._id"
+          class="favorite-card"
+        >
+          <div class="favorite-top">
+            <h4>
+              {{ segnalazione.bivaccoId?.nome || 'Bivacco non disponibile' }}
+            </h4>
+
+            <span class="favorite-altitude">
+              {{ segnalazione.statoSegnalazione?.replaceAll('_', ' ').toUpperCase() }}
+            </span>
+          </div>
+
+          <div class="favorite-meta">
+            <span>{{ segnalazione.bivaccoId?.zona || 'Zona non indicata' }}</span>
+            <span>{{ new Date(segnalazione.createdAt).toLocaleDateString('it-IT') }}</span>
+          </div>
+
+          <p class="segnalazione-desc">
+            {{ segnalazione.descrizione }}
+          </p>
+        </div>
+      </div>
+
+      <p v-else class="empty-favorites">
+        Non hai ancora inviato segnalazioni.
       </p>
     </section>
 
@@ -642,5 +700,16 @@ onMounted(() => {
   background: var(--warning-bg);
   color: var(--warning);
   border: 1px solid rgba(251, 191, 36, 0.28);
+}
+
+.segnalazioni-section h3 {
+  font-size: 1rem;
+  margin-bottom: 10px;
+}
+
+.segnalazione-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
 }
 </style>

@@ -296,19 +296,14 @@ router.patch('/richieste-supporto/:utenteId/approva', protectRoute, isSupportoTe
       utente.richiestaSupportoTecnico?.matricolaRichiesta ||
       `ST-${utente.id}`
 
-    const aggiornato = await Utente.findByIdAndUpdate(
-      req.params.utenteId,
-      {
-        $set: {
-          discriminator: 'SupportoTecnico',
-          matricola,
-          'richiestaSupportoTecnico.stato': 'approvata'
-        }
-      },
-      {
-        new: true,
-        overwriteDiscriminatorKey: true
-      }
+    utente.discriminator = 'SupportoTecnico'
+      utente.matricola = matricola
+      utente.richiestaSupportoTecnico.stato = 'approvata'
+
+      await utente.save()
+
+      const aggiornato = await Utente.findById(
+      req.params.utenteId
     ).select('-passwordHash')
 
     await inviaEmail(

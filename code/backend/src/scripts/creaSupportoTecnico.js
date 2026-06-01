@@ -12,7 +12,7 @@ const getNextSequence = require('../utils/getNewSequence')
 async function main() {
   await connectDB()
 
-  const email = 'noreply.bivacs@hmail.com'
+  const email = 'noreply.bivacs@gmail.com'
   const password = 'Bivacs2026!'
 
   const esistente = await SupportoTecnico.findOne({ email })
@@ -25,13 +25,13 @@ async function main() {
   const id = await getNextSequence('utenteId')
 
   await SupportoTecnico.create({
-    id,
-    email,
-    passwordHash,
-    discriminator: 'SupportoTecnico',
-    isVerified: true,
-    matricola: 'ST001'
-  })
+  id,
+  email,
+  passwordHash,
+  discriminator: 'SupportoTecnico',
+  isVerified: true,
+  matricola: 'ST-ADMIN'
+})
 
   console.log('Creato supporto tecnico:')
   console.log('email:', email)

@@ -27,11 +27,23 @@ export async function getBivacchi(filters = {}) {
 export async function getBivaccoById(id) {
   const response = await fetch(`${API_URL}/bivacchi/${id}`)
 
+  const data = await response.json()
+
   if (!response.ok) {
-    throw new Error('Errore caricamento scheda bivacco')
+    throw new Error(data.message || 'Errore caricamento scheda bivacco')
   }
 
-  return await response.json()
+  // Il backend D4 restituisce { bivacco, ticketManutenzione, risorse }
+  if (data.bivacco) {
+    return {
+      ...data.bivacco,
+      ticketManutenzione: data.ticketManutenzione || [],
+      risorseDettaglio: data.risorse || null
+    }
+  }
+
+  // Compatibilità con vecchia risposta diretta
+  return data
 }
 
 export async function creaRecensione(data) {
@@ -790,4 +802,47 @@ export async function scaricaAutoGpxBivacco(bivaccoId, suggestedName = 'percorso
   document.body.removeChild(a)
 
   setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
+export async function getMieSegnalazioni() {
+  const response = await fetchAuth(`${API_URL}/segnalazioni/mie`)
+
+  const data = await response.json()
+
+  if (!response.ok) {
+    throw new Error(data.errore || data.message || 'Errore caricamento segnalazioni')
+  }
+
+  return data
+}
+
+export async function resendVerificationEmail(email) {
+  const response = await fetch(`${API_URL}/auth/resend-verification`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ email })
+  })
+
+  const text = await response.text()
+  const data = text ? JSON.parse(text) : {}
+
+  if (!response.ok) {
+    throw new Error(data.errore || 'Errore invio email di verifica')
+  }
+
+  return data
+}
+
+export async function getStoricoSegnalazioniStaff() {
+  const response = await fetchAuth(`${API_URL}/segnalazioni/storico`)
+
+  const data = await response.json()
+
+  if (!response.ok) {
+    throw new Error(data.errore || data.message || 'Errore caricamento storico segnalazioni')
+  }
+
+  return data
 }

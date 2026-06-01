@@ -9,13 +9,15 @@ import {
   creaBivaccoTecnico,
   getBivacchi,
   getRichiesteSupporto,
-  approvaRichiestaSupporto
+  approvaRichiestaSupporto,
+  getStoricoSegnalazioniStaff
 } from '../services/api'
 
 const logs = ref([])
 const configs = ref([])
 const bivacchi = ref([])
 const richieste = ref([])
+const segnalazioniStaff = ref([])
 
 const loading = ref(false)
 const message = ref('')
@@ -137,6 +139,7 @@ async function loadSupportoData() {
     configs.value = await getConfigApi()
     bivacchi.value = await getBivacchi()
     richiesteSupporto.value = await getRichiesteSupporto()
+    segnalazioniStaff.value = await getStoricoSegnalazioniStaff()
   } catch (error) {
     messageType.value = 'error'
     message.value = error.message
@@ -254,6 +257,69 @@ onMounted(() => {
 
     <div v-else class="support-layout">
       <!-- US38 -->
+       <section
+  v-if="segnalazioniStaff.some(s => ['inviata', 'presa_in_carico', 'in_corso'].includes(s.statoSegnalazione))"
+  class="alert-segnalazioni"
+>
+  <div>
+    <strong>⚠️ Segnalazioni attive presenti</strong>
+    <p>
+      Ci sono
+      {{
+        segnalazioniStaff.filter(s =>
+          ['inviata', 'presa_in_carico', 'in_corso'].includes(s.statoSegnalazione)
+        ).length
+      }}
+      segnalazioni ancora aperte da controllare.
+    </p>
+  </div>
+</section>
+
+<section class="support-card support-card-wide">
+  <h4>Segnalazioni utenti</h4>
+
+  <div v-if="segnalazioniStaff.length" class="log-list">
+    <div
+      v-for="segnalazione in segnalazioniStaff"
+      :key="segnalazione._id"
+      class="log-row"
+    >
+      <strong>
+        {{ segnalazione.bivaccoId?.nome || 'Bivacco non disponibile' }}
+      </strong>
+
+      <small>
+        Stato:
+        {{ segnalazione.statoSegnalazione?.replaceAll('_', ' ').toUpperCase() }}
+      </small>
+
+      <small>
+        Utente:
+        {{ segnalazione.utenteId?.email || 'utente non disponibile' }}
+      </small>
+
+      <small>
+        Data:
+        {{ new Date(segnalazione.createdAt).toLocaleString('it-IT') }}
+      </small>
+
+      <p>{{ segnalazione.descrizione }}</p>
+
+      <a
+        v-if="segnalazione.foto"
+        :href="`http://localhost:5000${segnalazione.foto}`"
+        target="_blank"
+        class="foto-link"
+      >
+        Apri foto allegata
+      </a>
+    </div>
+  </div>
+
+  <p v-else class="empty">
+    Nessuna segnalazione disponibile.
+  </p>
+</section>
       <section class="support-card">
         <h4>Log API esterne</h4>
 
@@ -750,5 +816,40 @@ onMounted(() => {
   .support-card-wide {
     grid-column: auto;
   }
+}
+
+.alert-segnalazioni {
+  padding: 18px;
+  border-radius: var(--r-lg);
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
+  color: var(--danger);
+  animation: lampeggiaSegnalazioni 1.4s infinite;
+}
+
+.alert-segnalazioni strong {
+  font-size: 15px;
+  color: var(--danger);
+}
+
+.alert-segnalazioni p {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+@keyframes lampeggiaSegnalazioni {
+  0%, 100% {
+    box-shadow: 0 0 0 rgba(248, 113, 113, 0);
+  }
+  50% {
+    box-shadow: 0 0 26px rgba(248, 113, 113, 0.45);
+  }
+}
+
+.foto-link {
+  font-size: 12px;
+  color: var(--accent);
+  font-weight: 700;
 }
 </style>
