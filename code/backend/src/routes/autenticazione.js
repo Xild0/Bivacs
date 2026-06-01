@@ -73,7 +73,7 @@ router.post('/register', async (req, res) => {
          * creazione della mail da inviare automaticamente
          * mediante il servizio "inviaEmail"
          */
-        const linkVerifica = `http://localhost:5000/api/v1/auth/verify-email?token=${verificaToken}`;
+        const linkVerifica = `http://localhost:3000/api/v1/auth/verify-email?token=${verificaToken}`;
         const htmlContent = `
             <h1>Benvenuto su Bivacs!</h1>
             <p>Ciao ${nome}, clicca sul pulsante qui sotto per confermare la tua email:</p>

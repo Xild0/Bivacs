@@ -1,4 +1,4 @@
-const API_URL = 'http://localhost:5000/api/v1'
+const API_URL = 'http://localhost:3000/api/v1'
 const ORS_API_KEY = import.meta.env.VITE_ORS_API_KEY
 
 function buildQuery(filters = {}) {

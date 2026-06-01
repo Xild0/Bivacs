@@ -38,10 +38,11 @@ const supportoRoute = require('./routes/supporto');
  */
 const app = express();
 const httpServer = http.createServer(app);
-const socketServer = new Server(httpServer, {
+const socketServer = new Server(httpServer,{
     cors: {
-        origin: "http://localhost:5173", 
-        methods: ["GET", "POST", "DELETE"]
+        origin: 'http://localhost:5173',
+        methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+        credentials: true
     }
 });
 app.set('socketServer', socketServer);
@@ -56,7 +57,11 @@ socketServer.on('connection', (socket) => {
  * - parsing JSON
  * - esposizione statica della cartella uploads
  */
-app.use(cors());
+app.use(cors({
+    origin: 'http://localhost:5173',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    credentials: true
+}));
 app.use(express.json());
 
 // registrazione delle route API
