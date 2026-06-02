@@ -800,11 +800,11 @@ export async function scaricaAutoGpxBivacco(bivaccoId, suggestedName = 'percorso
  */
 export const attivaEmergenza = async (bivaccoId, note) => {
   const token = localStorage.getItem('token')
-  const response = await fetch('${API_URL}/bivacchi/${bivaccoId}/emergenza', {
+  const response = await fetch(`${API_URL}/bivacchi/${bivaccoId}/emergenza`, {
     method: 'POST', 
     headers:{
       'Content-Type': 'application/json',
-      'Authorization': 'Bearer ${token}'
+      'Authorization': `Bearer ${token}`
     }, 
     body: JSON.stringify({note})
   })
@@ -819,10 +819,10 @@ export const attivaEmergenza = async (bivaccoId, note) => {
  */
 export const revocaEmergenza = async (bivaccoId) => {
   const token = localStorage.getItem('token')
-  const response = await fetch('${API_URL}/bivacchi/${bivaccoId}/revoca-emergenza', {
+  const response = await fetch(`${API_URL}/bivacchi/${bivaccoId}/revoca-emergenza`, {
     method: 'POST',
     headers: {
-      'Authorization': 'Bearer ${token}'
+      'Authorization': `Bearer ${token}`
     }
   })
 

@@ -6,7 +6,6 @@
 
 <script setup>
 import { reactive, ref, watch, computed } from 'vue'
-import { useStore } from 'vuex'
 import * as api from '../services/api.js'
 import TripPlanner from './TripPlanner.vue'
 import MeteoPanel from './MeteoPanel.vue'
@@ -27,6 +26,60 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['route-calculated', 'clear-route', 'bivacco-updated'])
+
+/**
+ * @description Verifica se l'utwnte attualmente loggato possiede il ruolo di SuperUser
+ */
+const isSuperUser = computed(() => {
+  return props.currentUser?.discriminator === 'SuperUser'
+})
+
+/**
+ * Gestisce la procedura asincrona di attivazione dello stato di emergenza.
+ * @async
+ * @returns {Promise<void>}
+ */
+async function gestisciAttivazioneEmergenza() {
+  const descr = prompt('Inserisci la descrizione o causa dell\'emergenza:')
+  if (descr === null) return 
+
+  try {
+    // Usa la funzione API passandogli l'id numerico corretto e la descrizione
+    const data = await api.attivaEmergenza(props.bivacco.id, descr || 'Allerta meteo o emergenza generica')
+    
+    if (data.success) {
+      props.bivacco.emergenza = true
+      emit('bivacco-updated')
+      alert('Stato di emergenza attivato con successo')
+    }
+  } catch (error) {
+    console.error('Errore nell\'attivazione dell\'alert:', error)
+    alert('Impossibile attivare lo stato di emergenza. Verificare la connessione o i permessi.')
+  }
+}
+
+/**
+ * Gestisce la procedura asincrona di revoca dello stato di emergenza attivo.
+ * @async
+ * @returns {Promise<void>}
+ */
+async function gestisciRevocaEmergenza() {
+  if (!confirm('Sei sicuro di voler revocare lo stato di emergenza per questo bivacco?')) return
+
+  try {
+    // Usa la funzione API passandogli l'id numerico
+    const data = await api.revocaEmergenza(props.bivacco.id)
+    
+    if (data.success) {
+      props.bivacco.emergenza = false
+      emit('bivacco-updated')
+      alert('Stato di emergenza revocato con successo')
+    }
+  } catch (error) {
+    console.error('Errore nella revoca dell\'alert:', error)
+    alert('Impossibile revocare lo stato di emergenza. Verificare la connessione o i permessi.')
+  }
+}
 
 const recensioni = ref([])
 const message = ref('')
@@ -268,6 +321,15 @@ watch(
 
     <p v-if="message" class="toast">{{ message }}</p>
 
+    <div v-if="bivacco.emergenza" class="emergency-banner-active">
+      <span class="emergency-icon">⚠️</span>
+      <div class="emergency-content">
+          <h3>STATO DI EMERGENZA ATTIVO</h3>
+          <p>Questo bivacco è attualmente in stato di emergenza.</p>
+      </div>"
+    </div>
+
+
     <!-- Banner ticket aperti: visibile se ci sono segnalazioni attive sul bivacco (US24, RF18, RF36) -->
     <div v-if="bivacco.ticketAperti" class="ticket-banner">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -446,6 +508,16 @@ watch(
         </div>
       </div>
     </section>
+
+    <div v-if="isSuperUser" class="superuser-actions">
+      <h4>PAnnelllo Stato Emergenze</h4>
+      <button v-if="!bivacco.emergenza" @click="gestisciAttivazioneEmergenza" class="btn-mergency-trigger">
+        Attiva Allerta Emergenza
+      </button> 
+      <button v-else @click="gestisciRevocaEmergenza" class="btn-emergency-revoke">
+        Revoca Allerta Emergenza
+      </button>
+    </div>
 
     <!-- Recensioni -->
     <section class="section">
@@ -860,4 +932,84 @@ watch(
   font-size: 12px;
   line-height: 1.4;
 }
+
+/* ALERT BANNER */ 
+.emergency-banner-active {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background-color: rgba(239, 68, 68, 0.12);
+  border: 2px solid #ef4444;
+  border-radius: var(--r);
+  padding: 16px;
+  margin-bottom: 20px;
+  color: #b91c1c;
+}
+
+.emergency-icon {
+  font-size: 26px;
+}
+
+.emergency-content h3 {
+  margin: 0 0 4px 0;
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.05em;
+}
+
+.emergency-content p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.superuser-actions {
+  margin-top: 24px;
+  padding: 16px;
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r);
+}
+
+.superuser-actions h4 {
+  margin: 0 0 12px 0;
+  font-size: 13px;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.btn-emergency-trigger {
+  background-color: #ef4444;
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.btn-emergency-trigger:hover {
+  background-color: #dc2626;
+}
+
+.btn-emergency-revoke {
+  background-color: #10b981;
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.btn-emergency-revoke:hover {
+  background-color: #059669;
+}
+
 </style>
