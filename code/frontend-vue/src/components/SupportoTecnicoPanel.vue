@@ -10,7 +10,8 @@ import {
   getBivacchi,
   getRichiesteSupporto,
   approvaRichiestaSupporto,
-  getStoricoSegnalazioniStaff
+  getStoricoSegnalazioniStaff,
+  aggiornaStatoSegnalazione
 } from '../services/api'
 
 const logs = ref([])
@@ -229,6 +230,25 @@ async function submitBivacco() {
   }
 }
 
+async function handleCambioStato(idSegnalazione, nuovoStato) {
+  try {
+    loading.value = true
+    message.value = ''
+    await aggiornaStatoSegnalazione(idSegnalazione, nuovoStato)
+    const idx = segnalazioniStaff.value.findIndex(s => s._id === idSegnalazione)
+    if (idx !== -1) {
+      segnalazioniStaff.value[idx].statoSegnalazione = nuovoStato
+    }
+    message.value = 'Stato della segnalazione modificato con successo.'
+    messageType.value = 'success'
+  } catch (error) {
+    message.value = error.message || 'Errore durante la modifica dello stato.'
+    messageType.value = 'danger'
+  } finally {
+    loading.value = false
+  }
+}
+
 onMounted(() => {
   loadSupportoData()
 })
@@ -256,24 +276,85 @@ onMounted(() => {
     </p>
 
     <div v-else class="support-layout">
-      <!-- US38 -->
-       <section
-  v-if="segnalazioniStaff.some(s => ['inviata', 'presa_in_carico', 'in_corso'].includes(s.statoSegnalazione))"
-  class="alert-segnalazioni"
->
-  <div>
-    <strong>⚠️ Segnalazioni attive presenti</strong>
-    <p>
-      Ci sono
-      {{
-        segnalazioniStaff.filter(s =>
-          ['inviata', 'presa_in_carico', 'in_corso'].includes(s.statoSegnalazione)
-        ).length
-      }}
-      segnalazioni ancora aperte da controllare.
-    </p>
-  </div>
-</section>
+      
+      <section
+        v-if="segnalazioniStaff.some(s => ['inviata', 'presa_in_carico', 'in_corso'].includes(s.statoSegnalazione))"
+        class="alert-segnalazioni"
+      >
+        <div>
+          <strong>⚠️ Segnalazioni attive presenti</strong>
+          <p>
+            Ci sono
+            {{
+              segnalazioniStaff.filter(s =>
+                ['inviata', 'presa_in_carico', 'in_corso'].includes(s.statoSegnalazione)
+              ).length
+            }}
+            segnalazioni ancora aperte da controllare.
+          </p>
+        </div>
+
+        <h4>Segnalazioni Attive</h4>
+
+        <div 
+          v-for="segnalazione in segnalazioniStaff" 
+          :key="segnalazione._id" 
+          class="segnalazione-card" 
+          v-show="['inviata', 'presa_in_carico', 'in_corso'].includes(segnalazione.statoSegnalazione)"
+          style="border: 1px solid var(--danger-border); padding: 16px; border-radius: var(--r); margin-top: 10px;"
+        >
+          
+          <p><strong>Bivacco ID:</strong> {{ segnalazione.bivaccoId?.nome || segnalazione.bivaccoId }}</p>
+          <p><strong>Descrizione:</strong> {{ segnalazione.descrizione }}</p>
+
+          <div class="field" style="margin-top: 12px; max-width: 250px;">
+            <span>Stato Segnalazione</span>
+            <select 
+              :value="segnalazione.statoSegnalazione" 
+              @change="handleCambioStato(segnalazione._id, $event.target.value)"
+              :disabled="loading"
+            >
+              <option value="inviata" style="color: black;">Inviata</option>
+              <option value="presa_in_carico" style="color: black;">Presa in Carico</option>
+              <option value="in_corso" style="color: black;">In Corso</option>
+              <option value="risolta" style="color: black;">Risolta</option>
+              <option value="archiviata" style="color: black;">Archiviata</option>
+            </select>
+          </div>
+        </div>
+        
+        <h4 style="margin-top: 24px; color: var(--success);">Segnalazioni Risolte / Archiviate</h4>
+
+        <div 
+          v-for="segnalazione in segnalazioniStaff" 
+          :key="'risolta-' + segnalazione._id" 
+          class="segnalazione-card" 
+          v-show="['risolta', 'archiviata'].includes(segnalazione.statoSegnalazione)"
+          style="border: 1px solid var(--border-subtle); background-color: var(--bg-surface-2); padding: 16px; border-radius: var(--r); margin-top: 10px; opacity: 0.8;"
+        >
+          
+          <p><strong>Bivacco ID:</strong> {{ segnalazione.bivaccoId?.nome || segnalazione.bivaccoId }}</p>
+          <p><strong>Descrizione:</strong> {{ segnalazione.descrizione }}</p>
+
+          <div class="field" style="margin-top: 12px; max-width: 250px;">
+            <span>Stato Segnalazione</span>
+            <select 
+              :value="segnalazione.statoSegnalazione" 
+              @change="handleCambioStato(segnalazione._id, $event.target.value)"
+              :disabled="loading"
+              style="color: black; background-color: white;"
+            >
+              <option value="inviata" style="color: black;">Inviata</option>
+              <option value="presa_in_carico" style="color: black;">Presa in Carico</option>
+              <option value="in_corso" style="color: black;">In Corso</option>
+              <option value="risolta" style="color: black;">Risolta</option>
+              <option value="archiviata" style="color: black;">Archiviata</option>
+            </select>
+          </div>
+          
+        </div>
+      </section>
+
 
 <section class="support-card support-card-wide">
   <h4>Segnalazioni utenti</h4>
