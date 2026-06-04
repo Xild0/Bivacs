@@ -846,3 +846,21 @@ export async function getStoricoSegnalazioniStaff() {
 
   return data
 }
+
+export async function aggiornaStatoSegnalazione(id, nuovoStato) {
+  const response = await fetchAuth(`${API_URL}/segnalazioni/${id}/stato`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ nuovoStato })
+  })
+
+  const data = await response.json()
+
+  if (!response.ok) {
+    throw new Error(data.errore || data.message || 'Errore aggiornamento stato segnalazione')
+  }
+
+  return data
+}
