@@ -738,6 +738,28 @@ export async function richiediSupportoTecnico(data) {
   return res
 }
 
+/**
+ * @description Invia la richiesta per ottener eil ruolo di SuperUSer
+ * @param {Object} data - Dati della richiesta (motivazione)
+ * @returns {Promise<Object>} - Risposta server
+ */
+export const richiediSuperUser = async (data) => {
+  const token = localStorage.getItem('token')
+  const resp = await fetch(`${API_URL}/profilo/richiedi-super-user`, {
+    method: 'POST',
+    headers: {
+      'Conten-Type': 'application/json', 
+      'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify(data)
+  })
+  if (!resp.ok){
+    const errorData = await resp.json().catch(() => ({}))
+    throw new Error(errorData.message || 'Errore invio richiesta SuperUser')
+  }
+  return await resp.json()
+}
+
 export async function getRichiesteSupporto() {
   const response = await fetchAuth(`${API_URL}/supporto/richieste-supporto`)
   const data = await response.json()
@@ -829,3 +851,51 @@ export const revocaEmergenza = async (bivaccoId) => {
   if (!response.ok) throw new Error('Impossibile revocare l\'emergenza')
   return response.json()
 }
+
+/**
+ * @description Recupera l'elenco dei ticket attivi per il Supporto Tecnico.
+ * @returns {Promise<Array>} Dati ticket
+ */
+export const getCodaTicket = async () => {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_URL}/supporto/ticket`, {
+        headers: {'Authorization': `Bearer ${token}`}
+    });
+    if (!response.ok) throw new Error('Impossibile recuperare i ticket');
+    return response.json();
+};
+
+/**
+ * @description Aggiorna lo stato di un ticket
+ * @param {string} ticketId - ID ticket
+ * @param {string} stato - Nuovo stato
+ * @returns {Promise<Object>} Ticket aggiornato
+ */
+export const aggiornaStatoTicket = async (ticketId, stato) => {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_URL}/supporto/ticket/${ticketId}/stato`, {
+        method: 'PATCH',
+        headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}` 
+        },
+        body: JSON.stringify({stato})
+    });
+    if (!response.ok) throw new Error('Errore aggiornamento stato ticket');
+    return response.json();
+};
+
+/**
+ * @description Archivia un ticket
+ * @param {string} ticketId - ID ticket (CHE DEVE ESSERE CHIUSO) da archiviare
+ * @returns {Promise<Object>} Esito operazione
+ */
+export const archiviaTicket = async (ticketId) => {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_URL}/supporto/ticket/${ticketId}/archivia`, {
+        method: 'PATCH',
+        headers: {'Authorization': `Bearer ${token}`}
+    });
+    if (!response.ok) throw new Error('Errore durante l\'archiviazione del ticket. Assicurati che sia chiuso.');
+    return response.json();
+};

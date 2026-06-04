@@ -9,7 +9,10 @@ import {
   creaBivaccoTecnico,
   getBivacchi,
   getRichiesteSupporto,
-  approvaRichiestaSupporto
+  approvaRichiestaSupporto, 
+  getCodaTicket, 
+  aggiornaStatoTicket, 
+  archiviaTicket
 } from '../services/api'
 
 const logs = ref([])
@@ -20,6 +23,8 @@ const richieste = ref([])
 const loading = ref(false)
 const message = ref('')
 const messageType = ref('info')
+
+const codaTicket  = red([])
 
 const configForm = reactive({
   provider: 'Open-Meteo',
@@ -226,9 +231,47 @@ async function submitBivacco() {
   }
 }
 
-onMounted(() => {
+/**
+ * @description Chiama API per aggiungere elementi nella coda ticket 
+ */
+async function caricaTicket() {
+  try{
+    codaTicket.value=await getCodaTicket()
+  } catch(error) {
+    console.error('Errore recupero ticket:', error)
+  }
+}
+
+/**
+ * @description Gestisce logica dei bottoni
+ * di avanzamento di stato o di archiviazione
+ * @param {String} id - ObjectId del ticket
+ * @param {String} azione - Azione richiesta per il ticket
+ */
+async function avanzamentoTicket(id, azione) {
+  try {
+    if(azione === 'archiviata'){
+      await(archiviaTicket(id))
+    } else {
+      await aggiornaStatoTicket(id, azione)
+    }
+    await caricaTicket()
+  } catch (error) {
+    alert(error.message)
+  }
+}
+
+/**
+ * @description Inizializza i dati nel pannello di supporto 
+ */
+onMounted(async () => {
+  loading.value = true
   loadSupportoData()
+  await caricaTicket()
+  loading.value = false
 })
+
+
 </script>
 
 <template>
@@ -309,6 +352,55 @@ onMounted(() => {
     Nessuna richiesta in attesa.
   </p>
 </section>
+
+<div class="panel-section">
+  <h3>Coda Ticket Manutenzione</h3>
+  
+  <div v-if="ticketQueue.length === 0">
+    <p>Nessun ticket in coda.</p>
+  </div>
+  
+  <div v-else class="config-list">
+    <div v-for="ticket in ticketQueue" :key="ticket._id" class="log-row">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <strong>Ticket #{{ ticket.id }}</strong> - 
+          <span :class="{'ok': ticket.stato === 'chiuso', 'ko': ticket.stato === 'aperto'}">
+            Stato: {{ ticket.stato.toUpperCase() }}
+          </span>
+          <br>
+          <small>Priorità: {{ ticket.priorita }} | Aperto il: {{ new Date(ticket.dataApertura).toLocaleDateString() }}</small>
+        </div>
+        
+        <div style="display: flex; gap: 8px;">
+          <button 
+            v-if="ticket.stato === 'aperto'" 
+            class="btn btn-primary" 
+            @click="gestisciAvanzamentoTicket(ticket._id, 'in_lavorazione')"
+          >
+            Prendi in carico
+          </button>
+
+          <button 
+            v-if="ticket.stato === 'in_lavorazione'" 
+            class="btn btn-primary" 
+            @click="gestisciAvanzamentoTicket(ticket._id, 'chiuso')"
+          >
+            Chiudi Ticket
+          </button>
+
+          <button 
+            v-if="ticket.stato === 'chiuso'" 
+            class="btn btn-warning" 
+            @click="gestisciAvanzamentoTicket(ticket._id, 'archivia')"
+          >
+            Archivia
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
       <!-- US39 -->
       <section class="support-card">

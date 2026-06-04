@@ -13,7 +13,8 @@ import {
   deleteProfile,
   logoutUser,
   getAllertePreferiti,
-  richiediSupportoTecnico
+  richiediSupportoTecnico, 
+  richiediSuperUser
 } from '../services/api'
 
 const emit = defineEmits(['close', 'auth-changed', 'open-bivacco'])
@@ -25,12 +26,17 @@ const profile = reactive({
   password: '',
   discriminator: '',
   preferiti: [],
-  richiestaSupportoTecnico: null
+  richiestaSupportoTecnico: null, 
+  richiestaSuperUser: null
 })
 
 const richiestaST = reactive({
   motivo: '',
   matricola: ''
+})
+
+const richiestaSU = reactive({
+  motivo: ''
 })
 
 const message = ref('')
@@ -49,6 +55,7 @@ async function loadProfile() {
     profile.password = ''
     profile.preferiti = data.preferiti || []
     profile.richiestaSupportoTecnico = data.richiestaSupportoTecnico || null
+    profile.richiestaSuperUser = data.richiestaSuperUser || null
 
     loaded.value = true
     message.value = ''
@@ -93,6 +100,30 @@ async function inviaRichiestaSupporto() {
   } catch (error) {
     messageType.value = 'error'
     message.value = error.message
+  }
+}
+
+/**
+ * @description Gestische l'invio della richiesta per SuperUser
+ */
+async function inviaRichiestaSU(){
+  if(!richiestaSU.motivo) return
+
+  try{
+    await richiediSuperUser({
+      motivo: richiestaSU.motivo
+    })
+    profile.richiestaSuperUser={
+      stato: 'IN ATTESA'
+    }
+    richiestaSU.motivo = ''
+
+    message.value = 'Richiesta per il ruolo di Super User inviata con successo'
+    messageType.value = 'success'
+  } catch(error){
+    console.error(error)
+    message.value = 'Si è verificato un errore durante l\'invio della richiesta'
+    messageType.value = 'error'
   }
 }
 
@@ -323,6 +354,39 @@ onMounted(() => {
     >
       <SupportoTecnicoPanel />
     </section>
+
+<section
+  v-if="profile.discriminator !== 'SuperUser'"
+  class="support-request-section"
+>
+  <h3>Richiedi ruolo Super User</h3>
+  <p
+    v-if="profile.richiestaSuperUser?.stato === 'In attesa'"
+    class="request-status"
+  >
+    Richiesta già inviata: in attesa di approvazione.
+  </p>
+
+  <form
+    v-else
+    class="form"
+    @submit.prevent="inviaRichiestaSU"
+  >
+    <label class="field">
+      <span class="field-label">Motivo richiesta</span>
+      <textarea
+        v-model="richiestaSU.motivo"
+        class="textarea"
+        placeholder="Spiega perché richiedi il ruolo di Super User"
+        required
+      ></textarea>
+    </label>
+
+    <button class="btn btn-primary btn-block" type="submit" :disabled="!richiestaSU.motivo">
+      Invia richiesta
+    </button>
+  </form>
+</section>
 
     <div class="divider"></div>
 

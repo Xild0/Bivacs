@@ -65,7 +65,18 @@ const utenteSchema = new mongoose.Schema(
         type: String,
         default: ''
     }
-}
+    },
+    richiestaSuperUser:{
+        stato:{
+            type: String, 
+            enum: ['nessuna', 'in_attesa', 'approvata', 'rifiutata'],
+            default: 'nessuna'
+        },
+        motivo:{
+            type: String
+        }
+        
+    }
 },
 { 
     timestamps: true,

@@ -222,5 +222,53 @@ router.post('/richiesta-supporto-tecnico', protectRoute, async (req, res) => {
     }
 });
 
+/**
+ * @route POST /richiedi-super-user
+ * @description Permette a un utente loggato di inviare una richiesta per ottenere il ruolo di Super User. 
+ * Verifica che l'utente esista, che non possieda già il ruolo e che non abbia già una richiesta in attesa.
+ * * @param {import('express').Request} req - L'oggetto della richiesta Express.
+ * @param {Object} req.body - Il corpo della richiesta inviata dal client.
+ * @param {string} [req.body.motivo] - (Opzionale) La motivazione spiegata dall'utente per ottenere il ruolo.
+ * @param {Object} req.user - L'oggetto contenente i dati dell'utente autenticato (iniettato da authMiddleware).
+ * @param {string} req.user.id - L'identificativo univoco dell'utente.
+ * @param {import('express').Response} res - L'oggetto della risposta Express.
+ * * @returns {Promise<Object>} Risposta JSON con un messaggio di stato ed eventualmente i dati aggiornati.
+ * * @throws {404} - Ritorna errore se l'utente non viene trovato nel database.
+ * @throws {400} - Ritorna errore se l'utente è già SuperUser o ha già una richiesta 'In attesa'.
+ * @throws {500} - Ritorna errore in caso di malfunzionamento interno del server.
+ */
+router.post('/richiedi-super-user', protectRoute, async (req, res) => {
+  try {
+    const { motivo } = req.body;
+    const utenteId = req.user.id; 
+
+    const utente = await Utente.findById(utenteId);
+    if (!utente) {
+      return res.status(404).json({ message: 'Utente non trovato.' });
+    }
+
+    if (utente.discriminator === 'SuperUser') {
+      return res.status(400).json({ message: 'Possiedi già questo ruolo.' });
+    }
+
+    if (utente.richiestaSuperUser && utente.richiestaSuperUser.stato === 'In attesa') {
+      return res.status(400).json({ message: 'Hai già una richiesta pendente.' });
+    }
+
+    utente.richiestaSuperUser = {
+      stato: 'In attesa',
+      motivo: motivo || '',
+      dataRichiesta: new Date()
+    };
+
+    await utente.save();
+
+    res.status(200).json({ message: 'Richiesta presa in carico con successo.', utente });
+  } catch (error) {
+    console.error('Errore durante la richiesta Super User:', error);
+    res.status(500).json({ message: 'Errore interno del server.' });
+  }
+});
+
 
 module.exports = router;

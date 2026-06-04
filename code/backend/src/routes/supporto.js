@@ -14,6 +14,8 @@ const { protectRoute } = require('../middlewares/authMiddleware');
 const getNextSequence = require('../utils/getNewSequence');
 const inviaEmail = require('../utils/emailService')
 
+const ticketManutenzione = require('../models/ticketManutenzione');
+
 function isSupportoTecnico(req, res, next) {
   if (req.utente.discriminator === 'SupportoTecnico') {
     return next();
@@ -372,5 +374,76 @@ router.patch('/richieste-supporto/:utenteId/rifiuta', protectRoute, isSupportoTe
     })
   }
 })
+
+/**
+ * @route GET /api/v1/supporto/ticket
+ * @description Recupera la coda dei ticket e
+ * filtra opzionalmente per escludere i ticket già archiviati
+ * @returns {Promise<Array>} Ritorna l'array dei ticket 
+ */
+router.get('/ticket', protectRoute, isSupportoTecnico, async (req, res) => {
+    try {
+        const tickets = await TicketManutenzione.find({stato:{$ne:'archiviato'}})
+            .populate('segnalazione')
+            .sort({priority: -1, dataApertura: 1});
+            
+        res.status(200).json(tickets);
+    } catch (error) {
+        res.status(500).json({errore: 'Errore recupero coda ticket', dettaglio: error.message});
+    }
+});
+
+/**
+ * @route PATCH /api/v1/supporto/ticket/:id/stato
+ * @description Aggiorna lo stato di un ticket, se nuovo stato è 'chiuso',
+ * compila in automatico la dataChiusura.
+ * @param {string} req.params.id - ObjectId ticket da aggiornare.
+ * @param {string} req.body.stato - Nuovo stato.
+ */
+router.patch('/ticket/:id/stato', protectRoute, isSupportoTecnico, async (req, res) => {
+    try {
+        const {stato, note} = req.body;
+        const updateData = {stato};
+        
+        if (note) updateData.note = note;
+        if (stato === 'chiuso') updateData.dataChiusura = Date.now();
+        const ticketAggiornato = await TicketManutenzione.findByIdAndUpdate(
+            req.params.id, 
+            {$set: updateData}, 
+            {new: true, runValidators: true}
+        );
+        if (!ticketAggiornato) return res.status(404).json({ errore: 'Ticket non trovato' });
+        
+        res.status(200).json(ticketAggiornato);
+    } catch (error) {
+        res.status(500).json({ errore: 'Errore aggiornamento ticket', dettaglio: error.message });
+    }
+});
+
+/**
+ * @route PATCH /api/v1/supporto/ticket/:id/archivia
+ * @description Archivia un ticket
+ * @param {string} req.params.id - ObjectId ticket da archiviare.
+ */
+router.patch('/ticket/:id/archivia', protectRoute, isSupportoTecnico, async (req, res) => {
+    try {
+        const ticket = await TicketManutenzione.findById(req.params.id);
+        if (!ticket) return res.status(404).json({errore: 'Ticket non trovato'});
+
+        // Verifica che lo stato sia chiuso, altrimenti non archivia
+        if (ticket.stato !== 'chiuso') {
+            return res.status(400).json({ 
+                errore: 'Errore: il ticket deve essere CHIUSO per poter essere archiviato' 
+            });
+        }
+
+        ticket.stato = 'archiviato';
+        await ticket.save();
+
+        res.status(200).json({ messaggio: 'Ticket archiviato con successo', ticket });
+    } catch (error) {
+        res.status(500).json({ errore: 'Errore durante l\'archiviazione', dettaglio: error.message });
+    }
+});
 
 module.exports = router;
