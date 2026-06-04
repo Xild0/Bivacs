@@ -14,7 +14,8 @@ import {
   aggiornaStatoTicket, 
   archiviaTicket, 
   getSegnalazioniDaGestire, 
-  generaTicketDaSegnalazione
+  generaTicketDaSegnalazione, 
+  esportaCSV
 } from '../services/api'
 
 const logs = ref([])
@@ -290,6 +291,17 @@ async function gestisciCreazioneTicket(segnalazioneId) {
     }
 }
 
+/**
+ * @description funzione wrapper per intercettare eventuali errori durante l'esportazione dati
+ */
+async function gestisciEsportazione() {
+  try {
+    await esportaCSV();
+  } catch (error) {
+    alert(error.message);
+  }
+}
+
 
 /**
  * @description Inizializza i dati nel pannello di supporto 
@@ -387,12 +399,12 @@ onMounted(async () => {
 <div class="panel-section">
   <h3>Segnalazioni in attesa di Valutazione</h3>
   
-  <div v-if="segnalazioniQueue.length === 0">
+  <div v-if="codaSegnalazioni.length === 0">
     <p>Nessuna segnalazione utente in coda.</p>
   </div>
   
   <div v-else class="config-list">
-    <div v-for="seg in segnalazioniQueue" :key="seg._id" class="log-row">
+    <div v-for="seg in codaSegnalazioni" :key="seg._id" class="log-row">
       <div style="display: flex; justify-content: space-between; align-items: center;">
         <div>
           <strong>Bivacco: {{ seg.bivaccoId?.nome || 'Dato Rimosso' }}</strong> - Stato: {{ seg.statoSegnalazione }}<br>
@@ -414,12 +426,12 @@ onMounted(async () => {
 <div class="panel-section">
   <h3>Coda Ticket Manutenzione</h3>
   
-  <div v-if="ticketQueue.length === 0">
+  <div v-if="codaTicket.length === 0">
     <p>Nessun ticket in coda.</p>
   </div>
   
   <div v-else class="config-list">
-    <div v-for="ticket in ticketQueue" :key="ticket._id" class="log-row">
+    <div v-for="ticket in codaTicket" :key="ticket._id" class="log-row">
       <div style="display: flex; justify-content: space-between; align-items: center;">
         <div>
           <strong>Ticket #{{ ticket.id }}</strong> - 
@@ -459,6 +471,17 @@ onMounted(async () => {
     </div>
   </div>
 </div>
+
+<div class="panel-section">
+  <div style="display: flex; justify-content: space-between; align-items: center;">
+    <h3>Segnalazioni in attesa di Valutazione</h3>
+    
+    <button class="btn btn-secondary" @click="gestisciEsportazione">
+      Esporta l'intero Dataset (CSV)
+    </button>
+  </div>
+  </div>
+
 
       <!-- US39 -->
       <section class="support-card">

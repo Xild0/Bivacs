@@ -492,4 +492,40 @@ router.patch('/ticket/:id/archivia', protectRoute, isSupportoTecnico, async (req
     }
 });
 
+/**
+ * @route GET /api/v1/supporto/segnalazioni/export/csv
+ * @description Genera e scarica un file CSV contenente l'intero dataset delle segnalazioni
+ * @returns {string} File CSV come stream HTTP
+ */
+router.get('/segnalazioni/export/csv', protectRoute, isSupportoTecnico, async (req, res) => {
+    try {
+        const segnalazioni = await Segnalazione.find()        // Recupero tutte le segnalazioni
+            .populate('utenteId', 'email')
+            .populate('bivaccoId', 'nome')
+            .lean();
+        if (segnalazioni.length === 0) {
+            return res.status(404).json({ errore: 'Nessuna segnalazione presente nel database.' });
+        }
+
+        const headers = ['ID Segnalazione', 'Email Utente', 'Nome Bivacco', 'Stato', 'Descrizione', 'Data Creazione'];  //definisco le intestazioni del file
+        const csvRows = segnalazioni.map(s => {
+            const id = s._id;
+            const email = s.utenteId?.email || 'Utente Eliminato/Sconosciuto';
+            const bivacco = s.bivaccoId?.nome || 'Bivacco Rimosso';
+            const stato = s.statoSegnalazione;
+            const descrizione = `"${(s.descrizione || '').replace(/"/g, '""')}"`;               // tolgo le virgolette
+            const data = s.createdAt ? new Date(s.createdAt).toLocaleDateString() : '';
+            return `${id},${email},${bivacco},${stato},${descrizione},${data}`;
+        });
+
+        const csvString = [headers.join(','), ...csvRows].join('\n');
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', 'attachment; filename="dataset_segnalazioni.csv"');
+        
+        res.status(200).send(csvString);          // invio il file completo
+    } catch (error) {
+        res.status(500).json({ errore: 'Errore durante l\'esportazione del dataset', dettaglio: error.message });
+    }
+});
+
 module.exports = router;

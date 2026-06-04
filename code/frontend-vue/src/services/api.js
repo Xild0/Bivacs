@@ -932,3 +932,29 @@ export const generaTicketDaSegnalazione = async (segnalazioneId, priority) => {
     if (!response.ok) throw new Error('Impossibile generare il ticket.');
     return response.json();
 };
+
+/**
+ * @description Richiede al server il dataset delle segnalazioni
+ * @returns {Promise<void>}
+ */
+export const esportaCSV = async () => {
+    const token = localStorage.getItem('token');
+
+    const response = await fetch(`${API_URL}/supporto/segnalazioni/export/csv`, {
+        method: 'GET',
+        headers: {'Authorization': `Bearer ${token}`}
+    });
+    if (!response.ok) throw new Error('Errore durante la generazione del file CSV.');
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'dataset_segnalazioni_bivacs.csv';
+    document.body.appendChild(a);
+    a.click();                                      // simulo un click per far avviare il download
+    
+    document.body.removeChild(a);                   // pulisco per evitare garbage
+    setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+};
