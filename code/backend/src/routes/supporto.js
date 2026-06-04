@@ -14,6 +14,7 @@ const { protectRoute } = require('../middlewares/authMiddleware');
 const getNextSequence = require('../utils/getNewSequence');
 const inviaEmail = require('../utils/emailService')
 
+const segnalazione = require('../models/segnalazione');
 const ticketManutenzione = require('../models/ticketManutenzione');
 
 function isSupportoTecnico(req, res, next) {
@@ -376,6 +377,23 @@ router.patch('/richieste-supporto/:utenteId/rifiuta', protectRoute, isSupportoTe
 })
 
 /**
+ * @route GET /api/v1/supporto/segnalazioni
+ * @description Recupera la lista delle segnalazioni escludendo quelle archiviate.
+ * @returns {Promise<Array>} Array delle segnalazioni.
+ */
+router.get('/segnalazioni', protectRoute, isSupportoTecnico, async (req, res) => {
+    try {
+        const segnalazioni = await Segnalazione.find({statoSegnalazione: { $ne: 'archiviata'}})
+            .populate('utenteId', 'nome cognome email')
+            .populate('bivaccoId', 'nome');
+            
+        res.status(200).json(segnalazioni);
+    } catch (error) {
+        res.status(500).json({ errore: 'Errore recupero segnalazioni', dettaglio: error.message });
+    }
+});
+
+/**
  * @route GET /api/v1/supporto/ticket
  * @description Recupera la coda dei ticket e
  * filtra opzionalmente per escludere i ticket già archiviati
@@ -394,11 +412,39 @@ router.get('/ticket', protectRoute, isSupportoTecnico, async (req, res) => {
 });
 
 /**
+ * @route POST /api/v1/supporto/ticket
+ * @description Genera un nuovo ticket di manutenzione a partire da una segnalazione
+ * @param {string} req.body.segnalazioneId - ObjectId della Segnalazione.
+ * @param {number} req.body.priorita - Priorità assegnata
+ */
+router.post('/ticket', protectRoute, isSupportoTecnico, async (req, res) => {
+    try {
+        const {segnalazioneId, priority} = req.body;
+        const idNumerico = await getNextSequence('ticketId');
+
+        const nuovoTicket = new TicketManutenzione({
+            id: idNumerico,
+            segnalazione: segnalazioneId,
+            stato: 'aperto',
+            priorita: priority || 5
+        });
+        await nuovoTicket.save();
+
+        // Passa in automatico allo stato "presa_in_carico"
+        await Segnalazione.findByIdAndUpdate(segnalazioneId, {statoSegnalazione: 'presa_in_carico'});
+
+        res.status(201).json(nuovoTicket);
+    } catch (error) {
+        res.status(500).json({errore: 'Errore durante la creazione del ticket', dettaglio: error.message});
+    }
+});
+
+/**
  * @route PATCH /api/v1/supporto/ticket/:id/stato
- * @description Aggiorna lo stato di un ticket, se nuovo stato è 'chiuso',
- * compila in automatico la dataChiusura.
- * @param {string} req.params.id - ObjectId ticket da aggiornare.
- * @param {string} req.body.stato - Nuovo stato.
+ * @description Aggiorna lo stato di un ticket, se nuovo stato è 'chiuso'
+ * compila in automatico la dataChiusura
+ * @param {string} req.params.id - ObjectId ticket da aggiornare
+ * @param {string} req.body.stato - Nuovo stato
  */
 router.patch('/ticket/:id/stato', protectRoute, isSupportoTecnico, async (req, res) => {
     try {
@@ -423,7 +469,7 @@ router.patch('/ticket/:id/stato', protectRoute, isSupportoTecnico, async (req, r
 /**
  * @route PATCH /api/v1/supporto/ticket/:id/archivia
  * @description Archivia un ticket
- * @param {string} req.params.id - ObjectId ticket da archiviare.
+ * @param {string} req.params.id - ObjectId ticket da archiviare
  */
 router.patch('/ticket/:id/archivia', protectRoute, isSupportoTecnico, async (req, res) => {
     try {

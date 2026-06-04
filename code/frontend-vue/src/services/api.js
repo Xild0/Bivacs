@@ -899,3 +899,36 @@ export const archiviaTicket = async (ticketId) => {
     if (!response.ok) throw new Error('Errore durante l\'archiviazione del ticket. Assicurati che sia chiuso.');
     return response.json();
 };
+
+/**
+ * @description Recupera le segnalazioni non archiviate
+ * @returns {Promise<Array>} Array delle segnalazioni
+ */
+export const getSegnalazioniDaGestire = async () => {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_URL}/supporto/segnalazioni`, {
+        headers: {'Authorization': `Bearer ${token}`}
+    });
+    if (!response.ok) throw new Error('Errore durante il recupero delle segnalazioni');
+    return response.json();
+};
+
+/**
+ * @description Invia al server la richiesta di generare un ticket da una determinata segnalazione
+ * @param {string} segnalazioneId - ObjectId della Segnalazione
+ * @param {number} priorita - Priorità assegnata al ticket
+ * @returns {Promise<Object>} Ticket creato
+ */
+export const generaTicketDaSegnalazione = async (segnalazioneId, priority) => {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_URL}/supporto/ticket`, {
+        method: 'POST',
+        headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}` 
+        },
+        body: JSON.stringify({segnalazioneId, priority})
+    });
+    if (!response.ok) throw new Error('Impossibile generare il ticket.');
+    return response.json();
+};

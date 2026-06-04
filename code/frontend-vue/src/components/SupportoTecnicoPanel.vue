@@ -12,7 +12,9 @@ import {
   approvaRichiestaSupporto, 
   getCodaTicket, 
   aggiornaStatoTicket, 
-  archiviaTicket
+  archiviaTicket, 
+  getSegnalazioniDaGestire, 
+  generaTicketDaSegnalazione
 } from '../services/api'
 
 const logs = ref([])
@@ -24,7 +26,8 @@ const loading = ref(false)
 const message = ref('')
 const messageType = ref('info')
 
-const codaTicket  = red([])
+const codaTicket  = ref([])
+const codaSegnalazioni = ref([]) 
 
 const configForm = reactive({
   provider: 'Open-Meteo',
@@ -243,7 +246,7 @@ async function caricaTicket() {
 }
 
 /**
- * @description Gestisce logica dei bottoni
+ * @description Gestisce logica bottoni
  * di avanzamento di stato o di archiviazione
  * @param {String} id - ObjectId del ticket
  * @param {String} azione - Azione richiesta per il ticket
@@ -262,12 +265,40 @@ async function avanzamentoTicket(id, azione) {
 }
 
 /**
+ * @description Chiama API per popolare la coda delle segnalazioni
+ */
+async function caricaSegnalazioni() {
+  try {
+    codaSegnalazioni.value = await getSegnalazioniDaGestire();
+  } catch (error) {
+    console.error("Errore recupero segnalazioni:", error);
+  }
+}
+
+/**
+ * @description Crea un ticket e ricarica le schermate per far comparire 
+ * il ticket nella coda inferiore
+ * @param {string} segnalazioneId - ID segnalazione
+ */
+async function gestisciCreazioneTicket(segnalazioneId) {
+    try {
+        await generaTicketDaSegnalazione(segnalazioneId, 5);
+        await caricaSegnalazioni(); 
+        await caricaTicket();
+    } catch (error) {
+        alert(error.message);
+    }
+}
+
+
+/**
  * @description Inizializza i dati nel pannello di supporto 
  */
 onMounted(async () => {
   loading.value = true
   loadSupportoData()
   await caricaTicket()
+  await caricaSegnalazioni()
   loading.value = false
 })
 
@@ -352,6 +383,33 @@ onMounted(async () => {
     Nessuna richiesta in attesa.
   </p>
 </section>
+
+<div class="panel-section">
+  <h3>Segnalazioni in attesa di Valutazione</h3>
+  
+  <div v-if="segnalazioniQueue.length === 0">
+    <p>Nessuna segnalazione utente in coda.</p>
+  </div>
+  
+  <div v-else class="config-list">
+    <div v-for="seg in segnalazioniQueue" :key="seg._id" class="log-row">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <strong>Bivacco: {{ seg.bivaccoId?.nome || 'Dato Rimosso' }}</strong> - Stato: {{ seg.statoSegnalazione }}<br>
+          <small>Autore: {{ seg.utenteId?.nome || 'Anonimo' }} | Difficoltà: {{ seg.descrizione }}</small>
+        </div>
+        
+        <button 
+          v-if="seg.statoSegnalazione === 'inviata'"
+          class="btn btn-primary" 
+          @click="gestisciCreazioneTicket(seg._id)"
+        >
+          Genera Ticket
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <div class="panel-section">
   <h3>Coda Ticket Manutenzione</h3>
