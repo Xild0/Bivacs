@@ -163,4 +163,26 @@ router.patch('/:id/stato', protectRoute, isStaff, async (req, res) => {
     }
 });
 
+/**
+ * Recupera le segnalazioni inviate dall'utente autenticato.
+ * US31 - Storico segnalazioni utente.
+ *
+ * @route GET /api/v1/segnalazioni/mie
+ */
+router.get('/mie', protectRoute, async (req, res) => {
+    try {
+        const segnalazioni = await Segnalazione.find({
+            utenteId: req.utente.mongoId
+        })
+        .populate('bivaccoId', 'nome zona altitudine')
+        .sort({ createdAt: -1 });
+
+        res.status(200).json(segnalazioni);
+    } catch (error) {
+        res.status(500).json({
+            errore: 'Errore nel recupero delle tue segnalazioni.'
+        });
+    }
+});
+
 module.exports = router;

@@ -15,13 +15,16 @@ import {
   archiviaTicket, 
   getSegnalazioniDaGestire, 
   generaTicketDaSegnalazione, 
-  esportaCSV
+  esportaCSV,
+  getStoricoSegnalazioniStaff,
+  aggiornaStatoSegnalazione
 } from '../services/api'
 
 const logs = ref([])
 const configs = ref([])
 const bivacchi = ref([])
 const richieste = ref([])
+const segnalazioniStaff = ref([])
 
 const loading = ref(false)
 const message = ref('')
@@ -146,6 +149,7 @@ async function loadSupportoData() {
     configs.value = await getConfigApi()
     bivacchi.value = await getBivacchi()
     richiesteSupporto.value = await getRichiesteSupporto()
+    segnalazioniStaff.value = await getStoricoSegnalazioniStaff()
   } catch (error) {
     messageType.value = 'error'
     message.value = error.message
@@ -291,7 +295,7 @@ async function gestisciCreazioneTicket(segnalazioneId) {
     }
 }
 
-
+// LASCIARE COMMENTATA, SE CI SONO PROBLEMI LA DECOMMENTIAMO (TOLLO)
 /**
  * @description funzione wrapper per intercettare eventuali errori durante l'esportazione dati
  *
@@ -328,12 +332,31 @@ const handleEsportaCSV = async () => {
     }
 };
 
-
 /**
  * @description Inizializza i dati nel pannello di supporto 
  */
 onMounted(async () => {
   loading.value = true
+async function handleCambioStato(idSegnalazione, nuovoStato) {
+  try {
+    loading.value = true
+    message.value = ''
+    await aggiornaStatoSegnalazione(idSegnalazione, nuovoStato)
+    const idx = segnalazioniStaff.value.findIndex(s => s._id === idSegnalazione)
+    if (idx !== -1) {
+      segnalazioniStaff.value[idx].statoSegnalazione = nuovoStato
+    }
+    message.value = 'Stato della segnalazione modificato con successo.'
+    messageType.value = 'success'
+  } catch (error) {
+    message.value = error.message || 'Errore durante la modifica dello stato.'
+    messageType.value = 'danger'
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(() => {
   loadSupportoData()
   await caricaTicket()
   await caricaSegnalazioni()
@@ -365,7 +388,131 @@ onMounted(async () => {
     </p>
 
     <div v-else class="support-layout">
-      <!-- US38 -->
+      
+      <section
+        v-if="segnalazioniStaff.some(s => ['inviata', 'presa_in_carico', 'in_corso'].includes(s.statoSegnalazione))"
+        class="alert-segnalazioni"
+      >
+        <div>
+          <strong>⚠️ Segnalazioni attive presenti</strong>
+          <p>
+            Ci sono
+            {{
+              segnalazioniStaff.filter(s =>
+                ['inviata', 'presa_in_carico', 'in_corso'].includes(s.statoSegnalazione)
+              ).length
+            }}
+            segnalazioni ancora aperte da controllare.
+          </p>
+        </div>
+
+        <h4>Segnalazioni Attive</h4>
+
+        <div 
+          v-for="segnalazione in segnalazioniStaff" 
+          :key="segnalazione._id" 
+          class="segnalazione-card" 
+          v-show="['inviata', 'presa_in_carico', 'in_corso'].includes(segnalazione.statoSegnalazione)"
+          style="border: 1px solid var(--danger-border); padding: 16px; border-radius: var(--r); margin-top: 10px;"
+        >
+          
+          <p><strong>Bivacco ID:</strong> {{ segnalazione.bivaccoId?.nome || segnalazione.bivaccoId }}</p>
+          <p><strong>Descrizione:</strong> {{ segnalazione.descrizione }}</p>
+
+          <div class="field" style="margin-top: 12px; max-width: 250px;">
+            <span>Stato Segnalazione</span>
+            <select 
+              :value="segnalazione.statoSegnalazione" 
+              @change="handleCambioStato(segnalazione._id, $event.target.value)"
+              :disabled="loading"
+            >
+              <option value="inviata" style="color: black;">Inviata</option>
+              <option value="presa_in_carico" style="color: black;">Presa in Carico</option>
+              <option value="in_corso" style="color: black;">In Corso</option>
+              <option value="risolta" style="color: black;">Risolta</option>
+              <option value="archiviata" style="color: black;">Archiviata</option>
+            </select>
+          </div>
+        </div>
+        
+        <h4 style="margin-top: 24px; color: var(--success);">Segnalazioni Risolte / Archiviate</h4>
+
+        <div 
+          v-for="segnalazione in segnalazioniStaff" 
+          :key="'risolta-' + segnalazione._id" 
+          class="segnalazione-card" 
+          v-show="['risolta', 'archiviata'].includes(segnalazione.statoSegnalazione)"
+          style="border: 1px solid var(--border-subtle); background-color: var(--bg-surface-2); padding: 16px; border-radius: var(--r); margin-top: 10px; opacity: 0.8;"
+        >
+          
+          <p><strong>Bivacco ID:</strong> {{ segnalazione.bivaccoId?.nome || segnalazione.bivaccoId }}</p>
+          <p><strong>Descrizione:</strong> {{ segnalazione.descrizione }}</p>
+
+          <div class="field" style="margin-top: 12px; max-width: 250px;">
+            <span>Stato Segnalazione</span>
+            <select 
+              :value="segnalazione.statoSegnalazione" 
+              @change="handleCambioStato(segnalazione._id, $event.target.value)"
+              :disabled="loading"
+              style="color: black; background-color: white;"
+            >
+              <option value="inviata" style="color: black;">Inviata</option>
+              <option value="presa_in_carico" style="color: black;">Presa in Carico</option>
+              <option value="in_corso" style="color: black;">In Corso</option>
+              <option value="risolta" style="color: black;">Risolta</option>
+              <option value="archiviata" style="color: black;">Archiviata</option>
+            </select>
+          </div>
+          
+        </div>
+      </section>
+
+
+<section class="support-card support-card-wide">
+  <h4>Segnalazioni utenti</h4>
+
+  <div v-if="segnalazioniStaff.length" class="log-list">
+    <div
+      v-for="segnalazione in segnalazioniStaff"
+      :key="segnalazione._id"
+      class="log-row"
+    >
+      <strong>
+        {{ segnalazione.bivaccoId?.nome || 'Bivacco non disponibile' }}
+      </strong>
+
+      <small>
+        Stato:
+        {{ segnalazione.statoSegnalazione?.replaceAll('_', ' ').toUpperCase() }}
+      </small>
+
+      <small>
+        Utente:
+        {{ segnalazione.utenteId?.email || 'utente non disponibile' }}
+      </small>
+
+      <small>
+        Data:
+        {{ new Date(segnalazione.createdAt).toLocaleString('it-IT') }}
+      </small>
+
+      <p>{{ segnalazione.descrizione }}</p>
+
+      <a
+        v-if="segnalazione.foto"
+        :href="`http://localhost:5000${segnalazione.foto}`"
+        target="_blank"
+        class="foto-link"
+      >
+        Apri foto allegata
+      </a>
+    </div>
+  </div>
+
+  <p v-else class="empty">
+    Nessuna segnalazione disponibile.
+  </p>
+</section>
       <section class="support-card">
         <h4>Log API esterne</h4>
 
@@ -949,5 +1096,40 @@ onMounted(async () => {
   .support-card-wide {
     grid-column: auto;
   }
+}
+
+.alert-segnalazioni {
+  padding: 18px;
+  border-radius: var(--r-lg);
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
+  color: var(--danger);
+  animation: lampeggiaSegnalazioni 1.4s infinite;
+}
+
+.alert-segnalazioni strong {
+  font-size: 15px;
+  color: var(--danger);
+}
+
+.alert-segnalazioni p {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+@keyframes lampeggiaSegnalazioni {
+  0%, 100% {
+    box-shadow: 0 0 0 rgba(248, 113, 113, 0);
+  }
+  50% {
+    box-shadow: 0 0 26px rgba(248, 113, 113, 0.45);
+  }
+}
+
+.foto-link {
+  font-size: 12px;
+  color: var(--accent);
+  font-weight: 700;
 }
 </style>

@@ -25,13 +25,13 @@ async function main() {
   const id = await getNextSequence('utenteId')
 
   await SupportoTecnico.create({
-    id,
-    email,
-    passwordHash,
-    discriminator: 'SupportoTecnico',
-    isVerified: true,
-    matricola: 'ST-ADMIN'
-  })
+  id,
+  email,
+  passwordHash,
+  discriminator: 'SupportoTecnico',
+  isVerified: true,
+  matricola: 'ST-ADMIN'
+})
 
   console.log('Creato supporto tecnico:')
   console.log('email:', email)
