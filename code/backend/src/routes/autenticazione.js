@@ -26,37 +26,29 @@ const router = express.Router();
  * @returns {Promise<void>} JSON con messaggio di successo e i dati base dell'utente, oppure un messaggio di errore.
  */
 router.post('/register', async (req, res) => {
-    console.log('Dati in arrivo da postman:', req.body);
-
     try { 
-        // estrazione dati dal body 
         const { nome, cognome, email, password, dataNascita } = req.body;
 
-        // controllo dei campi obbligatori
         if (!nome || !cognome || !email || !password || !dataNascita) {
             return res.status(400).json({ errore: 'Tutti i campi sono obbligatori' });
         }
 
-        // controllo lunghezza password 
         if (password.length < 8){
-            return res.status(400).json({ errore: 'La password deve contenente almeno 8 carateri'});
+            return res.status(400).json({ errore: 'La password deve contenente almeno 8 caratteri'});
         }
 
-        // controllo mail nel Database
         const utenteEsistente = await UtenteRegistrato.findOne({ email: email });
         if (utenteEsistente) { 
             return res.status(409).json({ errore: 'Esiste già un account con questa mail' });
         }
 
 
-        // hashing della password 
         const saltRounds = 12;
         const hashedPassword = await bcrypt.hash(password, saltRounds);
         const verificaToken = crypto.randomBytes(32).toString('hex');
 
-        const idAggiornato = await getNewSequence('utendeId');
+        const idAggiornato = await getNewSequence('utenteId');
 
-        // creazione istanza UtenteRegistrato
         const nuovoUtente = new UtenteRegistrato({
             id: idAggiornato, 
             nome: nome, 
@@ -140,13 +132,11 @@ router.post('/login', async (req, res) => {
             });
         }
 
-        // confronto password in chiaro con hashing nel Database
         const verifica = await bcrypt.compare(password, utenteTrovato.passwordHash);
         if (!verifica) {
             return res.status(401).json({ errore: 'Credenziali non valide' });
         }
 
-        // generazione token JWT
         const Dati = {
             id: utenteTrovato.id, 
             mongoId: utenteTrovato._id, 
@@ -187,8 +177,6 @@ router.get('/verify-email', async (req, res) => {
         if (!utente) {
             return res.redirect('http://localhost:5173/?verificato=false');
         }
-
-        // Account attivato
         utente.isVerified = true;
         utente.emailToken = null; 
         await utente.save();
@@ -244,7 +232,6 @@ router.post('/reset-password/:token', async (req, res) => {
         const { token } = req.params;
         const { nuovaPassword } = req.body;
 
-        // controllo aggiuntivo: il token su resetPassExpires non deve essere scaduto
         const utente = await Utente.findOne({
             resetPassToken: token,
             resetPassExpires: { $gt: Date.now() }
@@ -257,7 +244,6 @@ router.post('/reset-password/:token', async (req, res) => {
         const saltRounds = 12;
         const hashedPassword = await bcrypt.hash(nuovaPassword, saltRounds);
 
-        // aggiornamento della password e reset dei token
         utente.passwordHash = hashedPassword;
         utente.resetPassToken = undefined;
         utente.resetPassExpires = undefined;

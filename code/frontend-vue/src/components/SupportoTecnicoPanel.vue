@@ -4,13 +4,13 @@ import {
   getLogApi,
   getConfigApi,
   creaConfigApi,
-  modificaConfigApi,
-  modificaBivaccoTecnico,
+  aggiornaConfigApi,
+  aggiornaBivaccoTecnico,
   creaBivaccoTecnico,
   getBivacchi,
-  getRichiesteSupporto,
-  approvaRichiestaSupporto,
-  getStoricoSegnalazioniStaff,
+  getRichiesteSupportoTecnico,
+  approvaRichiestaSupportoTecnico,
+  getStoricoSegnalazioni,
   aggiornaStatoSegnalazione
 } from '../services/api'
 
@@ -116,12 +116,12 @@ async function submitNuovoBivacco() {
 const richiesteSupporto = ref([])
 
 async function loadRichiesteSupporto() {
-  richiesteSupporto.value = await getRichiesteSupporto()
+  richiesteSupporto.value = await getRichiesteSupportoTecnico()
 }
 
 async function approvaRichiesta(utenteId) {
   try {
-    await approvaRichiestaSupporto(utenteId)
+    await approvaRichiestaSupportoTecnico(utenteId)
     messageType.value = 'success'
     message.value = 'Richiesta approvata correttamente'
     await loadRichiesteSupporto()
@@ -140,7 +140,7 @@ async function loadSupportoData() {
     configs.value = await getConfigApi()
     bivacchi.value = await getBivacchi()
     richiesteSupporto.value = await getRichiesteSupporto()
-    segnalazioniStaff.value = await getStoricoSegnalazioniStaff()
+    segnalazioniStaff.value = await getStoricoSegnalazioni()
   } catch (error) {
     messageType.value = 'error'
     message.value = error.message
@@ -156,7 +156,7 @@ async function submitConfig() {
     const esistente = configs.value.find(c => c.provider === configForm.provider)
 
     if (esistente) {
-      await modificaConfigApi(esistente._id, {
+      await aggiornaConfigApi(esistente._id, {
         baseUrl: configForm.baseUrl,
         enabled: configForm.enabled,
         timeoutMs: Number(configForm.timeoutMs)
@@ -207,7 +207,7 @@ async function submitBivacco() {
   }
 
   try {
-    await modificaBivaccoTecnico(bivaccoForm.bivaccoId, {
+    await aggiornaBivaccoTecnico(bivaccoForm.bivaccoId, {
       nome: bivaccoForm.nome,
       latitudine: Number(bivaccoForm.latitudine),
       longitudine: Number(bivaccoForm.longitudine),
@@ -250,7 +250,7 @@ async function handleCambioStato(idSegnalazione, nuovoStato) {
 }
 
 onMounted(() => {
-  loadSupportoData()
+  loadGpxOverlay()
 })
 </script>
 

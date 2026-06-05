@@ -13,7 +13,7 @@ async function main() {
   await connectDB()
 
   const email = 'noreply.bivacs@gmail.com'
-  const password = 'Bivacs2026!'
+  const password = process.env.SUPPORTO_TECNICO_PASSWORD;
 
   const esistente = await SupportoTecnico.findOne({ email })
   if (esistente) {
@@ -35,7 +35,6 @@ async function main() {
 
   console.log('Creato supporto tecnico:')
   console.log('email:', email)
-  console.log('password:', password)
 
   process.exit(0)
 }

@@ -1,6 +1,8 @@
 /**
  * @file supporto.js
- * @description Route per Supporto Tecnico: log API e configurazione API esterne.
+ * @description Route Express riservate al Supporto Tecnico.
+ * Gestisce log API, configurazioni dei provider esterni,
+ * modifica/creazione bivacchi e richieste di promozione a Supporto Tecnico.
  */
 
 const express = require('express');
@@ -9,11 +11,21 @@ const router = express.Router();
 const LogAPI = require('../models/logAPI');
 const ConfigAPI = require('../models/configAPI');
 const Bivacco = require('../models/bivacco');
+const Utente = require('../models/utente');
 
 const { protectRoute } = require('../middlewares/authMiddleware');
 const getNextSequence = require('../utils/getNewSequence');
-const inviaEmail = require('../utils/emailService')
+const inviaEmail = require('../utils/emailService');
 
+/**
+ * Verifica che l'utente autenticato abbia ruolo SupportoTecnico.
+ * Deve essere usato dopo protectRoute.
+ *
+ * @param {import('express').Request} req - Richiesta HTTP con utente autenticato.
+ * @param {import('express').Response} res - Risposta HTTP.
+ * @param {import('express').NextFunction} next - Middleware successivo.
+ * @returns {void}
+ */
 function isSupportoTecnico(req, res, next) {
   if (req.utente.discriminator === 'SupportoTecnico') {
     return next();
@@ -25,7 +37,13 @@ function isSupportoTecnico(req, res, next) {
 }
 
 /**
- * US38 - Visualizza log API esterne.
+ * Recupera gli ultimi log delle chiamate verso API esterne.
+ * US38.
+ *
+ * @route GET /api/v1/supporto/log-api
+ * @param {import('express').Request} req - Richiesta HTTP autenticata.
+ * @param {import('express').Response} res - Risposta HTTP.
+ * @returns {Promise<void>} Lista dei log API ordinati dal più recente.
  */
 router.get('/log-api', protectRoute, isSupportoTecnico, async (req, res) => {
   try {
@@ -43,7 +61,13 @@ router.get('/log-api', protectRoute, isSupportoTecnico, async (req, res) => {
 });
 
 /**
- * US39 - Lista configurazioni API.
+ * Recupera la lista delle configurazioni dei provider API esterni.
+ * US39.
+ *
+ * @route GET /api/v1/supporto/config-api
+ * @param {import('express').Request} req - Richiesta HTTP autenticata.
+ * @param {import('express').Response} res - Risposta HTTP.
+ * @returns {Promise<void>} Lista delle configurazioni API.
  */
 router.get('/config-api', protectRoute, isSupportoTecnico, async (req, res) => {
   try {
@@ -59,7 +83,13 @@ router.get('/config-api', protectRoute, isSupportoTecnico, async (req, res) => {
 });
 
 /**
- * US39 - Crea configurazione API.
+ * Crea una nuova configurazione per un provider API esterno.
+ * US39.
+ *
+ * @route POST /api/v1/supporto/config-api
+ * @param {import('express').Request} req - Richiesta HTTP con provider, baseUrl, enabled e timeoutMs.
+ * @param {import('express').Response} res - Risposta HTTP.
+ * @returns {Promise<void>} Configurazione creata oppure errore.
  */
 router.post('/config-api', protectRoute, isSupportoTecnico, async (req, res) => {
   try {
@@ -99,7 +129,13 @@ router.post('/config-api', protectRoute, isSupportoTecnico, async (req, res) => 
 });
 
 /**
- * US39 - Modifica configurazione API.
+ * Modifica una configurazione API esistente.
+ * US39.
+ *
+ * @route PATCH /api/v1/supporto/config-api/:id
+ * @param {import('express').Request} req - Richiesta HTTP con campi da aggiornare.
+ * @param {import('express').Response} res - Risposta HTTP.
+ * @returns {Promise<void>} Configurazione aggiornata oppure errore.
  */
 router.patch('/config-api/:id', protectRoute, isSupportoTecnico, async (req, res) => {
   try {
@@ -112,10 +148,10 @@ router.patch('/config-api/:id', protectRoute, isSupportoTecnico, async (req, res
     if (timeoutMs !== undefined) aggiornamenti.timeoutMs = timeoutMs;
 
     if (Object.keys(aggiornamenti).length === 0) {
-        return res.status(400).json({
-            message: 'Fornire almeno un campo da aggiornare'
-        });
-     }
+      return res.status(400).json({
+        message: 'Fornire almeno un campo da aggiornare'
+      });
+    }
 
     const configAggiornata = await ConfigAPI.findByIdAndUpdate(
       req.params.id,
@@ -142,8 +178,13 @@ router.patch('/config-api/:id', protectRoute, isSupportoTecnico, async (req, res
 });
 
 /**
- * US40 - Modifica dati tecnici bivacco.
- * Puoi tenerla qui se resta tua, oppure passarla a Stefano.
+ * Modifica i dati tecnici di un bivacco.
+ * US40.
+ *
+ * @route PATCH /api/v1/supporto/bivacchi/:id
+ * @param {import('express').Request} req - Richiesta HTTP con campi tecnici da aggiornare.
+ * @param {import('express').Response} res - Risposta HTTP.
+ * @returns {Promise<void>} Bivacco aggiornato oppure errore.
  */
 router.patch('/bivacchi/:id', protectRoute, isSupportoTecnico, async (req, res) => {
   try {
@@ -162,6 +203,7 @@ router.patch('/bivacchi/:id', protectRoute, isSupportoTecnico, async (req, res) 
     } = req.body;
 
     const aggiornamenti = {};
+
     if (nome !== undefined) aggiornamenti.nome = nome;
     if (latitudine !== undefined) aggiornamenti.latitudine = latitudine;
     if (longitudine !== undefined) aggiornamenti.longitudine = longitudine;
@@ -175,9 +217,9 @@ router.patch('/bivacchi/:id', protectRoute, isSupportoTecnico, async (req, res) 
     if (emergenza !== undefined) aggiornamenti.emergenza = emergenza;
 
     if (Object.keys(aggiornamenti).length === 0) {
-    return res.status(400).json({
+      return res.status(400).json({
         message: 'Fornire almeno un campo da aggiornare'
-    });
+      });
     }
 
     const bivaccoAggiornato = await Bivacco.findByIdAndUpdate(
@@ -196,7 +238,6 @@ router.patch('/bivacchi/:id', protectRoute, isSupportoTecnico, async (req, res) 
       message: 'Bivacco aggiornato con successo',
       bivacco: bivaccoAggiornato
     });
-
   } catch (error) {
     res.status(500).json({
       message: 'Errore modifica bivacco',
@@ -206,17 +247,28 @@ router.patch('/bivacchi/:id', protectRoute, isSupportoTecnico, async (req, res) 
 });
 
 /**
- * US40 estesa - Crea un nuovo bivacco.
- * Endpoint riservato a SupportoTecnico.
+ * Crea un nuovo bivacco dal pannello Supporto Tecnico.
+ * Estensione della US40.
  *
  * @route POST /api/v1/supporto/bivacchi
+ * @param {import('express').Request} req - Richiesta HTTP con dati del nuovo bivacco.
+ * @param {import('express').Response} res - Risposta HTTP.
+ * @returns {Promise<void>} Bivacco creato oppure errore.
  */
 router.post('/bivacchi', protectRoute, isSupportoTecnico, async (req, res) => {
   try {
     const {
-      nome, latitudine, longitudine, altitudine,
-      postiLetto, dotazioni, zona, tipoStruttura,
-      acquaPresente, legnaDisponibile, emergenza
+      nome,
+      latitudine,
+      longitudine,
+      altitudine,
+      postiLetto,
+      dotazioni,
+      zona,
+      tipoStruttura,
+      acquaPresente,
+      legnaDisponibile,
+      emergenza
     } = req.body;
 
     if (
@@ -259,6 +311,7 @@ router.post('/bivacchi', protectRoute, isSupportoTecnico, async (req, res) => {
         error: error.message
       });
     }
+
     res.status(500).json({
       message: 'Errore creazione bivacco',
       error: error.message
@@ -266,8 +319,14 @@ router.post('/bivacchi', protectRoute, isSupportoTecnico, async (req, res) => {
   }
 });
 
-const Utente = require('../models/utente');
-
+/**
+ * Recupera le richieste pendenti di promozione a Supporto Tecnico.
+ *
+ * @route GET /api/v1/supporto/richieste-supporto
+ * @param {import('express').Request} req - Richiesta HTTP autenticata.
+ * @param {import('express').Response} res - Risposta HTTP.
+ * @returns {Promise<void>} Lista degli utenti con richiesta in attesa.
+ */
 router.get('/richieste-supporto', protectRoute, isSupportoTecnico, async (req, res) => {
   try {
     const richieste = await Utente.find({
@@ -284,27 +343,37 @@ router.get('/richieste-supporto', protectRoute, isSupportoTecnico, async (req, r
   }
 });
 
+/**
+ * Approva una richiesta di promozione a Supporto Tecnico.
+ * Aggiorna il discriminator dell'utente, assegna la matricola e invia una notifica email.
+ *
+ * @route PATCH /api/v1/supporto/richieste-supporto/:utenteId/approva
+ * @param {import('express').Request} req - Richiesta HTTP con id dell'utente.
+ * @param {import('express').Response} res - Risposta HTTP.
+ * @returns {Promise<void>} Utente aggiornato oppure errore.
+ */
 router.patch('/richieste-supporto/:utenteId/approva', protectRoute, isSupportoTecnico, async (req, res) => {
   try {
-    const utente = await Utente.findById(req.params.utenteId)
+    const utente = await Utente.findById(req.params.utenteId);
 
     if (!utente) {
-      return res.status(404).json({ message: 'Utente non trovato' })
+      return res.status(404).json({
+        message: 'Utente non trovato'
+      });
     }
 
     const matricola =
       utente.richiestaSupportoTecnico?.matricolaRichiesta ||
-      `ST-${utente.id}`
+      `ST-${utente.id}`;
 
-    utente.discriminator = 'SupportoTecnico'
-      utente.matricola = matricola
-      utente.richiestaSupportoTecnico.stato = 'approvata'
+    utente.discriminator = 'SupportoTecnico';
+    utente.matricola = matricola;
+    utente.richiestaSupportoTecnico.stato = 'approvata';
 
-      await utente.save()
+    await utente.save();
 
-      const aggiornato = await Utente.findById(
-      req.params.utenteId
-    ).select('-passwordHash')
+    const aggiornato = await Utente.findById(req.params.utenteId)
+      .select('-passwordHash');
 
     await inviaEmail(
       utente.email,
@@ -314,23 +383,32 @@ router.patch('/richieste-supporto/:utenteId/approva', protectRoute, isSupportoTe
         <p>La tua richiesta per diventare Supporto Tecnico su Bivacs è stata approvata.</p>
         <p>Effettua nuovamente il login per accedere al pannello tecnico.</p>
       `
-    )
+    );
 
     res.status(200).json({
       message: 'Utente promosso a Supporto Tecnico',
       utente: aggiornato
-    })
+    });
   } catch (error) {
     res.status(500).json({
       message: 'Errore approvazione richiesta',
       error: error.message
-    })
+    });
   }
-})
+});
 
+/**
+ * Rifiuta una richiesta di promozione a Supporto Tecnico.
+ * Aggiorna lo stato della richiesta e invia una notifica email all'utente.
+ *
+ * @route PATCH /api/v1/supporto/richieste-supporto/:utenteId/rifiuta
+ * @param {import('express').Request} req - Richiesta HTTP con motivoRifiuto opzionale.
+ * @param {import('express').Response} res - Risposta HTTP.
+ * @returns {Promise<void>} Utente aggiornato oppure errore.
+ */
 router.patch('/richieste-supporto/:utenteId/rifiuta', protectRoute, isSupportoTecnico, async (req, res) => {
   try {
-    const { motivoRifiuto } = req.body
+    const { motivoRifiuto } = req.body;
 
     const utente = await Utente.findByIdAndUpdate(
       req.params.utenteId,
@@ -340,10 +418,12 @@ router.patch('/richieste-supporto/:utenteId/rifiuta', protectRoute, isSupportoTe
         }
       },
       { new: true }
-    ).select('-passwordHash')
+    ).select('-passwordHash');
 
     if (!utente) {
-      return res.status(404).json({ message: 'Utente non trovato' })
+      return res.status(404).json({
+        message: 'Utente non trovato'
+      });
     }
 
     await inviaEmail(
@@ -354,18 +434,18 @@ router.patch('/richieste-supporto/:utenteId/rifiuta', protectRoute, isSupportoTe
         <p>La tua richiesta per diventare Supporto Tecnico su Bivacs è stata rifiutata.</p>
         <p>${motivoRifiuto || 'Non è stata indicata una motivazione specifica.'}</p>
       `
-    )
+    );
 
     res.status(200).json({
       message: 'Richiesta rifiutata correttamente',
       utente
-    })
+    });
   } catch (error) {
     res.status(500).json({
       message: 'Errore rifiuto richiesta',
       error: error.message
-    })
+    });
   }
-})
+});
 
 module.exports = router;

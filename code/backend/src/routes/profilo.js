@@ -196,6 +196,17 @@ router.delete('/preferiti/:bivaccoId', protectRoute, async (req, res) => {
     }
 });
 
+/**
+ * Permette a un utente registrato di richiedere la promozione
+ * al ruolo di Supporto Tecnico.
+ *
+ * @route POST /api/v1/profilo/richiesta-supporto-tecnico
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @returns {Promise<void>}
+ */
+
+
 router.post('/richiesta-supporto-tecnico', protectRoute, async (req, res) => {
     try {
         const { motivo, matricola } = req.body;
