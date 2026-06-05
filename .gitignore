@@ -30,3 +30,6 @@ $RECYCLE.BIN/
 # NON RIMUOVERE O MI SI ROMPE TUTTO
 docker-data/
 db-data/
+
+# CARTELLA UPLOADS
+code/backend/uploads/segnalazioni/*
