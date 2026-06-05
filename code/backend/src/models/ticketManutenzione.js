@@ -19,7 +19,7 @@ const ticketManutenzioneSchema = new mongoose.Schema({
     stato: {
         type: String,
         required: [true, 'Lo stato del ticket è obbligatorio'],
-        enum: ['aperto', 'in_lavorazione', 'chiuso', 'archiviato'],
+        enum: ['aperto', 'in_lavorazione', 'chiuso', 'archivia'],
         default: 'aperto'
     },
     priorita: {

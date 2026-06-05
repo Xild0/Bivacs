@@ -442,6 +442,8 @@ router.post('/ticket', protectRoute, isSupportoTecnico, async (req, res) => {
  * @param {string} req.body.stato - Nuovo stato
  */
 router.patch('/ticket/:id/stato', protectRoute, isSupportoTecnico, async (req, res) => {
+  console.log("ID ricevuto:", req.params.id);
+  console.log("Body ricevuto:", req.body);
     try {
         const {stato, note} = req.body;
         const updateData = {stato};

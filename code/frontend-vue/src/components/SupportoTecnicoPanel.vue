@@ -256,16 +256,24 @@ async function caricaTicket() {
  * @param {String} id - ObjectId del ticket
  * @param {String} azione - Azione richiesta per il ticket
  */
-async function avanzamentoTicket(id, azione) {
+async function avanzamentoTicket(id, nuovoStato) {
   try {
-    if(azione === 'archiviata'){
-      await(archiviaTicket(id))
-    } else {
-      await aggiornaStatoTicket(id, azione)
+    loading.value=true
+    message.value=''
+    await aggiornaStatoTicket(id, nuovoStato)
+    const idx = codaTicket.value.findIndex(t => t._id === id)             // trovo il ticket in coda locale e lo aggiorno
+    if (idx !== -1){
+      codaTicket.value[idx].stato = nuovoStato
     }
-    await caricaTicket()
+    
+    message.value = 'Stato del ticket aggiornato con successo'
+    messageType.value = 'success'
   } catch (error) {
-    alert(error.message)
+    console.error("Errore avanzamento ticket:", error)
+    message.value=error.message || "Errore avanzamento ticket"
+    messageType.value="danger"
+  } finally {
+    loading.value=false
   }
 }
 
@@ -294,6 +302,8 @@ async function gestisciCreazioneTicket(segnalazioneId) {
         alert(error.message);
     }
 }
+
+
 
 // LASCIARE COMMENTATA, SE CI SONO PROBLEMI LA DECOMMENTIAMO (TOLLO)
 /**
@@ -605,7 +615,7 @@ onMounted(async () => {
           <button 
             v-if="ticket.stato === 'aperto'" 
             class="btn btn-primary" 
-            @click="gestisciAvanzamentoTicket(ticket._id, 'in_lavorazione')"
+            @click="avanzamentoTicket(ticket._id, 'in_lavorazione')"
           >
             Prendi in carico
           </button>
@@ -613,7 +623,7 @@ onMounted(async () => {
           <button 
             v-if="ticket.stato === 'in_lavorazione'" 
             class="btn btn-primary" 
-            @click="gestisciAvanzamentoTicket(ticket._id, 'chiuso')"
+            @click="avanzamentoTicket(ticket._id, 'chiuso')"
           >
             Chiudi Ticket
           </button>
@@ -621,7 +631,7 @@ onMounted(async () => {
           <button 
             v-if="ticket.stato === 'chiuso'" 
             class="btn btn-warning" 
-            @click="gestisciAvanzamentoTicket(ticket._id, 'archivia')"
+            @click="avanzamentoTicket(ticket._id, 'archivia')"
           >
             Archivia
           </button>
