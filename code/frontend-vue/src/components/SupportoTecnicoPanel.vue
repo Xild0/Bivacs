@@ -291,9 +291,10 @@ async function gestisciCreazioneTicket(segnalazioneId) {
     }
 }
 
+
 /**
  * @description funzione wrapper per intercettare eventuali errori durante l'esportazione dati
- */
+ *
 async function gestisciEsportazione() {
   try {
     await esportaCSV();
@@ -301,6 +302,31 @@ async function gestisciEsportazione() {
     alert(error.message);
   }
 }
+*/
+
+
+/**
+ * @description Gestisce l'evento del click automatico per 
+ * l'esportazione del dataset CSV. Chiama l'API per l'esportazione 
+ * e blocca temporaneamente l'UI intercettando gli eventuali errori.
+ * @returns {Promise<void>}
+ */
+const handleEsportaCSV = async () => {
+    loading.value = true;
+    message.value = '';                                         // Resetta eventuali messaggi precedenti
+    
+    try {
+        await esportaCSV();
+        message.value = 'Dataset CSV esportato con successo!';
+        messageType.value = 'success';                          
+    } catch (error) {
+        console.error("Fallimento durante l'esportazione del CSV:", error);
+        message.value = error.message || 'Si è verificato un errore imprevisto durante il download.';
+        messageType.value = 'danger';
+    } finally {
+        loading.value = false;
+    }
+};
 
 
 /**
@@ -476,8 +502,8 @@ onMounted(async () => {
   <div style="display: flex; justify-content: space-between; align-items: center;">
     <h3>Segnalazioni in attesa di Valutazione</h3>
     
-    <button class="btn btn-secondary" @click="gestisciEsportazione">
-      Esporta l'intero Dataset (CSV)
+    <button @click="handleEsportaCSV" :disabled="loading">
+      {{ loading ? 'Esportazione in corso...' : 'Esporta Dataset CSV' }}
     </button>
   </div>
   </div>

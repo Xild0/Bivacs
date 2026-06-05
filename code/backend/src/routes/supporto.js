@@ -14,8 +14,8 @@ const { protectRoute } = require('../middlewares/authMiddleware');
 const getNextSequence = require('../utils/getNewSequence');
 const inviaEmail = require('../utils/emailService')
 
-const segnalazione = require('../models/segnalazione');
-const ticketManutenzione = require('../models/ticketManutenzione');
+const Segnalazione = require('../models/segnalazione');
+const TicketManutenzione = require('../models/ticketManutenzione');
 
 function isSupportoTecnico(req, res, next) {
   if (req.utente.discriminator === 'SupportoTecnico') {

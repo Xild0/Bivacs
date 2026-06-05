@@ -44,6 +44,12 @@ const messageType = ref('info')
 const loaded = ref(false)
 const allerteMap = ref({})
 
+
+/**
+ * @description Carica i dati dell'utente dal backend e 
+ * carica le allerte meteo dei preferiti SOLO se utente ha 
+ * discriminator === UtenteRegistrato
+ */
 async function loadProfile() {
   try {
     const data = await getProfile()
@@ -56,6 +62,11 @@ async function loadProfile() {
     profile.preferiti = data.preferiti || []
     profile.richiestaSupportoTecnico = data.richiestaSupportoTecnico || null
     profile.richiestaSuperUser = data.richiestaSuperUser || null
+
+    // bugfix: allerte meteo richieste solo se utente è UtenteRegistrato
+    if(profile.discriminator === 'UtenteRegistrato' || !profile.discriminator){
+      await loadAllerte()
+    }
 
     loaded.value = true
     message.value = ''
@@ -172,7 +183,7 @@ function openPreferito(bivacco) {
 
 onMounted(() => {
   loadProfile()
-  loadAllerte()
+  //loadAllerte()
 })
 </script>
 

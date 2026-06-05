@@ -853,13 +853,17 @@ export const revocaEmergenza = async (bivaccoId) => {
 }
 
 /**
- * @description Recupera l'elenco dei ticket attivi per il Supporto Tecnico.
+ * @description Recupera l'elenco dei ticket attivi per il Supporto Tecnico
  * @returns {Promise<Array>} Dati ticket
  */
 export const getCodaTicket = async () => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('bivacs_token');
     const response = await fetch(`${API_URL}/supporto/ticket`, {
-        headers: {'Authorization': `Bearer ${token}`}
+      method: 'GET', 
+      headers:{
+        'Authorization':`Bearer ${token}`, 
+        'Accept':'application/json'
+      }
     });
     if (!response.ok) throw new Error('Impossibile recuperare i ticket');
     return response.json();
@@ -905,7 +909,7 @@ export const archiviaTicket = async (ticketId) => {
  * @returns {Promise<Array>} Array delle segnalazioni
  */
 export const getSegnalazioniDaGestire = async () => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('bvacs_token');
     const response = await fetch(`${API_URL}/supporto/segnalazioni`, {
         headers: {'Authorization': `Bearer ${token}`}
     });
@@ -938,15 +942,21 @@ export const generaTicketDaSegnalazione = async (segnalazioneId, priority) => {
  * @returns {Promise<void>}
  */
 export const esportaCSV = async () => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('bivacs_token');
 
-    const response = await fetch(`${API_URL}/supporto/segnalazioni/export/csv`, {
+    const resp = await fetch(`${API_URL}/supporto/segnalazioni/export/csv`, {
         method: 'GET',
-        headers: {'Authorization': `Bearer ${token}`}
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'text/csv'                          // bugfix: segnalo al server che aspettiamo un file csv 
+      }
     });
-    if (!response.ok) throw new Error('Errore durante la generazione del file CSV.');
+    if (!resp.ok) {
+      const errorData = await resp.text();                          // estraggo il testo dell'errore per debug
+      throw new Error(`Errore ${resp.status}: ${errorData || 'Impossibile generare file CSV}'}`);
+    }
 
-    const blob = await response.blob();
+    const blob = await resp.blob();
     const url = window.URL.createObjectURL(blob);
     
     const a = document.createElement('a');
@@ -956,5 +966,5 @@ export const esportaCSV = async () => {
     a.click();                                      // simulo un click per far avviare il download
     
     document.body.removeChild(a);                   // pulisco per evitare garbage
-    setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+    setTimeout(() => {window.URL.revokeObjectURL(url);}, 100);
 };
