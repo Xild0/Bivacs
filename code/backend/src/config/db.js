@@ -14,9 +14,6 @@ const mongoose = require('mongoose');
 
 const connectDB = async () => {
     try {
-        /**
-         * controllo di sicurezza per le variabili di ambiente
-         */
         const mongoUri = process.env.MONGO_URI;
 
         if (!mongoUri){
@@ -26,9 +23,6 @@ const connectDB = async () => {
         await mongoose.connect(process.env.MONGO_URI);
         console.log('MongoDB connesso con successo!');
     } catch (error) {
-        /**
-         * controllo del tipo di errore
-         */
         if (error instanceof Error){
             console.error('Errore di connessione a MongoDB:', error.message);
         } else {
