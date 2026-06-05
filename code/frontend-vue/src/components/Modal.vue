@@ -1,13 +1,13 @@
-/**
- * @file Modal.vue
- * @description Componente modale riutilizzabile.
- * Gestisce apertura, chiusura tramite click esterno e chiusura con tasto Escape.
- */
+<!--
+ @file Modal.vue
+ @description Componente modale riutilizzabile.
+ Gestisce apertura, chiusura tramite click esterno e chiusura con tasto Escape.
+ -->
 
 <script setup>
 import { onMounted, onUnmounted } from 'vue'
 
-const props = defineProps({
+defineProps({
   title: { type: String, default: '' },
   label: { type: String, default: '' },
   maxWidth: { type: String, default: '520px' }

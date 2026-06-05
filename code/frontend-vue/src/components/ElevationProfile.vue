@@ -1,7 +1,7 @@
-/**
- * @file ElevationProfile.vue
- * @description Visualizza il profilo altimetrico SVG di un percorso.
- */
+<!--
+ @file ElevationProfile.vue
+ @description Visualizza il profilo altimetrico SVG di un percorso.
+-->
 
 <script setup>
 import { computed } from 'vue'

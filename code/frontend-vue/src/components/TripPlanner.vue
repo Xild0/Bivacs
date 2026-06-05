@@ -1,11 +1,13 @@
-/**
- * @file TripPlanner.vue
- * @description Componente per pianificare il tragitto verso un bivacco.
- * Gestisce ricerca luogo di partenza, geolocalizzazione, calcolo percorso e riepilogo altimetrico.
- */
+<!--
+  @file TripPlanner.vue
+  @description Componente per pianificare il tragitto verso un bivacco.
+  Gestisce ricerca del luogo di partenza, geolocalizzazione,
+  calcolo percorso escursionistico e riepilogo altimetrico.
+-->
 
 <script setup>
 import { ref, watch } from 'vue'
+
 import { geocode, calcolaTragitto } from '../services/api'
 import ElevationProfile from './ElevationProfile.vue'
 
@@ -18,24 +20,25 @@ const props = defineProps({
 
 const emit = defineEmits(['route-calculated', 'clear-route'])
 
-const startQuery   = ref('')
-const suggestions  = ref([])
-const start        = ref(null)         // { nome, lat, lng }
-const showSuggest  = ref(false)
-const searching    = ref(false)
+const startQuery = ref('')
+const suggestions = ref([])
+const start = ref(null)
+const showSuggest = ref(false)
+const searching = ref(false)
 
 const loading = ref(false)
-const error   = ref('')
-const result  = ref(null)
+const error = ref('')
+const result = ref(null)
 
 let searchTimeout = null
 
 /**
- * Gestisce la digitazione del punto di partenza e carica suggerimenti geocodificati.
+ * Gestisce la digitazione del punto di partenza.
+ * Dopo un breve debounce interroga il servizio di geocoding
+ * e mostra i suggerimenti disponibili.
  *
  * @returns {void}
  */
-
 function onInput() {
   start.value = null
   clearTimeout(searchTimeout)
@@ -47,13 +50,14 @@ function onInput() {
   }
 
   searching.value = true
+
   searchTimeout = setTimeout(async () => {
     try {
       suggestions.value = await geocode(startQuery.value)
       showSuggest.value = true
-    } catch (e) {
-      console.error(e)
+    } catch (err) {
       suggestions.value = []
+      error.value = err.message
     } finally {
       searching.value = false
     }
@@ -61,17 +65,17 @@ function onInput() {
 }
 
 /**
- * Seleziona un punto di partenza dai suggerimenti.
+ * Seleziona un punto di partenza dai suggerimenti del geocoder.
  *
- * @param {{nome: string, lat: number, lng: number}} s - Suggerimento selezionato.
+ * @param {{nome: string, lat: number, lng: number}} suggestion - Suggerimento selezionato.
  * @returns {void}
  */
-
-function pickStart(s) {
-  start.value = s
-  startQuery.value = s.nome.split(',').slice(0, 2).join(',')
+function pickStart(suggestion) {
+  start.value = suggestion
+  startQuery.value = suggestion.nome.split(',').slice(0, 2).join(',')
   suggestions.value = []
   showSuggest.value = false
+  error.value = ''
 }
 
 /**
@@ -79,31 +83,32 @@ function pickStart(s) {
  *
  * @returns {void}
  */
-
-async function useMyLocation() {
+function useMyLocation() {
   if (!navigator.geolocation) {
     error.value = 'Geolocalizzazione non supportata dal browser'
     return
   }
 
   error.value = ''
+
   navigator.geolocation.getCurrentPosition(
-    (pos) => {
+    (position) => {
       start.value = {
         nome: 'La mia posizione',
-        lat: pos.coords.latitude,
-        lng: pos.coords.longitude
+        lat: position.coords.latitude,
+        lng: position.coords.longitude
       }
+
       startQuery.value = 'La mia posizione'
       suggestions.value = []
       showSuggest.value = false
     },
-    (err) => {
-      if (err.code === 1) {
-        error.value = 'Permesso negato. Clicca sul lucchetto nella barra degli indirizzi e abilita la posizione, oppure scrivi il punto di partenza manualmente.'
-      } else if (err.code === 2) {
-        error.value = 'Posizione non disponibile. Su PC senza GPS può capitare: scrivi il punto di partenza manualmente.'
-      } else if (err.code === 3) {
+    (geoError) => {
+      if (geoError.code === 1) {
+        error.value = 'Permesso negato. Abilita la posizione dal browser oppure scrivi il punto di partenza manualmente.'
+      } else if (geoError.code === 2) {
+        error.value = 'Posizione non disponibile. Scrivi il punto di partenza manualmente.'
+      } else if (geoError.code === 3) {
         error.value = 'Timeout: posizione non trovata in tempo. Riprova o scrivi manualmente il punto di partenza.'
       } else {
         error.value = 'Errore di geolocalizzazione. Scrivi il punto di partenza manualmente.'
@@ -118,11 +123,10 @@ async function useMyLocation() {
 }
 
 /**
- * Calcola il tragitto dalla partenza selezionata al bivacco.
+ * Calcola il tragitto escursionistico dalla partenza selezionata al bivacco.
  *
  * @returns {Promise<void>}
  */
-
 async function calcola() {
   if (!start.value) {
     error.value = 'Seleziona prima un punto di partenza'
@@ -140,30 +144,31 @@ async function calcola() {
   emit('clear-route')
 
   try {
-    const res = await calcolaTragitto(
+    const routeResult = await calcolaTragitto(
       [start.value.lat, start.value.lng],
       [props.bivacco.latitudine, props.bivacco.longitudine]
     )
-    result.value = res
-    emit('route-calculated', res)
-  } catch (e) {
-    error.value = e.message
+
+    result.value = routeResult
+    emit('route-calculated', routeResult)
+  } catch (err) {
+    error.value = err.message
   } finally {
     loading.value = false
   }
 }
 
 /**
- * Annulla il tragitto calcolato e ripristina il form.
+ * Annulla il tragitto calcolato e ripristina lo stato iniziale del form.
  *
  * @returns {void}
  */
-
 function reset() {
   result.value = null
   start.value = null
   startQuery.value = ''
   suggestions.value = []
+  showSuggest.value = false
   error.value = ''
   emit('clear-route')
 }
@@ -174,25 +179,28 @@ function reset() {
  * @param {number} metri - Distanza in metri.
  * @returns {string} Distanza formattata.
  */
-
 function formatKm(metri) {
-  if (metri < 1000) return `${Math.round(metri)} m`
+  if (metri < 1000) {
+    return `${Math.round(metri)} m`
+  }
+
   return `${(metri / 1000).toFixed(1)} km`
 }
 
 /**
- * Formatta una durata in secondi.
+ * Formatta una durata espressa in secondi.
  *
  * @param {number} secondi - Durata in secondi.
  * @returns {string} Durata formattata.
  */
-
 function formatDuration(secondi) {
   const h = Math.floor(secondi / 3600)
   const m = Math.round((secondi % 3600) / 60)
-  if (h === 0) return `${m}min`
-  if (m === 0) return `${h}h`
-  return `${h}h ${m}min`
+
+  if (h === 0) return `${m} min`
+  if (m === 0) return `${h} h`
+
+  return `${h} h ${m} min`
 }
 
 watch(
@@ -201,7 +209,6 @@ watch(
     reset()
   }
 )
-
 </script>
 
 <template>
@@ -211,9 +218,9 @@ watch(
       <h3>Calcola percorso al bivacco</h3>
     </header>
 
-    <!-- Destinazione (fissa sul bivacco) -->
     <div class="endpoint endpoint-end">
       <span class="endpoint-dot end"></span>
+
       <div class="endpoint-info">
         <span class="endpoint-tag">Arrivo</span>
         <strong>{{ bivacco.nome }}</strong>
@@ -221,9 +228,9 @@ watch(
       </div>
     </div>
 
-    <!-- Partenza -->
     <div class="endpoint endpoint-start">
       <span class="endpoint-dot start"></span>
+
       <div class="endpoint-info field-wrapper">
         <span class="endpoint-tag">Partenza</span>
 
@@ -254,28 +261,32 @@ watch(
           </button>
         </div>
 
-        <!-- Suggerimenti -->
         <div v-if="showSuggest && suggestions.length > 0" class="suggestions">
           <button
-            v-for="(s, i) in suggestions"
-            :key="i"
+            v-for="(suggestion, index) in suggestions"
+            :key="index"
             type="button"
             class="suggestion"
-            @click="pickStart(s)"
+            @click="pickStart(suggestion)"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
               <circle cx="12" cy="10" r="3" />
             </svg>
-            <span>{{ s.nome }}</span>
+
+            <span>{{ suggestion.nome }}</span>
           </button>
         </div>
 
-        <p v-if="searching" class="dim search-hint">Sto cercando…</p>
+        <p v-if="searching" class="dim search-hint">
+          Sto cercando…
+        </p>
       </div>
     </div>
 
-    <p v-if="error" class="error-msg">{{ error }}</p>
+    <p v-if="error" class="error-msg">
+      {{ error }}
+    </p>
 
     <div class="tp-actions">
       <button
@@ -299,21 +310,23 @@ watch(
       </button>
     </div>
 
-    <!-- Risultato -->
     <div v-if="result" class="result fade-up">
       <div class="stats-grid">
         <div class="stat-box">
           <span class="dim">Distanza</span>
           <strong class="mono">{{ formatKm(result.distance) }}</strong>
         </div>
+
         <div class="stat-box">
           <span class="dim">Durata</span>
           <strong class="mono">{{ formatDuration(result.duration) }}</strong>
         </div>
+
         <div class="stat-box">
           <span class="dim">Dislivello +</span>
           <strong class="mono up">+{{ Math.round(result.ascent) }} m</strong>
         </div>
+
         <div class="stat-box">
           <span class="dim">Dislivello −</span>
           <strong class="mono down">−{{ Math.round(result.descent) }} m</strong>
@@ -321,7 +334,10 @@ watch(
       </div>
 
       <div class="profile-wrap">
-        <p class="dim profile-label">Profilo altimetrico</p>
+        <p class="dim profile-label">
+          Profilo altimetrico
+        </p>
+
         <ElevationProfile :profile="result.profile" />
       </div>
     </div>
@@ -343,7 +359,6 @@ watch(
   letter-spacing: -0.01em;
 }
 
-/* —— Endpoint rows —— */
 .endpoint {
   display: flex;
   gap: 14px;
@@ -426,8 +441,9 @@ watch(
   font-size: 12px;
 }
 
-/* —— Search field —— */
-.field-wrapper { gap: 6px; }
+.field-wrapper {
+  gap: 6px;
+}
 
 .search-field {
   position: relative;
@@ -459,7 +475,6 @@ watch(
   background: var(--accent-bg);
 }
 
-/* —— Suggestions dropdown —— */
 .suggestions {
   margin-top: 6px;
   background: var(--bg-surface-2);
@@ -485,7 +500,9 @@ watch(
   transition: background 0.15s var(--ease);
 }
 
-.suggestion:last-child { border-bottom: none; }
+.suggestion:last-child {
+  border-bottom: none;
+}
 
 .suggestion:hover {
   background: var(--bg-surface-3);
@@ -503,7 +520,6 @@ watch(
   margin-top: 4px;
 }
 
-/* —— Error —— */
 .error-msg {
   background: var(--danger-bg);
   border: 1px solid var(--danger-border);
@@ -513,8 +529,9 @@ watch(
   font-size: 13px;
 }
 
-/* —— Actions —— */
-.tp-actions { margin-top: 4px; }
+.tp-actions {
+  margin-top: 4px;
+}
 
 .spinner-mini {
   display: inline-block;
@@ -527,9 +544,12 @@ watch(
   margin-right: 4px;
 }
 
-@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 
-/* —— Result —— */
 .result {
   display: flex;
   flex-direction: column;
@@ -568,8 +588,13 @@ watch(
   color: var(--text-primary);
 }
 
-.up   { color: var(--success); }
-.down { color: var(--warning); }
+.up {
+  color: var(--success);
+}
+
+.down {
+  color: var(--warning);
+}
 
 .profile-wrap {
   display: flex;

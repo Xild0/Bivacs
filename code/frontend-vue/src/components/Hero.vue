@@ -1,7 +1,7 @@
-/**
- * @file Hero.vue
- * @description Hero section principale della homepage Bivacs.
- */
+<!--
+ @file Hero.vue
+ @description Hero section principale della homepage Bivacs.
+-->
 
 <script setup>
 import { computed } from 'vue'

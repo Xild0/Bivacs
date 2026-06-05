@@ -1,7 +1,7 @@
-/**
- * @file Logo.vue
- * @description Componente grafico per visualizzare il logo dell'applicazione Bivacs.
- */
+<!--
+ @file Logo.vue
+ @description Componente grafico per visualizzare il logo dell'applicazione Bivacs.
+-->
 
 <script setup>
 defineProps({

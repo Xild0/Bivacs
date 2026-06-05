@@ -1,15 +1,16 @@
-/**
- * @file BivaccoDetails.vue
- * @description Visualizza informazioni dettagliate di un bivacco,
- * recensioni, risorse disponibili e pianificazione tragitto.
- */
+<!--
+  @file BivaccoDetails.vue
+  @description Scheda dettagliata del bivacco.
+  Mostra dati tecnici, risorse, meteo, pianificazione tragitto,
+  contatti di emergenza, legenda CAI, segnalazioni e recensioni.
+-->
 
 <script setup>
 import { reactive, ref, watch, computed } from 'vue'
 
 import {
   creaRecensione,
-  getRecensioni, 
+  getRecensioni,
   getToken
 } from '../services/api'
 
@@ -35,11 +36,6 @@ const emit = defineEmits(['route-calculated', 'clear-route', 'bivacco-updated'])
 
 const recensioni = ref([])
 const message = ref('')
-const nomeUtente = computed(() => {
-  if (!props.currentUser) return 'Escursionista'
-
-  return `${props.currentUser.nome || ''} ${props.currentUser.cognome || ''}`.trim() || 'Escursionista'
-})
 
 const recensioneForm = reactive({
   stelle: 5,
@@ -47,17 +43,50 @@ const recensioneForm = reactive({
   anonima: false
 })
 
+const mostrandoFormSegnalazione = ref(false)
+const segnalazioneDescrizione = ref('')
+const segnalazioneFoto = ref(null)
+const segnalazioneLoading = ref(false)
+const segnalazioneErrore = ref('')
+const segnalazioneSuccesso = ref('')
+
+const mostrandoStoricoStaff = ref(false)
+const storicoSegnalazioni = ref([])
+const storicoLoading = ref(false)
+
+/**
+ * Restituisce il nome da mostrare come autore della recensione.
+ *
+ * @returns {string} Nome utente oppure fallback generico.
+ */
+const nomeUtente = computed(() => {
+  if (!props.currentUser) return 'Escursionista'
+
+  return `${props.currentUser.nome || ''} ${props.currentUser.cognome || ''}`.trim() || 'Escursionista'
+})
+
+/**
+ * Verifica se l'utente corrente appartiene allo staff.
+ *
+ * @returns {boolean} True per SuperUser o SupportoTecnico.
+ */
+const isStaff = computed(() => {
+  if (!props.isLogged || !props.currentUser) return false
+
+  const role = props.currentUser.discriminator
+  return role === 'SuperUser' || role === 'SupportoTecnico'
+})
+
 /**
  * Recupera le recensioni associate al bivacco corrente.
  *
  * @returns {Promise<void>}
  */
-
 async function loadRecensioni() {
   try {
     recensioni.value = await getRecensioni(props.bivacco._id)
   } catch (error) {
-    console.error(error)
+    console.error('Errore caricamento recensioni:', error)
   }
 }
 
@@ -66,7 +95,6 @@ async function loadRecensioni() {
  *
  * @returns {Promise<void>}
  */
-
 async function submitRecensione() {
   if (!props.isLogged) {
     message.value = 'Accedi per lasciare una recensione.'
@@ -95,163 +123,161 @@ async function submitRecensione() {
   }
 }
 
-// —— STATO PER LA GESTIONE DELLA SEGNALAZIONE ——
-const mostrandoFormSegnalazione = ref(false)
-const segnalazioneDescrizione = ref('')
-const segnalazioneFoto = ref(null)
-const segnalazioneLoading = ref(false)
-const segnalazioneErrore = ref('')
-const segnalazioneSuccesso = ref('')
-
 /**
- * Gestisce la selezione del file immagine per la segnalazione
+ * Salva localmente il file immagine selezionato per la segnalazione.
+ *
+ * @param {Event} event - Evento change dell'input file.
+ * @returns {void}
  */
-const handleSegnalazioneFileChange = (e) => {
-  const file = e.target.files[0]
+function handleSegnalazioneFileChange(event) {
+  const file = event.target.files?.[0]
+
   if (file) {
     segnalazioneFoto.value = file
   }
 }
 
 /**
- * Esegue la chiamata multipart/form-data al backend
+ * Invia una segnalazione multipart/form-data al backend.
+ *
+ * @returns {Promise<void>}
  */
-const inviaSegnalazione = async () => {
+async function inviaSegnalazione() {
   segnalazioneErrore.value = ''
   segnalazioneSuccesso.value = ''
 
-  // Validazione locale (coerente con i vincoli del modello Mongoose)
   if (segnalazioneDescrizione.value.trim().length < 20) {
     segnalazioneErrore.value = 'La descrizione deve avere almeno 20 caratteri per essere specifica.'
     return
   }
+
   if (!segnalazioneFoto.value) {
     segnalazioneErrore.value = 'La foto della segnalazione è obbligatoria.'
     return
   }
+
   segnalazioneLoading.value = true
 
   try {
-    // Recupera il token JWT salvato durante l'autenticazione
     const token = getToken()
+
     if (!token) {
       throw new Error('Devi effettuare il login per inviare una segnalazione.')
     }
 
     const formData = new FormData()
-    formData.append('bivaccoId', props.bivacco._id) // Utilizza la prop esistente del bivacco
+    formData.append('bivaccoId', props.bivacco._id)
     formData.append('descrizione', segnalazioneDescrizione.value)
     formData.append('foto', segnalazioneFoto.value)
 
     const response = await fetch('http://localhost:5000/api/v1/segnalazioni', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${token}`
-        // Nota: Nessun Content-Type manuale, ci pensa il browser con FormData
+        Authorization: `Bearer ${token}`
       },
       body: formData
     })
 
-        const text = await response.text()
+    const text = await response.text()
     const data = text ? JSON.parse(text) : {}
 
     if (!response.ok) {
       throw new Error(data.errore || data.message || 'Impossibile inviare la segnalazione.')
     }
 
-    // Successo: reset dei campi del modulo
     segnalazioneSuccesso.value = 'Segnalazione inviata con successo al team di supporto!'
     segnalazioneDescrizione.value = ''
     segnalazioneFoto.value = null
-    
-    // Svuota l'input file nel DOM
+
     const fileInput = document.getElementById('segnalazione-file-input')
     if (fileInput) fileInput.value = ''
 
-    // Sfrutta l'emit già dichiarato nel tuo file per notificare che il bivacco ha subito modifiche/aggiornamenti
     emit('bivacco-updated')
-
-  } catch (err) {
-    segnalazioneErrore.value = err.message
-    } finally {
+  } catch (error) {
+    segnalazioneErrore.value = error.message
+  } finally {
     segnalazioneLoading.value = false
-    }
+  }
 }
 
 /**
- * Storico Segnalazioni per SuperUser e Supporto Tecnico
+ * Recupera le segnalazioni relative al bivacco corrente.
+ * La sezione è riservata a SuperUser e SupportoTecnico.
+ *
+ * @returns {Promise<void>}
  */
-
-const mostrandoStoricoStaff = ref(false)
-const storicoSegnalazioni = ref([])
-const storicoLoading = ref(false)
-
-/**
- * Computed property per verificare se l'utente corrente fa parte dello staff
- */
-const isStaff = computed(() => {
-  if (!props.isLogged || !props.currentUser) return false
-  const role = props.currentUser.discriminator
-  return role === 'SuperUser' || role === 'SupportoTecnico'
-})
-
-/**
- * Recupera le segnalazioni del bivacco corrente (endpoint protetto)
- */
-const loadStoricoSegnalazioni = async () => {
+async function loadStoricoSegnalazioni() {
   if (!isStaff.value) return
+
   storicoLoading.value = true
+
   try {
-    const token = localStorage.getItem('bivacs_token')
-    const response = await fetch(`/api/v1/segnalazioni/bivacco/${props.bivacco._id}`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
+    const token = getToken()
+
+    const response = await fetch(
+      `http://localhost:5000/api/v1/segnalazioni/bivacco/${props.bivacco._id}`,
+      {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
       }
-    })
-    if (response.ok) {
-      storicoSegnalazioni.value = await response.json()
+    )
+
+    if (!response.ok) {
+      storicoSegnalazioni.value = []
+      return
     }
+
+    storicoSegnalazioni.value = await response.json()
   } catch (error) {
-    console.error("Errore nel caricamento dello storico segnalazioni:", error)
+    console.error('Errore caricamento storico segnalazioni:', error)
+    storicoSegnalazioni.value = []
   } finally {
     storicoLoading.value = false
   }
 }
 
 /**
- * Formatta la stringa dello stato rendendola leggibile
+ * Formatta lo stato di una segnalazione in forma leggibile.
+ *
+ * @param {string} stato - Stato tecnico della segnalazione.
+ * @returns {string} Stato formattato.
  */
-const formattaStato = (stato) => {
-  if (!stato) return 'Inviata'
+function formattaStato(stato) {
+  if (!stato) return 'INVIATA'
+
   return stato.replace(/_/g, ' ').toUpperCase()
 }
 
 /**
  * Propaga il percorso calcolato al componente padre.
  *
- * @param {Object} res - Risultato percorso.
+ * @param {Object} routeResult - Risultato del calcolo percorso.
  * @returns {void}
  */
-
-function onRouteCalculated(res) {
-  emit('route-calculated', res)
+function onRouteCalculated(routeResult) {
+  emit('route-calculated', routeResult)
 }
 
+/**
+ * Propaga la richiesta di cancellazione percorso al componente padre.
+ *
+ * @returns {void}
+ */
 function onClearRoute() {
   emit('clear-route')
 }
 
 watch(
-  () => props.bivacco,
+  () => props.bivacco._id,
   () => {
     loadRecensioni()
-    //Carico storico segnalazioni se utente è parte dello Staff
+
     if (isStaff.value) {
       loadStoricoSegnalazioni()
     }
-    // Quando cambio bivacco, pulisco un eventuale tragitto precedente
+
     emit('clear-route')
   },
   { immediate: true }
@@ -263,6 +289,7 @@ watch(
     <header class="details-head">
       <p class="label">Scheda bivacco</p>
       <h2>{{ bivacco.nome }}</h2>
+
       <p class="zona-tag">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
@@ -272,9 +299,10 @@ watch(
       </p>
     </header>
 
-    <p v-if="message" class="toast">{{ message }}</p>
+    <p v-if="message" class="toast">
+      {{ message }}
+    </p>
 
-    <!-- Banner ticket aperti: visibile se ci sono segnalazioni attive sul bivacco (US24, RF18, RF36) -->
     <div v-if="bivacco.ticketAperti" class="ticket-banner">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
@@ -291,20 +319,22 @@ watch(
       </div>
     </div>
 
-    <!-- Quick facts grid -->
     <div class="facts">
       <div class="fact">
         <span class="fact-label">Quota</span>
         <strong class="mono">{{ bivacco.altitudine }} <small>m</small></strong>
       </div>
+
       <div class="fact">
         <span class="fact-label">Posti letto</span>
         <strong class="mono">{{ bivacco.postiLetto }}</strong>
       </div>
+
       <div class="fact">
         <span class="fact-label">Rating</span>
         <strong class="mono">{{ bivacco.mediaStelle || 0 }}<small>/5</small></strong>
       </div>
+
       <div class="fact">
         <span class="fact-label">Stato</span>
         <strong>
@@ -324,14 +354,13 @@ watch(
       </div>
     </div>
 
-    <!-- Meteo (US17, US19) -->
     <section class="section">
       <MeteoPanel :bivacco="bivacco" />
     </section>
 
-    <!-- Risorse -->
     <section class="section">
       <h3 class="section-title">Risorse disponibili</h3>
+
       <div class="resource-list">
         <div class="resource-row">
           <span>Acqua</span>
@@ -339,6 +368,7 @@ watch(
             {{ bivacco.acquaPresente ? 'Disponibile' : 'Non disponibile' }}
           </span>
         </div>
+
         <div class="resource-row">
           <span>Legna</span>
           <span :class="bivacco.legnaDisponibile ? 'res-ok' : 'res-ko'">
@@ -348,7 +378,6 @@ watch(
       </div>
     </section>
 
-    <!-- Pianificatore tragitto: sostituisce profilo altimetrico fisso + sezione GPX -->
     <section class="section">
       <TripPlanner
         :bivacco="bivacco"
@@ -357,7 +386,6 @@ watch(
       />
     </section>
 
-    <!-- Contatti emergenza -->
     <section class="section">
       <h3 class="section-title">Contatti di emergenza</h3>
 
@@ -379,9 +407,9 @@ watch(
       </div>
     </section>
 
-    <!-- Legenda CAI -->
     <section class="section">
       <h3 class="section-title">Legenda CAI</h3>
+
       <div class="cai-grid">
         <div class="cai-row"><span class="cai-code">T</span><span>Turistico</span></div>
         <div class="cai-row"><span class="cai-code">E</span><span>Escursionistico</span></div>
@@ -390,33 +418,64 @@ watch(
       </div>
     </section>
 
-    <!-- Segnalazione problemi -->
+    <section v-if="isStaff" class="section">
+      <h3 class="section-title">Storico segnalazioni staff</h3>
+
+      <button
+        type="button"
+        class="btn btn-ghost btn-block"
+        @click="mostrandoStoricoStaff = !mostrandoStoricoStaff"
+      >
+        {{ mostrandoStoricoStaff ? 'Nascondi storico' : 'Mostra storico segnalazioni' }}
+      </button>
+
+      <div v-if="mostrandoStoricoStaff" class="staff-history">
+        <p v-if="storicoLoading" class="empty">
+          Caricamento segnalazioni…
+        </p>
+
+        <div
+          v-for="segnalazione in storicoSegnalazioni"
+          v-else
+          :key="segnalazione._id"
+          class="staff-report"
+        >
+          <strong>{{ formattaStato(segnalazione.statoSegnalazione) }}</strong>
+          <p>{{ segnalazione.descrizione }}</p>
+          <small>{{ segnalazione.utenteId?.email || 'Utente non disponibile' }}</small>
+        </div>
+
+        <p v-if="!storicoLoading && storicoSegnalazioni.length === 0" class="empty">
+          Nessuna segnalazione per questo bivacco.
+        </p>
+      </div>
+    </section>
+
     <section class="section">
       <h3 class="section-title">Segnala un problema o un guasto</h3>
-      
+
       <div v-if="!isLogged" class="login-hint">
         Accedi per poter inviare una segnalazione sullo stato di questo bivacco.
       </div>
 
       <div v-else>
-        <button 
-          type="button" 
-          @click="mostrandoFormSegnalazione = !mostrandoFormSegnalazione" 
-          class="btn btn-block"
-          style="background: var(--bg-surface-2); border: 1px solid var(--border-subtle); color: var(--text-secondary); text-align: left; display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; margin-bottom: 12px;"
+        <button
+          type="button"
+          class="btn btn-ghost btn-block report-toggle"
+          @click="mostrandoFormSegnalazione = !mostrandoFormSegnalazione"
         >
-          <span>{{ mostrandoFormSegnalazione ? 'Chiudi modulo' : 'Invia una segnalazione per questo bivacco' }}</span>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" :style="{ transform: mostrandoFormSegnalazione ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }">
-            <polyline points="6 9 12 15 18 9"></polyline>
-          </svg>
+          <span>
+            {{ mostrandoFormSegnalazione ? 'Chiudi modulo' : 'Invia una segnalazione per questo bivacco' }}
+          </span>
+          <span>{{ mostrandoFormSegnalazione ? '▲' : '▼' }}</span>
         </button>
 
-        <div v-if="mostrandoFormSegnalazione" style="margin-top: 14px; display: flex; flex-direction: column; gap: 14px;">
-          
-          <p v-if="segnalazioneErrore" class="toast" style="background: var(--danger-bg); border-color: var(--danger-border); color: var(--danger); margin-bottom: 0;">
+        <div v-if="mostrandoFormSegnalazione" class="report-form-wrap">
+          <p v-if="segnalazioneErrore" class="toast toast-error">
             {{ segnalazioneErrore }}
           </p>
-          <p v-if="segnalazioneSuccesso" class="toast" style="background: var(--success-bg); border-color: var(--success-border); color: var(--success); margin-bottom: 0;">
+
+          <p v-if="segnalazioneSuccesso" class="toast toast-success">
             {{ segnalazioneSuccesso }}
           </p>
 
@@ -425,38 +484,43 @@ watch(
               <textarea
                 v-model="segnalazioneDescrizione"
                 class="textarea"
-                placeholder="Descrivi dettagliatamente il problema (es: infiltrazioni dal tetto, finestra rotta, rifiuti accumulati...). Minimo 20 caratteri."
+                placeholder="Descrivi dettagliatamente il problema. Minimo 20 caratteri."
                 required
               />
-              <div style="font-size: 11px; text-align: right; color: var(--text-tertiary); margin-top: 4px;">
+
+              <div class="counter">
                 Caratteri: {{ segnalazioneDescrizione.trim().length }}/20
               </div>
             </div>
 
-            <div style="display: flex; flex-direction: column; gap: 6px; background: var(--bg-surface-2); padding: 12px; border-radius: var(--r); border: 1px solid var(--border-subtle);">
-              <span style="font-size: 13px; color: var(--text-secondary); font-weight: 500;">Foto prova del danno (Obbligatoria) *</span>
-              <input 
+            <div class="file-box">
+              <span>Foto prova del danno obbligatoria *</span>
+
+              <input
                 id="segnalazione-file-input"
-                type="file" 
-                accept="image/*" 
-                @change="handleSegnalazioneFileChange"
-                style="font-size: 13px; color: var(--text-primary); cursor: pointer;"
+                type="file"
+                accept="image/*"
                 required
+                @change="handleSegnalazioneFileChange"
               />
             </div>
 
-            <button type="submit" :disabled="segnalazioneLoading" class="btn btn-primary btn-block" style="margin-top: 6px;">
-              {{ segnalazioneLoading ? 'Invio in corso...' : 'Invia Segnalazione' }}
+            <button
+              type="submit"
+              :disabled="segnalazioneLoading"
+              class="btn btn-primary btn-block"
+            >
+              {{ segnalazioneLoading ? 'Invio in corso...' : 'Invia segnalazione' }}
             </button>
           </form>
         </div>
       </div>
     </section>
 
-    <!-- Recensioni -->
     <section class="section">
-      <h3 class="section-title">Recensioni ({{ recensioni.length }})</h3>
-
+      <h3 class="section-title">
+        Recensioni <span class="mono">({{ recensioni.length }})</span>
+      </h3>
       <div v-if="!isLogged" class="login-hint">
         Accedi per lasciare una recensione.
       </div>
@@ -500,10 +564,18 @@ watch(
         >
           <div class="review-head">
             <strong>{{ recensione.utente }}</strong>
+
             <div class="stars">
-              <span v-for="n in 5" :key="n" :class="{ filled: n <= recensione.stelle }">★</span>
+              <span
+                v-for="n in 5"
+                :key="n"
+                :class="{ filled: n <= recensione.stelle }"
+              >
+                ★
+              </span>
             </div>
           </div>
+
           <p>{{ recensione.testo }}</p>
         </div>
 
@@ -547,7 +619,18 @@ watch(
   margin-bottom: 18px;
 }
 
-/* —— Quick facts —— */
+.toast-error {
+  background: var(--danger-bg);
+  border-color: var(--danger-border);
+  color: var(--danger);
+}
+
+.toast-success {
+  background: var(--success-bg);
+  border-color: rgba(52, 211, 153, 0.28);
+  color: var(--success);
+}
+
 .facts {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -594,14 +677,18 @@ watch(
   font-weight: 600;
   letter-spacing: 0.02em;
 }
-.status-ok { background: var(--success-bg); color: var(--success); }
+
+.status-ok {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
 .status-danger {
   background: var(--danger-bg);
   color: var(--danger);
   animation: pulseGlow 2s infinite;
 }
 
-/* —— Sections —— */
 .section {
   border-top: 1px solid var(--border-subtle);
   padding-top: 22px;
@@ -616,7 +703,6 @@ watch(
   letter-spacing: -0.01em;
 }
 
-/* —— Risorse —— */
 .resource-list {
   display: flex;
   flex-direction: column;
@@ -636,10 +722,15 @@ watch(
   color: var(--text-secondary);
 }
 
-.res-ok { color: var(--success); font-weight: 600; }
-.res-ko { color: var(--text-tertiary); }
+.res-ok {
+  color: var(--success);
+  font-weight: 600;
+}
 
-/* —— Legenda CAI —— */
+.res-ko {
+  color: var(--text-tertiary);
+}
+
 .cai-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -671,7 +762,6 @@ watch(
   font-weight: 600;
 }
 
-/* —— Review form —— */
 .review-form {
   display: flex;
   flex-direction: column;
@@ -721,7 +811,6 @@ watch(
   transform: rotate(45deg) translate(-1px, -1px);
 }
 
-/* —— Reviews list —— */
 .reviews {
   display: flex;
   flex-direction: column;
@@ -759,7 +848,10 @@ watch(
   font-size: 13px;
   color: var(--text-dim);
 }
-.stars .filled { color: #FBBF24; }
+
+.stars .filled {
+  color: #FBBF24;
+}
 
 .empty {
   text-align: center;
@@ -768,11 +860,6 @@ watch(
   padding: 20px;
   background: var(--bg-surface-2);
   border-radius: var(--r-md);
-}
-
-@media (max-width: 480px) {
-  .facts { grid-template-columns: 1fr; }
-  .cai-grid { grid-template-columns: 1fr; }
 }
 
 .emergency-grid {
@@ -806,16 +893,6 @@ watch(
 
 .emergency-wide {
   grid-column: 1 / -1;
-}
-
-@media (max-width: 480px) {
-  .emergency-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .emergency-wide {
-    grid-column: auto;
-  }
 }
 
 .login-hint {
@@ -865,5 +942,87 @@ watch(
   color: var(--text-secondary);
   font-size: 12px;
   line-height: 1.4;
+}
+
+.report-toggle {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.report-form-wrap {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.counter {
+  font-size: 11px;
+  text-align: right;
+  color: var(--text-tertiary);
+  margin-top: 4px;
+}
+
+.file-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--bg-surface-2);
+  padding: 12px;
+  border-radius: var(--r);
+  border: 1px solid var(--border-subtle);
+}
+
+.file-box span {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.file-box input {
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.staff-history {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.staff-report {
+  padding: 12px;
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r);
+}
+
+.staff-report strong {
+  color: var(--warning);
+  font-size: 12px;
+}
+
+.staff-report p {
+  font-size: 13px;
+  margin: 4px 0;
+}
+
+.staff-report small {
+  color: var(--text-tertiary);
+}
+
+@media (max-width: 480px) {
+  .facts,
+  .cai-grid,
+  .emergency-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .emergency-wide {
+    grid-column: auto;
+  }
 }
 </style>

@@ -1,7 +1,7 @@
-/**
- * @file BivaccoMap.vue
- * @description Visualizzazione mappa interattiva Leaflet dei bivacchi.
- */
+<!--
+ @file BivaccoMap.vue
+ @description Visualizzazione mappa interattiva Leaflet dei bivacchi.
+-->
 
 <script setup>
 import { onMounted, onBeforeUnmount, watch, ref, nextTick } from 'vue'
@@ -100,7 +100,7 @@ function renderMarkers() {
 
 
     if (lat < 45.6 || lat > 46.6 || lng < 10.4 || lng > 12.0) {
-    console.warn('Coordinate sospette per bivacco:', bivacco.nome, {
+      console.warn('Coordinate sospette per bivacco:', bivacco.nome, {
       latitudine: lat,
       longitudine: lng
     })

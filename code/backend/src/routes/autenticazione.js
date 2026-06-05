@@ -1,316 +1,357 @@
 /**
  * @file autenticazione.js
- * @description file che gestisce tutte le operazioni inerenti alla
- * registrazione, autorizzazione e login del profilo
+ * @description Route Express per registrazione, login, verifica email,
+ * recupero password e reinvio della mail di verifica.
  */
 
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+
 const Utente = require('../models/utente');
 const UtenteRegistrato = require('../models/utenteRegistrato');
-const {protectRoute} = require('../middlewares/authMiddleware')
+const { protectRoute } = require('../middlewares/authMiddleware');
 const inviaEmail = require('../utils/emailService');
 const getNewSequence = require('../utils/getNewSequence');
-const crypto = require('crypto');
+
 const router = express.Router();
 
 /**
- * Registra un nuovo utente nel Database.
- * * Controlla che i campi obbligatori siano presenti, verifica che l'email
- * non sia già in uso, esegue l'hashing della password e salva il nuovo
- * UtenteRegistrato nel database.
- * * @route POST /api/v1/auth/register
- * @param {import('express').Request} req - Oggetto richiesta HTTP. Il body deve contenere: id, nome, cognome, email, password, dataNascita.
- * @param {import('express').Response} res - Oggetto risposta HTTP.
- * @returns {Promise<void>} JSON con messaggio di successo e i dati base dell'utente, oppure un messaggio di errore.
+ * Registra un nuovo utente registrato.
+ *
+ * @route POST /api/v1/auth/register
  */
 router.post('/register', async (req, res) => {
-    console.log('Dati in arrivo da postman:', req.body);
+  try {
+    const { nome, cognome, email, password, dataNascita } = req.body;
 
-    try { 
-        // estrazione dati dal body 
-        const { nome, cognome, email, password, dataNascita } = req.body;
-
-        // controllo dei campi obbligatori
-        if (!nome || !cognome || !email || !password || !dataNascita) {
-            return res.status(400).json({ errore: 'Tutti i campi sono obbligatori' });
-        }
-
-        // controllo lunghezza password 
-        if (password.length < 8){
-            return res.status(400).json({ errore: 'La password deve contenente almeno 8 carateri'});
-        }
-
-        // controllo mail nel Database
-        const utenteEsistente = await UtenteRegistrato.findOne({ email: email });
-        if (utenteEsistente) { 
-            return res.status(409).json({ errore: 'Esiste già un account con questa mail' });
-        }
-
-
-        // hashing della password 
-        const saltRounds = 12;
-        const hashedPassword = await bcrypt.hash(password, saltRounds);
-        const verificaToken = crypto.randomBytes(32).toString('hex');
-
-        const idAggiornato = await getNewSequence('utendeId');
-
-        // creazione istanza UtenteRegistrato
-        const nuovoUtente = new UtenteRegistrato({
-            id: idAggiornato, 
-            nome: nome, 
-            cognome: cognome, 
-            email: email, 
-            passwordHash: hashedPassword,
-            dataNascita: new Date(dataNascita), 
-            emailToken: verificaToken, 
-            isVerified: false
-        });
-        await nuovoUtente.save();
-
-        /**
-         * creazione della mail da inviare automaticamente
-         * mediante il servizio "inviaEmail"
-         */
-        const linkVerifica = `http://localhost:5000/api/v1/auth/verify-email?token=${verificaToken}`;
-        const htmlContent = `
-            <h1>Benvenuto su Bivacs!</h1>
-            <p>Ciao ${nome}, clicca sul pulsante qui sotto per confermare la tua email:</p>
-            <a href="${linkVerifica}" style="background: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
-                Conferma account
-            </a>
-        `;
-        await inviaEmail(email, "Benvenuto! Conferma la tua email", htmlContent); 
-
-        res.status(201).json({
-            message: 'Utente registrato con successo', 
-            utente: {
-                id: nuovoUtente.id, 
-                nome: nuovoUtente.nome,
-                cognome: nuovoUtente.cognome,
-                email: nuovoUtente.email, 
-                discriminator: nuovoUtente.discriminator
-            }
-        });
-    } catch (error) {
-        console.error('Errore durante la registrazione:', error);
-
-        if (error.name === 'ValidationError') {
-            return res.status(400).json({ errore: error.message });
-        }
-
-        res.status(500).json({ errore: 'Errore interno del server' });
+    if (!nome || !cognome || !email || !password || !dataNascita) {
+      return res.status(400).json({
+        errore: 'Tutti i campi sono obbligatori'
+      });
     }
+
+    if (password.length < 8) {
+      return res.status(400).json({
+        errore: 'La password deve contenere almeno 8 caratteri'
+      });
+    }
+
+    const utenteEsistente = await Utente.findOne({ email });
+
+    if (utenteEsistente) {
+      return res.status(409).json({
+        errore: 'Esiste già un account con questa mail'
+      });
+    }
+
+    const saltRounds = 12;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+    const verificaToken = crypto.randomBytes(32).toString('hex');
+    const idAggiornato = await getNewSequence('utenteId');
+
+    const nuovoUtente = new UtenteRegistrato({
+      id: idAggiornato,
+      nome,
+      cognome,
+      email,
+      passwordHash: hashedPassword,
+      dataNascita: new Date(dataNascita),
+      emailToken: verificaToken,
+      isVerified: false,
+      discriminator: 'UtenteRegistrato'
+    });
+
+    await nuovoUtente.save();
+
+    const linkVerifica = `http://localhost:5000/api/v1/auth/verify-email?token=${verificaToken}`;
+    const htmlContent = `
+      <h1>Benvenuto su Bivacs!</h1>
+      <p>Ciao ${nome}, clicca sul pulsante qui sotto per confermare la tua email:</p>
+      <a href="${linkVerifica}" style="background:#4CAF50;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;">
+        Conferma account
+      </a>
+    `;
+
+    await inviaEmail(email, 'Benvenuto! Conferma la tua email', htmlContent);
+
+    res.status(201).json({
+      message: 'Utente registrato con successo',
+      utente: {
+        id: nuovoUtente.id,
+        nome: nuovoUtente.nome,
+        cognome: nuovoUtente.cognome,
+        email: nuovoUtente.email,
+        discriminator: nuovoUtente.discriminator
+      }
+    });
+  } catch (error) {
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({
+        errore: error.message
+      });
+    }
+
+    res.status(500).json({
+      errore: 'Errore interno del server'
+    });
+  }
 });
 
 /**
- * Effettua il login di un utente esistente.
- * * Riceve email e password, cerca l'utente nel DB 
- * e confronta la password con l'hash salvato. 
- * In caso di successo genera un token JWT valido per 2 ore.
- * * @route POST /api/v1/auth/login
- * @param {import('express').Request} req - Oggetto richiesta HTTP. Il body deve contenere: email, password.
- * @param {import('express').Response} res - Oggetto risposta HTTP.
- * @returns {Promise<void>} JSON contenente il Token JWT se le credenziali sono valide, oppure un errore 400/401.
+ * Effettua il login di un utente verificato.
+ *
+ * @route POST /api/v1/auth/login
  */
 router.post('/login', async (req, res) => {
-    try {
-        const { email, password } = req.body;
+  try {
+    const { email, password } = req.body;
 
-        if (!email || !password) {
-            return res.status(400).json({ errore: 'Email e password obbligatorie' });
-        }
-        
-        const utenteTrovato = await Utente.findOne({ email: email });
-        
-        if (!utenteTrovato) {
-            return res.status(404).json({
-                errore: 'Utente non trovato, si prega di registrarsi.',
-                codiceErrore: 'UTENTE_NON_TROVATO' 
-            });
-        }
-        
-        console.log('Email trovata nel Database: ', utenteTrovato.email);
-
-        if (!utenteTrovato.isVerified){
-            return res.status(403).json({
-                errore: 'Devi verificare la tua mail prima di poter accedere',
-                codiceErrore: 'EMAIL_NON_VERIFICATA'
-            });
-        }
-
-        // confronto password in chiaro con hashing nel Database
-        const verifica = await bcrypt.compare(password, utenteTrovato.passwordHash);
-        if (!verifica) {
-            return res.status(401).json({ errore: 'Credenziali non valide' });
-        }
-
-        // generazione token JWT
-        const Dati = {
-            id: utenteTrovato.id, 
-            mongoId: utenteTrovato._id, 
-            discriminator: utenteTrovato.discriminator
-        };
-
-        const token = jwt.sign(Dati, process.env.JWT_SECRET, { expiresIn: '2h' });
-
-        res.status(200).json({
-            messaggio: 'Login effettuato con successo',
-            token: token
-        });
-    } catch (error) {
-        console.error('Errore durante il login:', error);
-        res.status(500).json({ errore: 'Errore interno del server' });
+    if (!email || !password) {
+      return res.status(400).json({
+        errore: 'Email e password obbligatorie'
+      });
     }
+
+    const utenteTrovato = await Utente.findOne({ email });
+
+    if (!utenteTrovato) {
+      return res.status(404).json({
+        errore: 'Utente non trovato, si prega di registrarsi.',
+        codiceErrore: 'UTENTE_NON_TROVATO'
+      });
+    }
+
+    if (!utenteTrovato.isVerified) {
+      return res.status(403).json({
+        errore: 'Devi verificare la tua mail prima di poter accedere',
+        codiceErrore: 'EMAIL_NON_VERIFICATA'
+      });
+    }
+
+    const passwordCorretta = await bcrypt.compare(password, utenteTrovato.passwordHash);
+
+    if (!passwordCorretta) {
+      return res.status(401).json({
+        errore: 'Credenziali non valide'
+      });
+    }
+
+    const payload = {
+      id: utenteTrovato.id,
+      mongoId: utenteTrovato._id,
+      discriminator: utenteTrovato.discriminator
+    };
+
+    const token = jwt.sign(payload, process.env.JWT_SECRET, {
+      expiresIn: '2h'
+    });
+
+    res.status(200).json({
+      messaggio: 'Login effettuato con successo',
+      token
+    });
+  } catch (error) {
+    res.status(500).json({
+      errore: 'Errore interno del server'
+    });
+  }
 });
 
 /**
- * Verifica l'email dell'utente confrontando il token presente nell'URL:
- * se il token è valido, imposta l'utente come verificato e rimuove il token dal DB.
+ * Verifica l'indirizzo email tramite token ricevuto via mail.
+ *
  * @route GET /api/v1/auth/verify-email
- * @param {import('express').Request} req
- * @param {import('express').Response} res
  */
 router.get('/verify-email', async (req, res) => {
-    try {
-        const tokenSporco = req.query.token;
+  try {
+    const tokenSporco = req.query.token;
 
-        if (!tokenSporco){
-            return res.redirect('http://localhost:5173/?verificato=false&motivo=notoken');
-        }
-
-        const tokenUrl = tokenSporco.replace(/['"]/g, '');
-        console.log("Token ricevuto da URL: ", tokenUrl);
-        const utente = await UtenteRegistrato.findOne({ emailToken: tokenUrl });
-
-        if (!utente) {
-            return res.redirect('http://localhost:5173/?verificato=false');
-        }
-
-        // Account attivato
-        utente.isVerified = true;
-        utente.emailToken = null; 
-        await utente.save();
-
-        return res.redirect('http://localhost:5173/?verificato=true');
-
-    } catch (error) {
-        console.error('Errore durante la verifica dell\'email:', error);
-        return res.redirect('http://localhost:5173/?verificato=false&motivo=servererror');
+    if (!tokenSporco || typeof tokenSporco !== 'string') {
+      return res.redirect('http://localhost:5173/?verificato=false&motivo=notoken');
     }
+
+    const tokenUrl = tokenSporco.replace(/['"]/g, '');
+    const utente = await UtenteRegistrato.findOne({ emailToken: tokenUrl });
+
+    if (!utente) {
+      return res.redirect('http://localhost:5173/?verificato=false');
+    }
+
+    utente.isVerified = true;
+    utente.emailToken = undefined;
+
+    await utente.save();
+
+    return res.redirect('http://localhost:5173/?verificato=true');
+  } catch (error) {
+    return res.redirect('http://localhost:5173/?verificato=false&motivo=servererror');
+  }
 });
 
 /**
- * Necessario per la fase di testing: rotta di prova
+ * Route di test per verificare la validità del token JWT.
+ *
+ * @route GET /api/v1/auth/profilo-test
  */
-router.get('/profilo-test',protectRoute, (req, res) =>{
-    res.status(200).json({
-        messaggio: 'Accesso consentito! Token valido.', 
-        dati_utente_token: req.utente
-    });
+router.get('/profilo-test', protectRoute, (req, res) => {
+  res.status(200).json({
+    messaggio: 'Accesso consentito. Token valido.',
+    datiUtenteToken: req.utente
+  });
 });
 
 /**
- * Genera un token di reset e invia la mail all'utente.
- * @route POST /api/v1/auth/forgot-password
+ * Genera un token di recupero password e lo invia via email.
+ *
+ * @route POST /api/v1/auth/recupero_password
  */
 router.post('/recupero_password', async (req, res) => {
+  try {
     const { email } = req.body;
-    try {
-        const utente = await Utente.findOne({ email });
-        if (!utente) return res.status(404).json({ errore: "Email non trovata" });
 
-        const resetToken = crypto.randomBytes(32).toString('hex');
-        utente.resetPassToken = resetToken;
-        utente.resetPassExpires = Date.now() + 3600000; // 1 ora da adesso
-        await utente.save();
-
-        const linkReset = `http://localhost:5173/?reset=${resetToken}`; // Link che porterà al frontend
-        await inviaEmail(email, "Recupero Password Bivacs", `Clicca qui per resettare: ${linkReset}`);
-
-        res.json({ messaggio: "Email di recupero inviata!" });
-    } catch (error) {
-        res.status(500).json({ errore: "Errore nel reset password" });
+    if (!email) {
+      return res.status(400).json({
+        errore: 'Email obbligatoria'
+      });
     }
+
+    const utente = await Utente.findOne({ email });
+
+    if (!utente) {
+      return res.status(404).json({
+        errore: 'Email non trovata'
+      });
+    }
+
+    const resetToken = crypto.randomBytes(32).toString('hex');
+
+    utente.resetPassToken = resetToken;
+    utente.resetPassExpires = Date.now() + 3600000;
+
+    await utente.save();
+
+    const linkReset = `http://localhost:5173/?reset=${resetToken}`;
+
+    await inviaEmail(
+      email,
+      'Recupero Password Bivacs',
+      `<p>Clicca sul seguente link per reimpostare la password:</p><a href="${linkReset}">${linkReset}</a>`
+    );
+
+    res.status(200).json({
+      messaggio: 'Email di recupero inviata'
+    });
+  } catch (error) {
+    res.status(500).json({
+      errore: 'Errore nel reset password'
+    });
+  }
 });
 
 /**
- * Endpoint per impostare la nuova password usando il token ricevuto via mail
+ * Imposta una nuova password usando il token ricevuto via email.
+ *
  * @route POST /api/v1/auth/reset-password/:token
  */
 router.post('/reset-password/:token', async (req, res) => {
-    try {
-        const { token } = req.params;
-        const { nuovaPassword } = req.body;
+  try {
+    const { token } = req.params;
+    const { nuovaPassword } = req.body;
 
-        // controllo aggiuntivo: il token su resetPassExpires non deve essere scaduto
-        const utente = await Utente.findOne({
-            resetPassToken: token,
-            resetPassExpires: { $gt: Date.now() }
-        });
-
-        if (!utente) {
-            return res.status(400).json({ errore: "Token non valido o scaduto." });
-        }
-
-        const saltRounds = 12;
-        const hashedPassword = await bcrypt.hash(nuovaPassword, saltRounds);
-
-        // aggiornamento della password e reset dei token
-        utente.passwordHash = hashedPassword;
-        utente.resetPassToken = undefined;
-        utente.resetPassExpires = undefined;
-
-        await utente.save();
-
-        res.status(200).json({ messaggio: "Password aggiornata con successo! Ora puoi effettuare il login." });
-    } catch (error) {
-        console.error("Errore nel reset password:", error);
-        res.status(500).json({ errore: "Errore interno del server" });
+    if (!nuovaPassword || nuovaPassword.length < 8) {
+      return res.status(400).json({
+        errore: 'La nuova password deve contenere almeno 8 caratteri'
+      });
     }
+
+    const utente = await Utente.findOne({
+      resetPassToken: token,
+      resetPassExpires: { $gt: Date.now() }
+    });
+
+    if (!utente) {
+      return res.status(400).json({
+        errore: 'Token non valido o scaduto.'
+      });
+    }
+
+    const saltRounds = 12;
+
+    utente.passwordHash = await bcrypt.hash(nuovaPassword, saltRounds);
+    utente.resetPassToken = undefined;
+    utente.resetPassExpires = undefined;
+
+    await utente.save();
+
+    res.status(200).json({
+      messaggio: 'Password aggiornata con successo. Ora puoi effettuare il login.'
+    });
+  } catch (error) {
+    res.status(500).json({
+      errore: 'Errore interno del server'
+    });
+  }
 });
 
+/**
+ * Reinvia la mail di verifica a un account non ancora confermato.
+ *
+ * @route POST /api/v1/auth/resend-verification
+ */
 router.post('/resend-verification', async (req, res) => {
-    try {
-        const { email } = req.body;
+  try {
+    const { email } = req.body;
 
-        if (!email) {
-            return res.status(400).json({ errore: 'Email obbligatoria' });
-        }
-
-        const utente = await Utente.findOne({ email });
-
-        if (!utente) {
-            return res.status(404).json({ errore: 'Utente non trovato' });
-        }
-
-        if (utente.isVerified) {
-            return res.status(400).json({ errore: 'Account già verificato' });
-        }
-
-        const nuovoToken = crypto.randomBytes(32).toString('hex');
-        utente.emailToken = nuovoToken;
-        await utente.save();
-
-        const linkVerifica = `http://localhost:5000/api/v1/auth/verify-email?token=${nuovoToken}`;
-
-        await inviaEmail(
-            email,
-            'Conferma email Bivacs',
-            `
-            <h1>Conferma il tuo account Bivacs</h1>
-            <p>Clicca sul pulsante per verificare la tua email:</p>
-            <a href="${linkVerifica}" style="background:#4CAF50;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;">
-                Conferma account
-            </a>
-            `
-        );
-
-        res.status(200).json({ messaggio: 'Email di verifica inviata nuovamente' });
-    } catch (error) {
-        res.status(500).json({ errore: 'Errore invio nuova email di verifica' });
+    if (!email) {
+      return res.status(400).json({
+        errore: 'Email obbligatoria'
+      });
     }
+
+    const utente = await Utente.findOne({ email });
+
+    if (!utente) {
+      return res.status(404).json({
+        errore: 'Utente non trovato'
+      });
+    }
+
+    if (utente.isVerified) {
+      return res.status(400).json({
+        errore: 'Account già verificato'
+      });
+    }
+
+    const nuovoToken = crypto.randomBytes(32).toString('hex');
+
+    utente.emailToken = nuovoToken;
+
+    await utente.save();
+
+    const linkVerifica = `http://localhost:5000/api/v1/auth/verify-email?token=${nuovoToken}`;
+
+    await inviaEmail(
+      email,
+      'Conferma email Bivacs',
+      `
+        <h1>Conferma il tuo account Bivacs</h1>
+        <p>Clicca sul pulsante per verificare la tua email:</p>
+        <a href="${linkVerifica}" style="background:#4CAF50;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;">
+          Conferma account
+        </a>
+      `
+    );
+
+    res.status(200).json({
+      messaggio: 'Email di verifica inviata nuovamente'
+    });
+  } catch (error) {
+    res.status(500).json({
+      errore: 'Errore invio nuova email di verifica'
+    });
+  }
 });
 
 module.exports = router;

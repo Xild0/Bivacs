@@ -1,46 +1,53 @@
 /**
  * @file percorso.js
  * @description Modello Mongoose per i percorsi GPX associati ai bivacchi.
- * Include file GPX, lunghezza, dislivello, difficoltà CAI e durata stimata.
+ * Memorizza il file GPX, i dati altimetrici, la difficoltà CAI,
+ * la lunghezza stimata e il riferimento al bivacco.
  */
 
 const mongoose = require('mongoose');
 
-const percorsoSchema = new mongoose.Schema({
+const percorsoSchema = new mongoose.Schema(
+  {
     id: {
-        type: Number,
-        required: [true, 'L\'ID del percorso è obbligatorio']
+      type: Number,
+      required: [true, "L'ID del percorso è obbligatorio"]
     },
     bivacco: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Bivacco',
-        required: [true, 'Il riferimento al bivacco è obbligatorio']
-    },
-    tipo: {
-        type: String,
-        enum: ['ottimale', 'panoramico'],
-        default: 'ottimale'
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Bivacco',
+      required: [true, 'Il riferimento al bivacco è obbligatorio']
     },
     gpxFile: {
-        type: String,
-        required: [true, 'Il file del percorso è obbligatorio']
+      type: String,
+      required: [true, 'Il file GPX del percorso è obbligatorio']
     },
     dislivello: {
-        type: Number,
-        required: [true, 'Dislivello obbligatorio']
+      type: Number,
+      default: 0
     },
     difficolta: {
-        type: String,
-        enum: ['T', 'E', 'EE', 'EEA']
+      type: String,
+      enum: ['T', 'E', 'EE', 'EEA'],
+      default: 'E'
     },
     lunghezza: {
-        type: Number,
-        required: [true, 'La lunghezza del percorso è obbligatoria']
+      type: Number,
+      default: 0
     },
     durataStimata: {
-        type: Number,
-        required: [true, 'La durata stimata è obbligatoria']
+      type: Number,
+      default: 0
+    },
+    tipo: {
+      type: String,
+      enum: ['ottimale', 'panoramico', 'sat', 'fallback'],
+      default: 'sat'
     }
-}, { timestamps: true });
+  },
+  {
+    timestamps: true
+  }
+);
 
 module.exports = mongoose.model('Percorso', percorsoSchema);

@@ -1,7 +1,7 @@
-/**
- * @file Filters.vue
- * @description Pannello filtri per ricerca bivacchi.
- */
+<!--
+ @file Filters.vue
+ @description Pannello filtri per ricerca bivacchi.
+-->
 
 <script setup>
 import { reactive, computed } from 'vue'
