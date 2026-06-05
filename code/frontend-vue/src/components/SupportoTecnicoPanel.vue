@@ -333,36 +333,22 @@ const handleEsportaCSV = async () => {
 };
 
 /**
- * @description Inizializza i dati nel pannello di supporto 
+ * @description Inizializza i dati nel pannello di supporto
  */
 onMounted(async () => {
   loading.value = true
-async function handleCambioStato(idSegnalazione, nuovoStato) {
   try {
-    loading.value = true
-    message.value = ''
-    await aggiornaStatoSegnalazione(idSegnalazione, nuovoStato)
-    const idx = segnalazioniStaff.value.findIndex(s => s._id === idSegnalazione)
-    if (idx !== -1) {
-      segnalazioniStaff.value[idx].statoSegnalazione = nuovoStato
-    }
-    message.value = 'Stato della segnalazione modificato con successo.'
-    messageType.value = 'success'
+    loadSupportoData() 
+    await caricaTicket()
+    await caricaSegnalazioni()
   } catch (error) {
-    message.value = error.message || 'Errore durante la modifica dello stato.'
-    messageType.value = 'danger'
+    console.error("Errore durante il caricamento dei dati del pannello:", error)
+    message.value = "Impossibile caricare alcuni dati del pannello di supporto"      // degub: mostra errore a schermo
+    messageType.value = "danger"
   } finally {
     loading.value = false
   }
-}
-
-onMounted(() => {
-  loadSupportoData()
-  await caricaTicket()
-  await caricaSegnalazioni()
-  loading.value = false
 })
-
 
 </script>
 

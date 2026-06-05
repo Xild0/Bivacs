@@ -756,7 +756,7 @@ export async function richiediSupportoTecnico(data) {
  * @returns {Promise<Object>} - Risposta server
  */
 export const richiediSuperUser = async (data) => {
-  const token = localStorage.getItem('token')
+  const token = localStorage.getItem('bivacs_token')
   const resp = await fetch(`${API_URL}/profilo/richiedi-super-user`, {
     method: 'POST',
     headers: {
@@ -833,7 +833,7 @@ export async function scaricaAutoGpxBivacco(bivaccoId, suggestedName = 'percorso
  * @returns {Promise<Object>} - Risposta del server
  */
 export const attivaEmergenza = async (bivaccoId, note) => {
-  const token = localStorage.getItem('token')
+  const token = localStorage.getItem('bivacs_token')
   const response = await fetch(`${API_URL}/bivacchi/${bivaccoId}/emergenza`, {
     method: 'POST', 
     headers:{
@@ -852,7 +852,7 @@ export const attivaEmergenza = async (bivaccoId, note) => {
  * @returns {Promise<Object>} - Risposta del server
  */
 export const revocaEmergenza = async (bivaccoId) => {
-  const token = localStorage.getItem('token')
+  const token = localStorage.getItem('bivacs_token')
   const response = await fetch(`${API_URL}/bivacchi/${bivaccoId}/revoca-emergenza`, {
     method: 'POST',
     headers: {
@@ -888,7 +888,7 @@ export const getCodaTicket = async () => {
  * @returns {Promise<Object>} Ticket aggiornato
  */
 export const aggiornaStatoTicket = async (ticketId, stato) => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('bivacs_token');
     const response = await fetch(`${API_URL}/supporto/ticket/${ticketId}/stato`, {
         method: 'PATCH',
         headers: { 
@@ -907,7 +907,7 @@ export const aggiornaStatoTicket = async (ticketId, stato) => {
  * @returns {Promise<Object>} Esito operazione
  */
 export const archiviaTicket = async (ticketId) => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('bivacs_token');
     const response = await fetch(`${API_URL}/supporto/ticket/${ticketId}/archivia`, {
         method: 'PATCH',
         headers: {'Authorization': `Bearer ${token}`}
@@ -921,7 +921,7 @@ export const archiviaTicket = async (ticketId) => {
  * @returns {Promise<Array>} Array delle segnalazioni
  */
 export const getSegnalazioniDaGestire = async () => {
-    const token = localStorage.getItem('bvacs_token');
+    const token = localStorage.getItem('bivacs_token');
     const response = await fetch(`${API_URL}/supporto/segnalazioni`, {
         headers: {'Authorization': `Bearer ${token}`}
     });
@@ -936,7 +936,7 @@ export const getSegnalazioniDaGestire = async () => {
  * @returns {Promise<Object>} Ticket creato
  */
 export const generaTicketDaSegnalazione = async (segnalazioneId, priority) => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('bivacs_token');
     const response = await fetch(`${API_URL}/supporto/ticket`, {
         method: 'POST',
         headers: { 
