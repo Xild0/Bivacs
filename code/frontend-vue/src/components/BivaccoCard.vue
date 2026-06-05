@@ -1,12 +1,11 @@
-/**
- * @file BivaccoCard.vue
- * @description Card riassuntiva di un bivacco mostrata nei risultati ricerca.
- */
+<!--
+ @file BivaccoCard.vue
+ @description Card riassuntiva di un bivacco mostrata nei risultati ricerca.
+-->
 
 <script setup>
 import { ref, computed } from 'vue'
 import { aggiungiPreferito, rimuoviPreferito } from '../services/api'
-import { getMeteoBivacco } from '../services/api'
 
 const props = defineProps({
   bivacco: { type: Object, required: true },
@@ -18,7 +17,8 @@ const props = defineProps({
 const emit = defineEmits(['open', 'favorite-changed'])
 
 /**
- * Genera le iniziali del nome del bivacco.
+ * Calcola il monogramma del bivacco utilizzando le prime lettere
+ * delle prime due parole del nome.
  */
 
 const initials = computed(() => {
@@ -27,7 +27,8 @@ const initials = computed(() => {
 })
 
 /**
- * Genera un colore deterministico per la card del bivacco.
+ * Calcola una tonalità deterministica basata sul nome del bivacco.
+ * Utilizzata per personalizzare il gradiente dell'intestazione.
  */
 
 const hue = computed(() => {

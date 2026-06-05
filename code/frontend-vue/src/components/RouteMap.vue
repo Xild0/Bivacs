@@ -1,3 +1,10 @@
+<!--
+  @file RouteMap.vue
+  @description Visualizzazione Leaflet del percorso verso il bivacco.
+  Mostra il tragitto dinamico, il tracciato ufficiale GPX,
+  il punto di partenza e il punto di arrivo.
+-->
+  
 <script setup>
 import { onMounted, onBeforeUnmount, ref, nextTick, watch } from 'vue'
 import L from 'leaflet'
@@ -15,6 +22,12 @@ const mapEl = ref(null)
 let map = null
 let routeLayer = null
 
+/**
+ * Crea l'icona Leaflet che rappresenta il punto di partenza.
+ *
+ * @returns {L.DivIcon} Icona personalizzata del punto di partenza.
+ */
+
 function makeStartIcon() {
   return L.divIcon({
     html: `
@@ -30,6 +43,12 @@ function makeStartIcon() {
   })
 }
 
+/**
+ * Crea l'icona Leaflet che rappresenta il punto di arrivo.
+ *
+ * @returns {L.DivIcon} Icona personalizzata del punto di arrivo.
+ */
+
 function makeEndIcon() {
   return L.divIcon({
     html: `
@@ -44,6 +63,14 @@ function makeEndIcon() {
     iconAnchor: [17, 17]
   })
 }
+
+/**
+ * Disegna il percorso sulla mappa.
+ * Mostra il tracciato ufficiale GPX come riferimento e il percorso
+ * dinamico calcolato tramite OpenRouteService.
+ *
+ * @returns {void}
+ */
 
 function renderRoute() {
   if (!map) return
@@ -105,6 +132,10 @@ function renderRoute() {
   }
 }
 
+/**
+ * Inizializza la mappa Leaflet e carica il percorso.
+ */
+
 onMounted(async () => {
   await nextTick()
 
@@ -123,11 +154,20 @@ onMounted(async () => {
   setTimeout(() => map?.invalidateSize(), 300)
 })
 
+/**
+ * Aggiorna automaticamente la mappa quando cambiano
+ * il percorso dinamico o il tracciato ufficiale.
+ */
+
 watch(
   () => [props.routeCoords, props.officialTrailCoords],
   () => renderRoute(),
   { deep: true }
 )
+
+/**
+ * Rilascia le risorse Leaflet alla chiusura del componente.
+ */
 
 onBeforeUnmount(() => {
   if (map) {

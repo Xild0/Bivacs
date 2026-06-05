@@ -1,8 +1,8 @@
-/**
- * @file Navbar.vue
- * @description Barra di navigazione principale dell'applicazione.
- * Mostra accesso/profilo, pulsante SOS e cambia stile durante lo scroll.
- */
+<!--
+ @file Navbar.vue
+ @description Barra di navigazione principale dell'applicazione.
+ Mostra accesso/profilo, pulsante SOS e cambia stile durante lo scroll.
+-->
 
 <script setup>
 import { onMounted, onUnmounted, ref } from 'vue'

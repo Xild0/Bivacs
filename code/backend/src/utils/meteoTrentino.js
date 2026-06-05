@@ -2,10 +2,7 @@
  * @file meteoTrentino.js
  * @description Integrazione con le API open data di MeteoTrentino.
  * Trova la stazione meteo più vicina a un bivacco e ne legge le ultime osservazioni.
- *
- * I punti marcati [VERIFICA] vanno confrontati con una risposta reale dell'API
- * (vedi i comandi curl nella chat) prima di considerare l'integrazione definitiva.
- */
+ **/
 
 const { XMLParser } = require('fast-xml-parser')
 
@@ -42,8 +39,6 @@ async function getStazioni() {
   const xml = await res.text()
   const data = parser.parse(xml)
 
-  // [VERIFICA 1] percorso verso l'array stazioni e nomi dei campi
-  // (atteso: anagrafica > statale[] con codice/nome/latitudine/longitudine)
   let stazioni = data?.anagrafica?.statale || []
   if (!Array.isArray(stazioni)) stazioni = [stazioni]
 
@@ -95,10 +90,10 @@ async function getUltimiDati(codice) {
   const data = parser.parse(xml)
   const root = data?.ultimiDati || {}
 
-  // [VERIFICA 2] nomi dei blocchi di serie e dei campi numerici
+  
   const temperatura = ultimoCampione(root.temperatura_aria, 'temperatura')
 
-  // [VERIFICA 3] MeteoTrentino dà spesso il vento in m/s: converto in km/h (×3.6).
+  
   // Se la risposta è già in km/h, togli il *3.6.
   const ventoRaw = ultimoCampione(root.vento, 'velocita')
   const vento = ventoRaw != null ? ventoRaw * 3.6 : null

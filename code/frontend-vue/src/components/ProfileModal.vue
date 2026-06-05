@@ -1,12 +1,16 @@
-/**
- * @file ProfileModal.vue
- * @description Modale per la gestione del profilo utente.
- */
+<!--
+  @file ProfileModal.vue
+  @description Modale per la gestione del profilo utente.
+  Permette di visualizzare e modificare i dati personali, consultare preferiti,
+  segnalazioni personali, richieste Supporto Tecnico e pannello tecnico.
+-->
 
 <script setup>
 import { reactive, ref, onMounted } from 'vue'
+
 import Modal from './Modal.vue'
 import SupportoTecnicoPanel from './SupportoTecnicoPanel.vue'
+
 import {
   getProfile,
   updateProfile,
@@ -37,10 +41,28 @@ const richiestaST = reactive({
 const message = ref('')
 const messageType = ref('info')
 const loaded = ref(false)
+
 const allerteMap = ref({})
 const mieSegnalazioni = ref([])
 const segnalazioniLoading = ref(false)
 
+/**
+ * Imposta un messaggio informativo, di successo o di errore.
+ *
+ * @param {'info'|'success'|'error'} type - Tipo del messaggio.
+ * @param {string} text - Testo da mostrare.
+ * @returns {void}
+ */
+function setMessage(type, text) {
+  messageType.value = type
+  message.value = text
+}
+
+/**
+ * Carica il profilo dell'utente autenticato.
+ *
+ * @returns {Promise<void>}
+ */
 async function loadProfile() {
   try {
     const data = await getProfile()
@@ -56,11 +78,15 @@ async function loadProfile() {
     loaded.value = true
     message.value = ''
   } catch (error) {
-    messageType.value = 'error'
-    message.value = error.message
+    setMessage('error', error.message)
   }
 }
 
+/**
+ * Salva le modifiche al profilo.
+ *
+ * @returns {Promise<void>}
+ */
 async function saveProfile() {
   try {
     await updateProfile({
@@ -71,14 +97,17 @@ async function saveProfile() {
     })
 
     profile.password = ''
-    messageType.value = 'success'
-    message.value = 'Profilo aggiornato correttamente'
+    setMessage('success', 'Profilo aggiornato correttamente')
   } catch (error) {
-    messageType.value = 'error'
-    message.value = error.message
+    setMessage('error', error.message)
   }
 }
 
+/**
+ * Recupera le segnalazioni inviate dall'utente.
+ *
+ * @returns {Promise<void>}
+ */
 async function loadMieSegnalazioni() {
   segnalazioniLoading.value = true
 
@@ -92,6 +121,11 @@ async function loadMieSegnalazioni() {
   }
 }
 
+/**
+ * Invia una richiesta di promozione al ruolo Supporto Tecnico.
+ *
+ * @returns {Promise<void>}
+ */
 async function inviaRichiestaSupporto() {
   try {
     await richiediSupportoTecnico({
@@ -99,21 +133,27 @@ async function inviaRichiestaSupporto() {
       matricola: richiestaST.matricola
     })
 
-    messageType.value = 'success'
-    message.value = 'Richiesta inviata. Attendi approvazione.'
+    setMessage('success', 'Richiesta inviata. Attendi approvazione.')
 
     richiestaST.motivo = ''
     richiestaST.matricola = ''
 
     await loadProfile()
   } catch (error) {
-    messageType.value = 'error'
-    message.value = error.message
+    setMessage('error', error.message)
   }
 }
 
+/**
+ * Elimina definitivamente l'account dell'utente.
+ *
+ * @returns {Promise<void>}
+ */
 async function removeAccount() {
-  const conferma = confirm('Sei sicuro/a di voler eliminare definitivamente il tuo account? Le tue recensioni resteranno visibili in forma anonima.')
+  const conferma = confirm(
+    'Sei sicuro/a di voler eliminare definitivamente il tuo account? Le tue recensioni resteranno visibili in forma anonima.'
+  )
+
   if (!conferma) return
 
   try {
@@ -122,17 +162,26 @@ async function removeAccount() {
     emit('auth-changed')
     emit('close')
   } catch (error) {
-    messageType.value = 'error'
-    message.value = error.message
+    setMessage('error', error.message)
   }
 }
 
+/**
+ * Esegue il logout dell'utente.
+ *
+ * @returns {void}
+ */
 function submitLogout() {
   logoutUser()
   emit('auth-changed')
   emit('close')
 }
 
+/**
+ * Recupera le allerte meteo sui preferiti e crea una mappa indicizzata per bivacco.
+ *
+ * @returns {Promise<void>}
+ */
 async function loadAllerte() {
   try {
     const data = await getAllertePreferiti()
@@ -150,6 +199,12 @@ async function loadAllerte() {
   }
 }
 
+/**
+ * Apre la scheda del bivacco preferito selezionato.
+ *
+ * @param {Object} bivacco - Bivacco da aprire.
+ * @returns {void}
+ */
 function openPreferito(bivacco) {
   emit('open-bivacco', bivacco)
   emit('close')
@@ -174,35 +229,35 @@ onMounted(() => {
     </p>
 
     <div v-if="loaded" class="profile-hero">
-  <div class="profile-avatar">
-    {{ (profile.nome?.[0] || profile.email?.[0] || 'U').toUpperCase() }}
-  </div>
+      <div class="profile-avatar">
+        {{ (profile.nome?.[0] || profile.email?.[0] || 'U').toUpperCase() }}
+      </div>
 
-  <div class="profile-info">
-    <h3>
-      {{ profile.nome || 'Utente' }} {{ profile.cognome || '' }}
-    </h3>
+      <div class="profile-info">
+        <h3>
+          {{ profile.nome || 'Utente' }} {{ profile.cognome || '' }}
+        </h3>
 
-    <p>{{ profile.email }}</p>
+        <p>{{ profile.email }}</p>
 
-    <span
-      class="role-badge"
-      :class="{
-        'role-user': profile.discriminator === 'UtenteRegistrato',
-        'role-tech': profile.discriminator === 'SupportoTecnico',
-        'role-super': profile.discriminator === 'SuperUser'
-      }"
-    >
-      {{
-        profile.discriminator === 'SupportoTecnico'
-          ? 'Supporto Tecnico'
-          : profile.discriminator === 'SuperUser'
-            ? 'Super User'
-            : 'Utente registrato'
-      }}
-    </span>
-  </div>
-</div>
+        <span
+          class="role-badge"
+          :class="{
+            'role-user': profile.discriminator === 'UtenteRegistrato',
+            'role-tech': profile.discriminator === 'SupportoTecnico',
+            'role-super': profile.discriminator === 'SuperUser'
+          }"
+        >
+          {{
+            profile.discriminator === 'SupportoTecnico'
+              ? 'Supporto Tecnico'
+              : profile.discriminator === 'SuperUser'
+                ? 'Super User'
+                : 'Utente registrato'
+          }}
+        </span>
+      </div>
+    </div>
 
     <form v-if="loaded" class="form" @submit.prevent="saveProfile">
       <div class="row">
@@ -290,7 +345,7 @@ onMounted(() => {
       </p>
     </section>
 
-        <div class="divider"></div>
+    <div class="divider"></div>
 
     <section class="segnalazioni-section">
       <h3>Le mie segnalazioni</h3>
@@ -489,7 +544,8 @@ onMounted(() => {
 }
 
 .favorites-section h3,
-.support-request-section h3 {
+.support-request-section h3,
+.segnalazioni-section h3 {
   font-size: 1rem;
   margin-bottom: 10px;
 }
@@ -616,16 +672,6 @@ onMounted(() => {
   margin-top: 22px;
 }
 
-@media (max-width: 420px) {
-  .row {
-    grid-template-columns: 1fr;
-  }
-
-  .favorite-top {
-    flex-direction: column;
-  }
-}
-
 .profile-hero {
   display: flex;
   align-items: center;
@@ -702,14 +748,19 @@ onMounted(() => {
   border: 1px solid rgba(251, 191, 36, 0.28);
 }
 
-.segnalazioni-section h3 {
-  font-size: 1rem;
-  margin-bottom: 10px;
-}
-
 .segnalazione-desc {
   font-size: 13px;
   color: var(--text-secondary);
   line-height: 1.5;
+}
+
+@media (max-width: 420px) {
+  .row {
+    grid-template-columns: 1fr;
+  }
+
+  .favorite-top {
+    flex-direction: column;
+  }
 }
 </style>

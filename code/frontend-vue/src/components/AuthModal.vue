@@ -1,11 +1,11 @@
-/**
- * @file AuthModal.vue
- * @description Modale per autenticazione utenti.
- * Gestisce login, registrazione e recupero password.
- */
+<!--
+ @file AuthModal.vue
+ @description Modale per autenticazione utenti.
+ Gestisce login, registrazione e recupero password.
+-->
 
 <script setup>
-import { reactive, ref } from 'vue'
+import { reactive, ref, onUnmounted } from 'vue'
 import Modal from './Modal.vue'
 import {
   registerUser,
@@ -54,13 +54,15 @@ async function submitLogin() {
     message.value = 'Accesso effettuato. Benvenuta.'
     emit('auth-changed')
     setTimeout(() => emit('close'), 700)
-  } catch (error) {
-    messageType.value = 'error'
+    } catch (error) {
+      messageType.value = 'error'
 
-    if (error.codiceErrore === 'EMAIL_NON_VERIFICATA') {
-      emailNonVerificata.value = loginForm.email
-      message.value = 'Devi prima verificare la tua email. Controlla la tua casella di posta.'
-    }
+      if (error.codiceErrore === 'EMAIL_NON_VERIFICATA') {
+        emailNonVerificata.value = loginForm.email
+        message.value = 'Devi prima verificare la tua email. Controlla la tua casella di posta.'
+      } else {
+        message.value = error.message || 'Credenziali non valide.'
+      }
   }
 }
 
@@ -143,6 +145,11 @@ async function submitRegister() {
     message.value = error.message
   }
 }
+
+onUnmounted(() => {
+  clearInterval(resendTimer)
+})
+
 </script>
 
 <template>
@@ -182,7 +189,7 @@ async function submitRegister() {
   @click="resendVerification"
 >
   {{
-    resendCooldown > 0
+      resendCooldown > 0
       ? `Puoi rimandare la mail tra ${resendCooldown}s`
       : 'Rimanda email di verifica'
   }}
