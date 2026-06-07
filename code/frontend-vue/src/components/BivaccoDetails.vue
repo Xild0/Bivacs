@@ -10,7 +10,9 @@ import { reactive, ref, watch, computed } from 'vue'
 import {
   creaRecensione,
   getRecensioni, 
-  getToken
+  getToken, 
+  attivaEmergenza, 
+  revocaEmergenza
 } from '../services/api'
 
 import TripPlanner from './TripPlanner.vue'
@@ -51,7 +53,7 @@ async function gestisciAttivazioneEmergenza() {
 
   try {
     // Usa la funzione API passandogli l'id numerico corretto e la descrizione
-    const data = await api.attivaEmergenza(props.bivacco.id, descr || 'Allerta meteo o emergenza generica')
+    const data = await attivaEmergenza(props.bivacco.id, descr || 'Allerta meteo o emergenza generica')
     
     if (data.success) {
       props.bivacco.emergenza = true
@@ -74,7 +76,7 @@ async function gestisciRevocaEmergenza() {
 
   try {
     // Usa la funzione API passandogli l'id numerico
-    const data = await api.revocaEmergenza(props.bivacco.id)
+    const data = await revocaEmergenza(props.bivacco.id)
     
     if (data.success) {
       props.bivacco.emergenza = false

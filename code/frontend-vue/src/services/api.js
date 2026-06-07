@@ -887,15 +887,21 @@ export const getCodaTicket = async () => {
  * @param {string} stato - Nuovo stato
  * @returns {Promise<Object>} Ticket aggiornato
  */
-export const aggiornaStatoTicket = async (ticketId, stato) => {
+export const aggiornaStatoTicket = async (ticketId, stato, note = null) => {
     const token = localStorage.getItem('bivacs_token');
+    const payload = {stato};
+
+    if(note){
+      payload.note = note;
+    }
+
     const response = await fetch(`${API_URL}/supporto/ticket/${ticketId}/stato`, {
         method: 'PATCH',
         headers: { 
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}` 
         },
-        body: JSON.stringify({stato})
+        body: JSON.stringify({payload})
     });
     if (!response.ok) throw new Error('Errore aggiornamento stato ticket');
     return response.json();
