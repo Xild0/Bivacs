@@ -452,6 +452,100 @@ router.patch('/richieste-supporto/:utenteId/rifiuta', protectRoute, isSupportoTe
 });
 
 /**
+ * @description recupera le richieste per SuperUser
+ * @route GET /api/v1/supporto/richieste-superuser
+ */
+router.get('/richieste-superuser', protectRoute, isSupportoTecnico, async (req, res) => {
+  try {
+    const richieste = await Utente.find({
+      discriminator: 'UtenteRegistrato',
+      'richiestaSuperUser.stato': 'in_attesa'
+    }).select('-passwordHash');
+
+    res.status(200).json(richieste);
+  } catch (error) {
+    res.status(500).json({message: 'Errore recupero richieste SuperUser', error: error.message});
+  }
+});
+
+/**
+ * @description approva una richiesta SuperUser
+ * @route PATCH /api/v1/supporto/richieste-superuser/:utenteId/approva
+ */
+router.patch('/richieste-superuser/:utenteId/approva', protectRoute, isSupportoTecnico, async (req, res) => {
+  try {
+    const utente = await Utente.findById(req.params.utenteId);
+    if (!utente) {
+      return res.status(404).json({ message: 'Utente non trovato' });
+    }
+    utente.discriminator = 'SuperUser';
+    utente.richiestaSuperUser.stato = 'approvata';
+    await utente.save();
+
+    const aggiornato = await Utente.findById(req.params.utenteId).select('-passwordHash');
+
+    await inviaEmail(
+      utente.email,
+      'Richiesta SuperUser approvata',
+      `<h2>Richiesta approvata</h2>
+       <p>Sei stato promosso a SuperUser su Bivacs. Effettua nuovamente il login per accedere al pannello.</p>`
+    );
+
+    res.status(200).json({ message: 'Utente promosso a SuperUser', utente: aggiornato });
+  } catch (error) {
+    res.status(500).json({ message: 'Errore approvazione richiesta', error: error.message });
+  }
+});
+
+/**
+ * @description rifiuta una richiesta di promozione a SuperUser, 
+ * aggiorna lo stato e invia una mail all'utente rifiutato
+ * @route PATCH /api/v1/supporto/richieste-superuser/:utenteId/rifiuta
+ * @param {import('express').Request} req - richiesta HTTP motivoRifiuto (opzionale)
+ * @param {import('express').Response} res - risposta HTTP
+ * @returns {Promise<void>} utente aggiornato oppure errore
+ */
+router.patch('/richieste-superuser/:utenteId/rifiuta', protectRoute, isSupportoTecnico, async (req, res) => {
+  try {
+    const {motivoRifiuto} = req.body;
+    const utente = await Utente.findByIdAndUpdate(
+      req.params.utenteId,
+      {
+        $set: {
+          'richiestaSuperUser.stato': 'rifiutata'
+        }
+      },
+      { new: true }
+    ).select('-passwordHash');
+    if (!utente) {
+      return res.status(404).json({
+        message: 'Utente non trovato'
+      });
+    }
+
+    await inviaEmail(
+      utente.email,
+      'Richiesta SuperUser rifiutata',
+      `
+        <h2>Richiesta rifiutata</h2>
+        <p>La tua richiesta per diventare SuperUser su Bivacs è stata rifiutata.</p>
+        <p>${motivoRifiuto || 'Non è stata indicata una motivazione specifica.'}</p>
+      `
+    );
+
+    res.status(200).json({
+      message: 'Richiesta rifiutata correttamente',
+      utente
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: 'Errore rifiuto richiesta',
+      error: error.message
+    });
+  }
+});
+
+/**
  * @route GET /api/v1/supporto/segnalazioni
  * @description Recupera la lista delle segnalazioni escludendo quelle archiviate.
  * @returns {Promise<Array>} Array delle segnalazioni.
