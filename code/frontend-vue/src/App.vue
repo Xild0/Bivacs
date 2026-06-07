@@ -1,13 +1,12 @@
-/**
- * @file App.vue
- * @description Componente root dell'applicazione Bivacs.
- * Gestisce caricamento dati, autenticazione, dettagli bivacchi,
- * modali globali, notifiche e coordinamento tra componenti.
- */
+<!--
+  @file App.vue
+  @description Componente root dell'applicazione Bivacs.
+  Gestisce caricamento dati, autenticazione, dettagli bivacchi,
+  modali globali, notifiche e coordinamento tra componenti.
+-->
 
 <script setup>
-import { ref, onMounted, onUnmounted} from 'vue'
-import { io } from 'socket.io-client'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 
 import Navbar from './components/Navbar.vue'
 import Hero from './components/Hero.vue'
@@ -20,26 +19,38 @@ import AuthModal from './components/AuthModal.vue'
 import ProfileModal from './components/ProfileModal.vue'
 import RouteModal from './components/RouteModal.vue'
 import ResetPassword from './components/ResetPassword.vue'
-import { getBivacchi, getBivaccoById, isLoggedIn, getProfile, getMeteoSintetico} from './services/api'
+
+import {
+  getBivacchi,
+  getBivaccoById,
+  isLoggedIn,
+  getProfile,
+  getMeteoSintetico
+} from './services/api'
 
 const bivacchi = ref([])
 const viewMode = ref('list')
 const selectedBivacco = ref(null)
-const routeModal = ref(null)       // dati del modal del tragitto     // coordinate del tragitto calcolato
+const routeModal = ref(null)
 const loading = ref(true)
 
 const showEmergency = ref(false)
 const showAuth = ref(false)
 const showProfile = ref(false)
+
 const logged = ref(isLoggedIn())
 const currentUser = ref(null)
 const preferitiIds = ref([])
 
 const resetTokenAttivo = ref(null)
-const notTemp = ref({ visible: false, type: 'info', text: ''})
-const meteoMap = ref({})  // { bivaccoId: { temperatura, vento, precipitazioni, livelloRischio, allerta } }
-const allerteAttive = ref([])
-let socketServer = null
+
+const notTemp = ref({
+  visible: false,
+  type: 'info',
+  text: ''
+})
+
+const meteoMap = ref({})
 
 /**
  * Carica l'elenco dei bivacchi dal backend applicando eventuali filtri.
@@ -47,33 +58,43 @@ let socketServer = null
  * @param {Object} [filters={}] - Filtri di ricerca.
  * @returns {Promise<void>}
  */
-
 async function loadBivacchi(filters = {}) {
   loading.value = true
+
   try {
     bivacchi.value = await getBivacchi(filters)
     await loadMeteoSintetico()
   } catch (error) {
-    console.error(error)
+    console.error('Errore caricamento bivacchi:', error)
     bivacchi.value = []
+    meteoMap.value = {}
   } finally {
     loading.value = false
   }
 }
 
+/**
+ * Carica il meteo sintetico per i bivacchi attualmente visualizzati.
+ *
+ * @returns {Promise<void>}
+ */
 async function loadMeteoSintetico() {
   if (bivacchi.value.length === 0) {
     meteoMap.value = {}
     return
   }
+
   try {
-    const ids = bivacchi.value.map(b => b._id)
+    const ids = bivacchi.value.map((bivacco) => bivacco._id)
     const data = await getMeteoSintetico(ids)
-    const newMap = {}
-    for (const m of data.meteoSintetico || []) {
-      newMap[m.bivaccoId] = m
+
+    const nuovaMappa = {}
+
+    for (const meteo of data.meteoSintetico || []) {
+      nuovaMappa[meteo.bivaccoId] = meteo
     }
-    meteoMap.value = newMap
+
+    meteoMap.value = nuovaMappa
   } catch (error) {
     console.error('Errore meteo sintetico:', error)
     meteoMap.value = {}
@@ -86,7 +107,6 @@ async function loadMeteoSintetico() {
  * @param {Object} bivacco - Bivacco selezionato.
  * @returns {Promise<void>}
  */
-
 async function openDetails(bivacco) {
   routeModal.value = null
 
@@ -112,19 +132,17 @@ async function openDetails(bivacco) {
  *
  * @returns {void}
  */
-
 function closeDetails() {
   selectedBivacco.value = null
   routeModal.value = null
 }
 
 /**
- * Aggiorna lo stato del tragitto calcolato.
+ * Aggiorna lo stato del tragitto calcolato e apre la modale di riepilogo.
  *
  * @param {Object} result - Risultato del percorso generato.
  * @returns {void}
  */
-
 function onRouteCalculated(result) {
   routeModal.value = {
     result,
@@ -132,10 +150,20 @@ function onRouteCalculated(result) {
   }
 }
 
+/**
+ * Rimuove il tragitto attualmente visualizzato.
+ *
+ * @returns {void}
+ */
 function onClearRoute() {
   routeModal.value = null
 }
 
+/**
+ * Aggiorna lo stato di autenticazione dopo login, logout o modifica account.
+ *
+ * @returns {void}
+ */
 function refreshAuth() {
   logged.value = isLoggedIn()
   loadUserData()
@@ -146,7 +174,6 @@ function refreshAuth() {
  *
  * @returns {Promise<void>}
  */
-
 async function loadUserData() {
   if (!isLoggedIn()) {
     currentUser.value = null
@@ -157,7 +184,7 @@ async function loadUserData() {
   try {
     const data = await getProfile()
     currentUser.value = data
-    preferitiIds.value = (data.preferiti || []).map(p => p._id || p)
+    preferitiIds.value = (data.preferiti || []).map((preferito) => preferito._id || preferito)
   } catch (error) {
     console.error('Errore caricamento dati utente:', error)
     currentUser.value = null
@@ -168,14 +195,18 @@ async function loadUserData() {
 /**
  * Aggiorna la lista dei bivacchi preferiti.
  *
- * @param {Array} preferiti - Lista aggiornata preferiti.
+ * @param {Array} preferiti - Lista aggiornata dei preferiti.
  * @returns {void}
  */
-
 function onFavoriteChanged(preferiti) {
-  preferitiIds.value = preferiti.map(p => p._id || p)
+  preferitiIds.value = preferiti.map((preferito) => preferito._id || preferito)
 }
 
+/**
+ * Ricarica il bivacco selezionato e aggiorna la lista principale.
+ *
+ * @returns {Promise<void>}
+ */
 async function refreshSelectedBivacco() {
   if (!selectedBivacco.value?._id) return
 
@@ -184,23 +215,29 @@ async function refreshSelectedBivacco() {
 }
 
 /**
- * Mostra una notifica temporanea (notTemp) in sovrimpressione.
+ * Mostra una notifica temporanea in sovrimpressione.
  *
- * @param {string} text testo da mostrare all'utente
- * @param {'info'|'success'|'error'} [type='info'] tipo di avviso, condiziona il colore
- * @param {number} [durata=4000] millisecondi di permanenza a schermo
+ * @param {string} text - Testo da mostrare.
+ * @param {'info'|'success'|'error'} [type='info'] - Tipo di notifica.
+ * @param {number} [durata=4000] - Durata in millisecondi.
  * @returns {void}
  */
 function mostraNotTemp(text, type = 'info', durata = 4000) {
-  notTemp.value = { visible: true, type, text }
-  setTimeout(() => { notTemp.value.visible = false }, durata)
+  notTemp.value = {
+    visible: true,
+    type,
+    text
+  }
+
+  setTimeout(() => {
+    notTemp.value.visible = false
+  }, durata)
 }
 
 /**
- * All'avvio dell'app, ispeziona l'URL e gestisce
- * i due link che arrivano via email:
- *   - ?verificato=true|false  → esito verifica email
- *   - ?reset=<token>          → reset password
+ * Gestisce i parametri URL prodotti dai link inviati via email:
+ * - verificato=true|false per la verifica email;
+ * - reset=<token> per il recupero password.
  *
  * @returns {void}
  */
@@ -208,6 +245,7 @@ function gestisciQueryString() {
   const params = new URLSearchParams(window.location.search)
 
   const verificato = params.get('verificato')
+
   if (verificato === 'true') {
     mostraNotTemp('Email verificata! Ora puoi accedere.', 'success')
   } else if (verificato === 'false') {
@@ -215,6 +253,7 @@ function gestisciQueryString() {
   }
 
   const reset = params.get('reset')
+
   if (reset) {
     resetTokenAttivo.value = reset
   }
@@ -225,14 +264,15 @@ function gestisciQueryString() {
 }
 
 /**
- * Handler dell'evento globale 'bivacs:auth-expired' emesso quando il backend risponde 401. 
- * Aggiorna lo stato locale di login e avvisa l'utente con una notifica temporanea.
+ * Gestisce la scadenza della sessione quando il backend restituisce 401.
  *
  * @returns {void}
  */
 function gestisciSessioneScaduta() {
   logged.value = false
-  mostraNotTemp('La tua sessione è scaduta. Effettua di nuovo l\'accesso.', 'error', 6000)
+  currentUser.value = null
+  preferitiIds.value = []
+  mostraNotTemp('La tua sessione è scaduta. Effettua di nuovo l’accesso.', 'error', 6000)
 }
 
 onMounted(async () => {
@@ -260,6 +300,10 @@ onUnmounted(() => {
   if(socketServer){
     socketServer.disconnect()
   }
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('bivacs:auth-expired', gestisciSessioneScaduta)
 })
 </script>
 
@@ -289,8 +333,8 @@ onUnmounted(() => {
         :bivacchi="bivacchi"
         @search="loadBivacchi"
       />
+
       <div class="results">
-        <!-- LEFT: cards/map -->
         <section class="results-pane">
           <div class="results-head">
             <div>
@@ -303,8 +347,8 @@ onUnmounted(() => {
             <div class="view-toggle" role="tablist">
               <button
                 :class="{ active: viewMode === 'list' }"
-                @click="viewMode = 'list'"
                 role="tab"
+                @click="viewMode = 'list'"
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <line x1="8" y1="6" x2="21" y2="6" />
@@ -319,8 +363,8 @@ onUnmounted(() => {
 
               <button
                 :class="{ active: viewMode === 'map' }"
-                @click="viewMode = 'map'"
                 role="tab"
+                @click="viewMode = 'map'"
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6" />
@@ -334,7 +378,6 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <!-- Loading state -->
           <div v-if="loading" class="cards-grid">
             <div v-for="n in 4" :key="n" class="skeleton">
               <div class="skeleton-header"></div>
@@ -346,7 +389,6 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <!-- List view -->
           <div v-else-if="viewMode === 'list' && bivacchi.length > 0" class="cards-grid">
             <BivaccoCard
               v-for="bivacco in bivacchi"
@@ -360,7 +402,6 @@ onUnmounted(() => {
             />
           </div>
 
-          <!-- Empty state -->
           <div v-else-if="viewMode === 'list' && bivacchi.length === 0" class="empty">
             <div class="empty-icon">
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -372,15 +413,13 @@ onUnmounted(() => {
             <p>Prova a modificare i filtri di ricerca o ad allargare l'area.</p>
           </div>
 
-          <!-- Map view -->
           <BivaccoMap
-          v-else
-          :bivacchi="bivacchi"
-          @open="openDetails"
-        />
+            v-else
+            :bivacchi="bivacchi"
+            @open="openDetails"
+          />
         </section>
 
-        <!-- RIGHT: details (sticky on desktop) -->
         <aside class="details-pane">
           <BivaccoDetails
             v-if="selectedBivacco"
@@ -418,13 +457,17 @@ onUnmounted(() => {
       </div>
     </footer>
 
-    <!-- Modals -->
-    <EmergencyModal v-if="showEmergency" @close="showEmergency = false" />
+    <EmergencyModal
+      v-if="showEmergency"
+      @close="showEmergency = false"
+    />
+
     <AuthModal
       v-if="showAuth"
       @close="showAuth = false"
       @auth-changed="refreshAuth"
     />
+
     <ProfileModal
       v-if="showProfile"
       @close="showProfile = false"
@@ -433,12 +476,12 @@ onUnmounted(() => {
     />
 
     <RouteModal
-          v-if="routeModal"
-          :result="routeModal.result"
-          :bivacco="routeModal.bivacco"
-          @close="routeModal = null"
-        />
-    
+      v-if="routeModal"
+      :result="routeModal.result"
+      :bivacco="routeModal.bivacco"
+      @close="routeModal = null"
+    />
+
     <ResetPassword
       v-if="resetTokenAttivo"
       :token="resetTokenAttivo"
@@ -446,10 +489,13 @@ onUnmounted(() => {
       @reset-success="logged = false"
     />
 
-    <div v-if="notTemp.visible" class="notTemp" :class="`notTemp-${notTemp.type}`">
+    <div
+      v-if="notTemp.visible"
+      class="notTemp"
+      :class="`notTemp-${notTemp.type}`"
+    >
       {{ notTemp.text }}
     </div>
-
   </div>
 </template>
 
@@ -474,7 +520,9 @@ onUnmounted(() => {
 }
 
 @media (max-width: 1100px) {
-  .results { grid-template-columns: 1fr; }
+  .results {
+    grid-template-columns: 1fr;
+  }
 }
 
 .results-head {
@@ -522,7 +570,9 @@ onUnmounted(() => {
   transition: color 0.2s var(--ease);
 }
 
-.view-toggle button.active { color: var(--text-primary); }
+.view-toggle button.active {
+  color: var(--text-primary);
+}
 
 .toggle-indicator {
   position: absolute;
@@ -537,7 +587,9 @@ onUnmounted(() => {
   z-index: 0;
 }
 
-.toggle-indicator.map { transform: translateX(100%); }
+.toggle-indicator.map {
+  transform: translateX(100%);
+}
 
 .cards-grid {
   display: grid;
@@ -574,13 +626,26 @@ onUnmounted(() => {
   border-radius: 4px;
 }
 
-.w-40 { width: 40%; }
-.w-60 { width: 60%; }
-.w-80 { width: 80%; }
+.w-40 {
+  width: 40%;
+}
+
+.w-60 {
+  width: 60%;
+}
+
+.w-80 {
+  width: 80%;
+}
 
 @keyframes shimmer {
-  0%   { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 .empty {
@@ -699,7 +764,9 @@ onUnmounted(() => {
 }
 
 .footer-brand .dot {
-  width: 6px; height: 6px; border-radius: 50%;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
   background: var(--accent);
   box-shadow: 0 0 8px var(--accent);
 }
@@ -711,30 +778,33 @@ onUnmounted(() => {
 }
 
 .notTemp {
-  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
-  padding: 12px 20px; border-radius: var(--r-md); font-size: 14px;
-  z-index: 9999; max-width: 90vw; box-shadow: 0 8px 24px rgba(0,0,0,0.3);
-}
-.notTemp-info    { background: var(--accent-bg); border: 1px solid var(--accent-border); color: var(--accent-hi); }
-.notTemp-success { background: var(--success-bg); border: 1px solid rgba(52,211,153,0.28); color: var(--success); }
-.notTemp-error   { background: var(--danger-bg); border: 1px solid var(--danger-border); color: var(--danger); }
-
-.emergencyBannerContainer{
-  position: sticky; 
-  top: 0; 
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 12px 20px;
+  border-radius: var(--r-md);
+  font-size: 14px;
   z-index: 9999;
-  width: 100%;
+  max-width: 90vw;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
 }
 
-.emergencyBanner{
-  background-color: #dc2626;
-  color: #ffffff;
-  text-align: center;
-  padding: 15px 20px;
-  font-size: 1.15rem;
-  font-weight: bold;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  border-bottom: 2px solid #991b1b;
+.notTemp-info {
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
+  color: var(--accent-hi);
 }
 
+.notTemp-success {
+  background: var(--success-bg);
+  border: 1px solid rgba(52, 211, 153, 0.28);
+  color: var(--success);
+}
+
+.notTemp-error {
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
+  color: var(--danger);
+}
 </style>

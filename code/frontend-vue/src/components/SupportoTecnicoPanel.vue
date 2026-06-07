@@ -4,13 +4,13 @@ import {
   getLogApi,
   getConfigApi,
   creaConfigApi,
-  modificaConfigApi,
-  modificaBivaccoTecnico,
+  aggiornaConfigApi,
+  aggiornaBivaccoTecnico,
   creaBivaccoTecnico,
   getBivacchi,
-  getRichiesteSupporto,
-  approvaRichiestaSupporto, 
-  getStoricoSegnalazioniStaff,
+  getRichiesteSupportoTecnico,
+  approvaRichiestaSupportoTecnico,
+  getStoricoSegnalazioni,
   aggiornaStatoSegnalazione
 } from '../services/api'
 
@@ -119,12 +119,12 @@ async function submitNuovoBivacco() {
 const richiesteSupporto = ref([])
 
 async function loadRichiesteSupporto() {
-  richiesteSupporto.value = await getRichiesteSupporto()
+  richiesteSupporto.value = await getRichiesteSupportoTecnico()
 }
 
 async function approvaRichiesta(utenteId) {
   try {
-    await approvaRichiestaSupporto(utenteId)
+    await approvaRichiestaSupportoTecnico(utenteId)
     messageType.value = 'success'
     message.value = 'Richiesta approvata correttamente'
     await loadRichiesteSupporto()
@@ -143,7 +143,7 @@ async function loadSupportoData() {
     configs.value = await getConfigApi()
     bivacchi.value = await getBivacchi()
     richiesteSupporto.value = await getRichiesteSupporto()
-    segnalazioniStaff.value = await getStoricoSegnalazioniStaff()
+    segnalazioniStaff.value = await getStoricoSegnalazioni()
   } catch (error) {
     messageType.value = 'error'
     message.value = error.message
@@ -159,7 +159,7 @@ async function submitConfig() {
     const esistente = configs.value.find(c => c.provider === configForm.provider)
 
     if (esistente) {
-      await modificaConfigApi(esistente._id, {
+      await aggiornaConfigApi(esistente._id, {
         baseUrl: configForm.baseUrl,
         enabled: configForm.enabled,
         timeoutMs: Number(configForm.timeoutMs)
@@ -210,7 +210,7 @@ async function submitBivacco() {
   }
 
   try {
-    await modificaBivaccoTecnico(bivaccoForm.bivaccoId, {
+    await aggiornaBivaccoTecnico(bivaccoForm.bivaccoId, {
       nome: bivaccoForm.nome,
       latitudine: Number(bivaccoForm.latitudine),
       longitudine: Number(bivaccoForm.longitudine),
@@ -233,21 +233,27 @@ async function submitBivacco() {
   }
 }
 
-
-/**
- * @description Inizializza i dati nel pannello di supporto
- */
-onMounted(async () => {
-  loading.value = true
+async function handleCambioStato(idSegnalazione, nuovoStato) {
   try {
-    loadSupportoData()
+    loading.value = true
+    message.value = ''
+    await aggiornaStatoSegnalazione(idSegnalazione, nuovoStato)
+    const idx = segnalazioniStaff.value.findIndex(s => s._id === idSegnalazione)
+    if (idx !== -1) {
+      segnalazioniStaff.value[idx].statoSegnalazione = nuovoStato
+    }
+    message.value = 'Stato della segnalazione modificato con successo.'
+    messageType.value = 'success'
   } catch (error) {
-    console.error("Errore durante il caricamento dei dati del pannello:", error)
-    message.value = "Impossibile caricare alcuni dati del pannello di supporto"      // degub: mostra errore a schermo
-    messageType.value = "danger"
+    message.value = error.message || 'Errore durante la modifica dello stato.'
+    messageType.value = 'danger'
   } finally {
     loading.value = false
   }
+}
+
+onMounted(() => {
+  loadGpxOverlay()
 })
 
 </script>
@@ -273,7 +279,7 @@ onMounted(async () => {
     </p>
 
     <div v-else class="support-layout">
-
+      
       <section
         v-if="segnalazioniStaff.some(s => ['inviata', 'presa_in_carico', 'in_corso'].includes(s.statoSegnalazione))"
         class="alert-segnalazioni"
@@ -293,20 +299,21 @@ onMounted(async () => {
 
         <h4>Segnalazioni Attive</h4>
 
-        <div
-          v-for="segnalazione in segnalazioniStaff"
-          :key="segnalazione._id"
-          class="segnalazione-card"
+        <div 
+          v-for="segnalazione in segnalazioniStaff" 
+          :key="segnalazione._id" 
+          class="segnalazione-card" 
           v-show="['inviata', 'presa_in_carico', 'in_corso'].includes(segnalazione.statoSegnalazione)"
           style="border: 1px solid var(--danger-border); padding: 16px; border-radius: var(--r); margin-top: 10px;"
         >
+          
           <p><strong>Bivacco ID:</strong> {{ segnalazione.bivaccoId?.nome || segnalazione.bivaccoId }}</p>
           <p><strong>Descrizione:</strong> {{ segnalazione.descrizione }}</p>
 
           <div class="field" style="margin-top: 12px; max-width: 250px;">
             <span>Stato Segnalazione</span>
-            <select
-              :value="segnalazione.statoSegnalazione"
+            <select 
+              :value="segnalazione.statoSegnalazione" 
               @change="handleCambioStato(segnalazione._id, $event.target.value)"
               :disabled="loading"
             >
@@ -318,23 +325,24 @@ onMounted(async () => {
             </select>
           </div>
         </div>
-
+        
         <h4 style="margin-top: 24px; color: var(--success);">Segnalazioni Risolte / Archiviate</h4>
 
-        <div
-          v-for="segnalazione in segnalazioniStaff"
-          :key="'risolta-' + segnalazione._id"
-          class="segnalazione-card"
+        <div 
+          v-for="segnalazione in segnalazioniStaff" 
+          :key="'risolta-' + segnalazione._id" 
+          class="segnalazione-card" 
           v-show="['risolta', 'archiviata'].includes(segnalazione.statoSegnalazione)"
           style="border: 1px solid var(--border-subtle); background-color: var(--bg-surface-2); padding: 16px; border-radius: var(--r); margin-top: 10px; opacity: 0.8;"
         >
+          
           <p><strong>Bivacco ID:</strong> {{ segnalazione.bivaccoId?.nome || segnalazione.bivaccoId }}</p>
           <p><strong>Descrizione:</strong> {{ segnalazione.descrizione }}</p>
 
           <div class="field" style="margin-top: 12px; max-width: 250px;">
             <span>Stato Segnalazione</span>
-            <select
-              :value="segnalazione.statoSegnalazione"
+            <select 
+              :value="segnalazione.statoSegnalazione" 
               @change="handleCambioStato(segnalazione._id, $event.target.value)"
               :disabled="loading"
               style="color: black; background-color: white;"
@@ -346,55 +354,56 @@ onMounted(async () => {
               <option value="archiviata" style="color: black;">Archiviata</option>
             </select>
           </div>
+          
         </div>
       </section>
 
-      <section class="support-card support-card-wide">
-        <h4>Segnalazioni utenti</h4>
 
-        <div v-if="segnalazioniStaff.length" class="log-list">
-          <div
-            v-for="segnalazione in segnalazioniStaff"
-            :key="segnalazione._id"
-            class="log-row"
-          >
-            <strong>
-              {{ segnalazione.bivaccoId?.nome || 'Bivacco non disponibile' }}
-            </strong>
+<section class="support-card support-card-wide">
+  <h4>Segnalazioni utenti</h4>
 
-            <small>
-              Stato:
-              {{ segnalazione.statoSegnalazione?.replaceAll('_', ' ').toUpperCase() }}
-            </small>
+  <div v-if="segnalazioniStaff.length" class="log-list">
+    <div
+      v-for="segnalazione in segnalazioniStaff"
+      :key="segnalazione._id"
+      class="log-row"
+    >
+      <strong>
+        {{ segnalazione.bivaccoId?.nome || 'Bivacco non disponibile' }}
+      </strong>
 
-            <small>
-              Utente:
-              {{ segnalazione.utenteId?.email || 'utente non disponibile' }}
-            </small>
+      <small>
+        Stato:
+        {{ segnalazione.statoSegnalazione?.replaceAll('_', ' ').toUpperCase() }}
+      </small>
 
-            <small>
-              Data:
-              {{ new Date(segnalazione.createdAt).toLocaleString('it-IT') }}
-            </small>
+      <small>
+        Utente:
+        {{ segnalazione.utenteId?.email || 'utente non disponibile' }}
+      </small>
 
-            <p>{{ segnalazione.descrizione }}</p>
+      <small>
+        Data:
+        {{ new Date(segnalazione.createdAt).toLocaleString('it-IT') }}
+      </small>
 
-            <a
-              v-if="segnalazione.foto"
-              :href="`http://localhost:5000${segnalazione.foto}`"
-              target="_blank"
-              class="foto-link"
-            >
-              Apri foto allegata
-            </a>
-          </div>
-        </div>
+      <p>{{ segnalazione.descrizione }}</p>
 
-        <p v-else class="empty">
-          Nessuna segnalazione disponibile.
-        </p>
-      </section>
+      <a
+        v-if="segnalazione.foto"
+        :href="`http://localhost:5000${segnalazione.foto}`"
+        target="_blank"
+        class="foto-link"
+      >
+        Apri foto allegata
+      </a>
+    </div>
+  </div>
 
+  <p v-else class="empty">
+    Nessuna segnalazione disponibile.
+  </p>
+</section>
       <section class="support-card">
         <h4>Log API esterne</h4>
 

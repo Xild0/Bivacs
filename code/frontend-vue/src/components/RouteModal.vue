@@ -1,8 +1,9 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import {
-  getAutoGpxText,
-  scaricaAutoGpxBivacco,
+  getAutoGpxBivacco,
+  getAutoDownloadGpxUrl,
+  getToken,
   isLoggedIn
 } from '../services/api'
 
@@ -175,7 +176,7 @@ async function loadGpxOverlay() {
   gpxError.value = ''
 
   try {
-    const xmlText = await getAutoGpxText(props.bivacco._id)
+    const xmlText = await getAutoGpxBivacco(props.bivacco._id)
     const parsed = parseGpx(xmlText)
 
     if (parsed.coords.length < 2) {
@@ -201,17 +202,15 @@ function formatDuration(minutes) {
   return `${h} h ${m} min`
 }
 
-async function avviaDownload() {
+function avviaDownload() {
   downloadError.value = ''
-  downloadInCorso.value = true
 
-  try {
-    await scaricaAutoGpxBivacco(props.bivacco._id, downloadFileName.value)
-  } catch (error) {
-    downloadError.value = error.message
-  } finally {
-    downloadInCorso.value = false
+  if (!getToken()) {
+    downloadError.value = 'Accedi per scaricare il GPX.'
+    return
   }
+
+  window.open(getAutoDownloadGpxUrl(props.bivacco._id), '_blank')
 }
 
 onMounted(() => {

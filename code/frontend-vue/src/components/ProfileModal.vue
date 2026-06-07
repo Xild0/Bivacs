@@ -199,7 +199,7 @@ function openPreferito(bivacco) {
 
 onMounted(() => {
   loadProfile()
-  //loadAllerte()
+  loadAllerte()
   loadMieSegnalazioni()
 })
 </script>

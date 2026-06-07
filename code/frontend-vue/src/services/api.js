@@ -1,1004 +1,186 @@
-const API_URL = 'http://localhost:3000/api/v1'
-const ORS_API_KEY = import.meta.env.VITE_ORS_API_KEY
+/**
+ * @file api.js
+ * @description Servizi frontend per comunicare con le API backend di Bivacs.
+ * Gestisce autenticazione, profilo, bivacchi, preferiti, recensioni,
+ * segnalazioni, meteo, percorsi e funzioni del Supporto Tecnico.
+ */
 
-function buildQuery(filters = {}) {
-  const params = new URLSearchParams()
+const API_URL = import.meta.env.VITE_API_BASE || 'http://localhost:5000/api/v1'
+const ORS_API_KEY = import.meta.env.VITE_ORS_API_KEY || ''
 
-  Object.entries(filters).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== '') {
-      params.append(key, value)
-    }
-  })
-
-  const query = params.toString()
-  return query ? `?${query}` : ''
-}
-
-export async function getBivacchi(filters = {}) {
-  const response = await fetch(`${API_URL}/bivacchi${buildQuery(filters)}`)
-
-  if (!response.ok) {
-    throw new Error('Errore caricamento bivacchi')
-  }
-
-  return await response.json()
-}
-
-export async function getBivaccoById(id) {
-  const response = await fetch(`${API_URL}/bivacchi/${id}`)
-
-  const data = await response.json()
-
-  if (!response.ok) {
-    throw new Error(data.message || 'Errore caricamento scheda bivacco')
-  }
-
-  // Il backend D4 restituisce { bivacco, ticketManutenzione, risorse }
-  if (data.bivacco) {
-    return {
-      ...data.bivacco,
-      ticketManutenzione: data.ticketManutenzione || [],
-      risorseDettaglio: data.risorse || null
-    }
-  }
-
-  // Compatibilità con vecchia risposta diretta
-  return data
-}
-
-export async function creaRecensione(data) {
-  const response = await fetch(`${API_URL}/recensioni`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(data)
-  })
-
-  if (!response.ok) {
-    throw new Error('Errore creazione recensione')
-  }
-
-  return await response.json()
-}
-
-export async function getRecensioni(bivaccoId) {
-  const response = await fetch(`${API_URL}/recensioni/${bivaccoId}`)
-
-  if (!response.ok) {
-    throw new Error('Errore caricamento recensioni')
-  }
-
-  return await response.json()
-}
-
-export async function registerUser(userData) {
-  const response = await fetch(`${API_URL}/auth/register`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(userData)
-  })
-
-  const data = await response.json()
-
-  if (!response.ok) {
-    throw new Error(data.errore || 'Errore durante la registrazione')
-  }
-
-  return data
-}
-
-export async function loginUser(credentials) {
-  const response = await fetch(`${API_URL}/auth/login`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(credentials)
-  })
-
-  const data = await response.json()
-
-  if (!response.ok) {
-    const error = new Error(data.errore || 'Errore durante il login');
-    error.status = response.status;
-    error.codiceErrore = data.codiceErrore;
-    throw error;
-  }
-
-  localStorage.setItem('bivacs_token', data.token)
-
-  return data
-}
-
-export function logoutUser() {
-  localStorage.removeItem('bivacs_token')
-}
-
+/**
+ * Restituisce il token JWT salvato nel browser.
+ *
+ * @returns {string|null}
+ */
 export function getToken() {
-  return localStorage.getItem('bivacs_token')
+  return localStorage.getItem('token')
 }
 
+/**
+ * Verifica se l'utente risulta autenticato lato frontend.
+ *
+ * @returns {boolean}
+ */
 export function isLoggedIn() {
-  return getToken() !== null
+  return Boolean(getToken())
 }
-
-export async function getProfile() {
-  const token = getToken()
-
-  const response = await fetch(`${API_URL}/profilo`, {
-    headers: {
-      Authorization: `Bearer ${token}`
-    }
-  })
-
-  const data = await response.json()
-
-  if (!response.ok) {
-    throw new Error(data.errore || 'Errore caricamento profilo')
-  }
-
-  return data
-}
-
-export async function updateProfile(profileData) {
-  const token = getToken()
-
-  const response = await fetch(`${API_URL}/profilo`, {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`
-    },
-    body: JSON.stringify(profileData)
-  })
-
-  const data = await response.json()
-
-  if (!response.ok) {
-    throw new Error(data.errore || 'Errore aggiornamento profilo')
-  }
-
-  return data
-}
-
-export async function deleteProfile() {
-  const token = getToken()
-
-  const response = await fetch(`${API_URL}/profilo`, {
-    method: 'DELETE',
-    headers: {
-      Authorization: `Bearer ${token}`
-    }
-  })
-
-  const data = await response.json()
-
-  if (!response.ok) {
-    throw new Error(data.errore || 'Errore eliminazione account')
-  }
-
-  logoutUser()
-
-  return data
-}
-
-// ============================================================
-// Geocoding + routing per il pianificatore tragitto
-// ------------------------------------------------------------
-// NOTA: per produzione queste chiamate andrebbero proxate dal
-// Logic Server (la API key ORS non dovrebbe stare nel frontend).
-// Per D3 le tengo qui per velocità di sviluppo.
-// ============================================================
 
 /**
- * Geocoding via Nominatim (OpenStreetMap).
- * Cerca un luogo per nome e ritorna max 5 risultati con coordinate.
+ * Rimuove il token salvato localmente.
  *
- * @param {string} query - testo libero (es. "Madonna di Campiglio")
- * @returns {Promise<Array<{nome, lat, lng}>>}
+ * @returns {void}
  */
-export async function geocode(query) {
-  if (!query || query.length < 3) return []
-
-  const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5&countrycodes=it&addressdetails=1`
-
-  const response = await fetch(url, {
-    headers: { 'Accept-Language': 'it' }
-  })
-
-  if (!response.ok) {
-    throw new Error('Errore ricerca geografica')
-  }
-
-  const data = await response.json()
-  return data.map(r => ({
-    nome: r.display_name,
-    lat: Number(r.lat),
-    lng: Number(r.lon)
-  }))
+export function logoutUser() {
+  localStorage.removeItem('token')
 }
 
 /**
- * Calcola un tragitto pedonale da uno start a un end usando
- * OpenRouteService (profilo foot-hiking) e restituisce geometria,
- * distanza, durata, dislivelli e profilo altimetrico.
+ * Esegue una fetch autenticata aggiungendo il token JWT.
+ * In caso di sessione scaduta rimuove il token e notifica l'app.
  *
- * @param {[number, number]} start - [lat, lng]
- * @param {[number, number]} end - [lat, lng]
- * @returns {Promise<{coords, distance, duration, ascent, descent, profile}>}
- */
-
-export async function calcolaTragitto(start, end) {
-  if (!ORS_API_KEY) {
-    throw new Error('API key OpenRouteService non configurata. Aggiungi VITE_ORS_API_KEY al file .env')
-  }
-
-  const response = await fetch(
-    'https://api.openrouteservice.org/v2/directions/foot-hiking/geojson',
-    {
-      method: 'POST',
-      headers: {
-        'Authorization': ORS_API_KEY,
-        'Content-Type': 'application/json',
-        'Accept': 'application/geo+json'
-      },
-      body: JSON.stringify({
-        // ORS vuole [lon, lat], invertito rispetto a Leaflet
-        coordinates: [
-          [start[1], start[0]],
-          [end[1], end[0]]
-        ],
-        elevation: true,
-        units: 'm'
-      })
-    }
-  )
-
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}))
-    throw new Error(err?.error?.message || 'Tragitto non calcolabile per questi punti')
-  }
-
-  const data = await response.json()
-  const feature = data.features?.[0]
-  if (!feature) throw new Error('Nessun tragitto trovato')
-
-  const summary = feature.properties.summary
-  const raw3d = feature.geometry.coordinates // [lon, lat, ele]
-
-  // Coordinate in formato [lat, lng] per Leaflet
-  const coords = raw3d.map(c => [c[1], c[0]])
-
-  // Profilo altimetrico: distanza cumulativa + quota
-  const profile = []
-  let cumDist = 0
-  for (let i = 0; i < raw3d.length; i++) {
-    const [lon, lat, ele] = raw3d[i]
-    if (i > 0) {
-      const [pLon, pLat] = raw3d[i - 1]
-      cumDist += haversine(pLat, pLon, lat, lon)
-    }
-    profile.push({ distance: cumDist, elevation: ele })
-  }
-
-  const distanzaCalcolata = calcolaDistanzaProfilo(raw3d)
-  const dislivelli = calcolaDislivelliPuliti(raw3d)
-  const durataStimata = stimaDurataEscursionistica(
-  distanzaCalcolata,
-  dislivelli.ascent,
-  dislivelli.descent
-)
-
-return {
-  coords,
-  distance: distanzaCalcolata,
-  duration: durataStimata,
-  ascent: dislivelli.ascent,
-  descent: dislivelli.descent,
-  profile
-}
-}
-
-// Distanza in metri tra due punti lat/lng (formula di Haversine)
-function haversine(lat1, lon1, lat2, lon2) {
-  const R = 6371000
-  const toRad = (deg) => deg * Math.PI / 180
-  const dLat = toRad(lat2 - lat1)
-  const dLon = toRad(lon2 - lon1)
-  const a = Math.sin(dLat / 2) ** 2 +
-            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-            Math.sin(dLon / 2) ** 2
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-  return R * c
-}
-
-function calcolaDistanzaProfilo(raw3d) {
-  let totale = 0
-
-  for (let i = 1; i < raw3d.length; i++) {
-    const [lon1, lat1] = raw3d[i - 1]
-    const [lon2, lat2] = raw3d[i]
-
-    totale += haversine(lat1, lon1, lat2, lon2)
-  }
-
-  return totale
-}
-
-function calcolaDislivelliPuliti(raw3d) {
-  let ascent = 0
-  let descent = 0
-
-  const SOGLIA_RUMORE = 3
-
-  for (let i = 1; i < raw3d.length; i++) {
-    const elePrev = Number(raw3d[i - 1][2])
-    const eleNow = Number(raw3d[i][2])
-
-    if (!Number.isFinite(elePrev) || !Number.isFinite(eleNow)) continue
-
-    const diff = eleNow - elePrev
-
-    if (diff > SOGLIA_RUMORE) ascent += diff
-    if (diff < -SOGLIA_RUMORE) descent += Math.abs(diff)
-  }
-
-  return {
-    ascent: Math.round(ascent),
-    descent: Math.round(descent)
-  }
-}
-
-function stimaDurataEscursionistica(distanzaMetri, dislivelloPositivo, dislivelloNegativo = 0) {
-  const km = distanzaMetri / 1000
-
-  // Stima escursionistica prudente:
-  // 4 km/h in piano + 1h ogni 600m salita + piccolo peso sulla discesa
-  const ore =
-    km / 4 +
-    dislivelloPositivo / 600 +
-    dislivelloNegativo / 1200
-
-  return Math.round(ore * 3600)
-}
-
-export async function getPercorsiByBivacco(bivaccoId) {
-  const response = await fetch(`${API_URL}/bivacchi/${bivaccoId}/percorsi`)
-
-  if (!response.ok) {
-    throw new Error('Errore caricamento percorsi del bivacco')
-  }
-
-  return await response.json()
-}
-
-/**
- * Inietta in maniera automatica l'header Authorization con il JWT salvato e, 
- * se il backend risponde 401 (token scaduto o non valido),effettua il logout locale 
- * ed emette un evento custom 'bivacs:auth-expired' che i componenti possono ascoltare 
- * per aggiornare lo stato e mostrare un avviso.
- *
- * @param {string} url
- * @param {RequestInit} [options={}] - opzioni standard fetch
- * @returns {Promise<Response>} response originale, da consumare con .json() nel chiamante
+ * @param {string} url - URL della risorsa.
+ * @param {Object} [options={}] - Opzioni fetch.
+ * @returns {Promise<Response>}
  */
 async function fetchAuth(url, options = {}) {
   const token = getToken()
 
+  const headers = {
+    ...(options.headers || {})
+  }
+
+  if (token) {
+    headers.Authorization = `Bearer ${token}`
+  }
+
   const response = await fetch(url, {
     ...options,
-    headers: {
-      ...(options.headers || {}),
-      Authorization: `Bearer ${token}`
-    }
+    headers
   })
 
   if (response.status === 401) {
     logoutUser()
-    window.dispatchEvent(new CustomEvent('bivacs:auth-expired'))
+    window.dispatchEvent(new Event('bivacs:auth-expired'))
   }
 
   return response
 }
 
 /**
- * Avvia la procedura di recupero password: invia l'email al backend, 
- * che genera un token di reset valido un'ora e 
- * invia all'utente un link via posta elettronica.
+ * Converte una risposta HTTP in JSON e gestisce gli errori backend.
  *
- * @param {string} email - email dell'account per cui recuperare la password
- * @returns {Promise<{messaggio: string}>} conferma di invio della mail di recupero
- * @throws {Error} se l'email non esiste a sistema o se c'è un errore di rete
+ * @param {Response} response - Risposta fetch.
+ * @returns {Promise<any>}
+ */
+async function parseResponse(response) {
+  const contentType = response.headers.get('content-type') || ''
+  const isJson = contentType.includes('application/json')
+
+  const data = isJson ? await response.json() : await response.text()
+
+  if (!response.ok) {
+    const message =
+      data?.errore ||
+      data?.message ||
+      data?.error ||
+      data ||
+      'Errore durante la richiesta'
+
+    const error = new Error(message)
+    error.status = response.status
+    error.codiceErrore = data?.codiceErrore
+    throw error
+  }
+
+  return data
+}
+
+/**
+ * Registra un nuovo utente.
+ *
+ * @param {Object} payload - Dati registrazione.
+ * @returns {Promise<Object>}
+ */
+export async function registerUser(payload) {
+  const response = await fetch(`${API_URL}/auth/register`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(payload)
+  })
+
+  return parseResponse(response)
+}
+
+/**
+ * Effettua il login e salva il token JWT.
+ *
+ * @param {Object} payload - Credenziali utente.
+ * @returns {Promise<Object>}
+ */
+export async function loginUser(payload) {
+  const response = await fetch(`${API_URL}/auth/login`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(payload)
+  })
+
+  const data = await parseResponse(response)
+
+  if (data.token) {
+    localStorage.setItem('token', data.token)
+  }
+
+  return data
+}
+
+/**
+ * Richiede una mail di recupero password.
+ *
+ * @param {string} email - Email dell'utente.
+ * @returns {Promise<Object>}
  */
 export async function richiediRecuperoPassword(email) {
   const response = await fetch(`${API_URL}/auth/recupero_password`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json'
+    },
     body: JSON.stringify({ email })
   })
 
-  const data = await response.json()
-
-  if (!response.ok) {
-    throw new Error(data.errore || 'Errore durante la richiesta di recupero')
-  }
-
-  return data
+  return parseResponse(response)
 }
 
 /**
- * Completa la procedura di recupero password settando una nuova password.
- * Il token monouso arriva all'utente via mail e viene passato come parametro di URL così
- * il backend lo valida e aggiorna l'hash.
+ * Imposta una nuova password usando il token ricevuto via email.
  *
- * @param {string} token token di reset via email
- * @param {string} nuovaPassword nuova password in chiaro (verrà hashata lato server)
- * @returns {Promise<{messaggio: string}>} conferma di avvenuta modifica
- * @throws {Error}
+ * @param {string} token - Token di reset password.
+ * @param {string} nuovaPassword - Nuova password.
+ * @returns {Promise<Object>}
  */
 export async function resetPassword(token, nuovaPassword) {
   const response = await fetch(`${API_URL}/auth/reset-password/${token}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json'
+    },
     body: JSON.stringify({ nuovaPassword })
   })
 
-  const data = await response.json()
-
-  if (!response.ok) {
-    throw new Error(data.errore || 'Errore durante il reset della password')
-  }
-
-  return data
+  return parseResponse(response)
 }
 
 /**
- * Aggiunge un bivacco alla lista dei preferiti dell'utente loggato.
+ * Richiede un nuovo invio della mail di verifica account.
  *
- * @param {string} bivaccoId id del bivacco da aggiungere
- * @returns {Promise<{messaggio: string, preferiti: string[]}>} lista aggiornata di ObjectId
- * @throws {Error}
+ * @param {string} email - Email dell'utente.
+ * @returns {Promise<Object>}
  */
-export async function aggiungiPreferito(bivaccoId) {
-  const response = await fetchAuth(`${API_URL}/profilo/preferiti/${bivaccoId}`, {
-    method: 'POST'
-  })
-
-  const data = await response.json()
-
-  if (!response.ok) {
-    throw new Error(data.errore || 'Errore aggiunta ai preferiti')
-  }
-
-  return data
-}
-
-/**
- * Rimuove un bivacco dalla lista dei preferiti dell'utente loggato.
- *
- * @param {string} bivaccoId 
- * @returns {Promise<{messaggio: string, preferiti: string[]}>} 
- * @throws {Error} 
- */
-export async function rimuoviPreferito(bivaccoId) {
-  const response = await fetchAuth(`${API_URL}/profilo/preferiti/${bivaccoId}`, {
-    method: 'DELETE'
-  })
-
-  const data = await response.json()
-
-  if (!response.ok) {
-    throw new Error(data.errore || 'Errore rimozione dai preferiti')
-  }
-
-  return data
-}
-
-export async function getPreferiti() {
-  const token = getToken()
-
-  const response = await fetch(`${API_URL}/profilo`, {
-    headers: {
-      Authorization: `Bearer ${token}`
-    }
-  })
-
-  const data = await response.json()
-
-  if (!response.ok) {
-    throw new Error(data.errore || 'Errore caricamento preferiti')
-  }
-
-  return data.preferiti || []
-}
-
-// ============================================================
-// Meteo - US17, US18, US19, US20
-// ============================================================
-
-export async function getMeteoBivacco(bivaccoId) {
-  const response = await fetch(`${API_URL}/meteo/${bivaccoId}`)
-
-  const data = await response.json()
-
-  if (!response.ok) {
-    throw new Error(data.message || 'Errore caricamento meteo')
-  }
-
-  return data
-}
-
-export async function getPrevisioniBivacco(bivaccoId) {
-  const response = await fetch(`${API_URL}/meteo/${bivaccoId}/previsioni`)
-
-  const data = await response.json()
-
-  if (!response.ok) {
-    throw new Error(data.message || 'Errore caricamento previsioni')
-  }
-
-  return data
-}
-
-export async function getMeteoSintetico(bivacchiIds) {
-  const response = await fetch(`${API_URL}/meteo/sintetico`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ bivacchiIds })
-  })
-
-  const data = await response.json()
-
-  if (!response.ok) {
-    throw new Error(data.message || 'Errore caricamento meteo sintetico')
-  }
-
-  return data
-}
-
-export async function getAllertePreferiti() {
-  const response = await fetchAuth(`${API_URL}/meteo/preferiti/allerte`)
-
-  const data = await response.json()
-
-  if (!response.ok) {
-    throw new Error(data.message || 'Errore caricamento allerte preferiti')
-  }
-
-  return data
-}
-
-// ============================================================
-// Supporto Tecnico - US38, US39, US40
-// ============================================================
-
-export async function getLogApi() {
-  const response = await fetchAuth(`${API_URL}/supporto/log-api`)
-
-  const data = await response.json()
-
-  if (!response.ok) {
-    throw new Error(data.errore || data.message || 'Errore caricamento log API')
-  }
-
-  return data
-}
-
-export async function getConfigApi() {
-  const response = await fetchAuth(`${API_URL}/supporto/config-api`)
-
-  const data = await response.json()
-
-  if (!response.ok) {
-    throw new Error(data.errore || data.message || 'Errore caricamento configurazioni API')
-  }
-
-  return data
-}
-
-export async function creaConfigApi(config) {
-  const response = await fetchAuth(`${API_URL}/supporto/config-api`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(config)
-  })
-
-  const data = await response.json()
-
-  if (!response.ok) {
-    throw new Error(data.errore || data.message || 'Errore creazione configurazione API')
-  }
-
-  return data
-}
-
-export async function modificaConfigApi(configId, aggiornamenti) {
-  const response = await fetchAuth(`${API_URL}/supporto/config-api/${configId}`, {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(aggiornamenti)
-  })
-
-  const data = await response.json()
-
-  if (!response.ok) {
-    throw new Error(data.errore || data.message || 'Errore modifica configurazione API')
-  }
-
-  return data
-}
-
-export async function modificaBivaccoTecnico(bivaccoId, aggiornamenti) {
-  const response = await fetchAuth(`${API_URL}/supporto/bivacchi/${bivaccoId}`, {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(aggiornamenti)
-  })
-
-  const data = await response.json()
-
-  if (!response.ok) {
-    throw new Error(data.errore || data.message || 'Errore modifica bivacco')
-  }
-
-  return data
-}
-
-// ============================================================
-// Percorsi GPX - US14 (visualizzazione) e US16 (download)
-// ============================================================
-
-const API_BASE = API_URL  // alias per chiarezza
-
-/**
- * Restituisce l'URL pubblico per visualizzare il file GPX di un percorso
- * (usato dal componente RouteModal per disegnare la polyline sulla mappa).
- *
- * @param {string} percorsoId
- * @returns {string}
- */
-export function getGpxViewUrl(percorsoId) {
-  return `${API_URL}/percorsi/${percorsoId}/gpx`
-}
-
-/**
- * Recupera il contenuto testuale del file GPX di un percorso (XML).
- * Endpoint pubblico, no autenticazione.
- *
- * @param {string} percorsoId
- * @returns {Promise<string>} contenuto XML del file GPX
- */
-export async function getGpxText(percorsoId) {
-  const response = await fetch(getGpxViewUrl(percorsoId))
-
-  if (!response.ok) {
-    const data = await response.json().catch(() => ({}))
-    throw new Error(data.message || 'Errore caricamento file GPX')
-  }
-
-  return await response.text()
-}
-
-/**
- * Scarica il file GPX di un percorso tramite API backend autenticata (US16).
- * Innesca il download del file nel browser.
- *
- * @param {string} percorsoId
- * @param {string} [suggestedName='percorso.gpx'] - nome file da suggerire al browser
- * @returns {Promise<void>}
- */
-export async function scaricaGpxAutenticato(percorsoId, suggestedName = 'percorso.gpx') {
-  const response = await fetchAuth(`${API_URL}/percorsi/${percorsoId}/download`)
-
-  if (!response.ok) {
-    if (response.status === 401) {
-      throw new Error('Devi accedere per scaricare il file GPX')
-    }
-    const data = await response.json().catch(() => ({}))
-    throw new Error(data.message || 'Errore download GPX')
-  }
-
-  const blob = await response.blob()
-  const url = URL.createObjectURL(blob)
-
-  const a = document.createElement('a')
-  a.href = url
-  a.download = suggestedName
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-
-  setTimeout(() => URL.revokeObjectURL(url), 1000)
-}
-
-export async function creaBivaccoTecnico(bivacco) {
-  const response = await fetchAuth(`${API_URL}/supporto/bivacchi`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(bivacco)
-  })
-
-  const data = await response.json()
-
-  if (!response.ok) {
-    throw new Error(data.errore || data.message || 'Errore creazione bivacco')
-  }
-
-  return data
-}
-
-export async function richiediSupportoTecnico(data) {
-  const response = await fetchAuth(`${API_URL}/profilo/richiesta-supporto-tecnico`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data)
-  })
-
-  const res = await response.json()
-  if (!response.ok) throw new Error(res.errore || res.message || 'Errore invio richiesta')
-  return res
-}
-
-/**
- * @description Invia la richiesta per ottener eil ruolo di SuperUSer
- * @param {Object} data - Dati della richiesta (motivazione)
- * @returns {Promise<Object>} - Risposta server
- */
-export const richiediSuperUser = async (data) => {
-  const token = localStorage.getItem('bivacs_token')
-  const resp = await fetch(`${API_URL}/profilo/richiedi-super-user`, {
-    method: 'POST',
-    headers: {
-      'Conten-Type': 'application/json', 
-      'Authorization': `Bearer ${token}`
-    },
-    body: JSON.stringify(data)
-  })
-  if (!resp.ok){
-    const errorData = await resp.json().catch(() => ({}))
-    throw new Error(errorData.message || 'Errore invio richiesta SuperUser')
-  }
-  return await resp.json()
-}
-
-export async function getRichiesteSupporto() {
-  const response = await fetchAuth(`${API_URL}/supporto/richieste-supporto`)
-  const data = await response.json()
-
-  if (!response.ok) throw new Error(data.errore || data.message || 'Errore caricamento richieste')
-  return data
-}
-
-export async function approvaRichiestaSupporto(utenteId) {
-  const response = await fetchAuth(`${API_URL}/supporto/richieste-supporto/${utenteId}/approva`, {
-    method: 'PATCH'
-  })
-
-  const data = await response.json()
-  if (!response.ok) throw new Error(data.errore || data.message || 'Errore approvazione richiesta')
-  return data
-}
-
-export async function getAutoGpxText(bivaccoId) {
-  const response = await fetch(`${API_URL}/percorsi/bivacco/${bivaccoId}/auto-gpx`)
-
-  if (!response.ok) {
-    const data = await response.json().catch(() => ({}))
-    throw new Error(data.message || 'Nessun GPX SAT automatico trovato')
-  }
-
-  return await response.text()
-}
-
-export async function scaricaAutoGpxBivacco(bivaccoId, suggestedName = 'percorso_sat.gpx') {
-  const response = await fetchAuth(`${API_URL}/percorsi/bivacco/${bivaccoId}/auto-download`)
-
-  if (!response.ok) {
-    if (response.status === 401) {
-      throw new Error('Devi accedere per scaricare il file GPX')
-    }
-
-    const data = await response.json().catch(() => ({}))
-    throw new Error(data.message || 'Errore download GPX SAT')
-  }
-
-  const blob = await response.blob()
-  const url = URL.createObjectURL(blob)
-
-  const a = document.createElement('a')
-  a.href = url
-  a.download = suggestedName
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-
-  setTimeout(() => URL.revokeObjectURL(url), 1000)
-}
-
-/**
- * @description Attiva lo stato di emergenza per un bivacco
- * @param {string|number} bivaccoId - ID del bivacco
- * @param {string} note - Motivazione dell'emergenza
- * @returns {Promise<Object>} - Risposta del server
- */
-export const attivaEmergenza = async (bivaccoId, note) => {
-  const token = localStorage.getItem('bivacs_token')
-  const response = await fetch(`${API_URL}/bivacchi/${bivaccoId}/emergenza`, {
-    method: 'POST', 
-    headers:{
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    }, 
-    body: JSON.stringify({note})
-  })
-  if(!response.ok) throw new Error('Impossibile attivare l\'emergenza')
-  return response.json()
-}
-
-/**
- * @description Revoca lo stato di emergenza per un bivacco
- * @param {string|number} bivaccoId - ID del bivacco
- * @returns {Promise<Object>} - Risposta del server
- */
-export const revocaEmergenza = async (bivaccoId) => {
-  const token = localStorage.getItem('bivacs_token')
-  const response = await fetch(`${API_URL}/bivacchi/${bivaccoId}/revoca-emergenza`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${token}`
-    }
-  })
-
-  if (!response.ok) throw new Error('Impossibile revocare l\'emergenza')
-  return response.json()
-}
-
-/**
- * @description Recupera l'elenco dei ticket attivi per il Supporto Tecnico
- * @returns {Promise<Array>} Dati ticket
- */
-export const getCodaTicket = async () => {
-    const token = localStorage.getItem('bivacs_token');
-    const response = await fetch(`${API_URL}/supporto/ticket`, {
-      method: 'GET', 
-      headers:{
-        'Authorization':`Bearer ${token}`, 
-        'Accept':'application/json'
-      }
-    });
-    if (!response.ok) throw new Error('Impossibile recuperare i ticket');
-    return response.json();
-};
-
-/**
- * @description Aggiorna lo stato di un ticket
- * @param {string} ticketId - ID ticket
- * @param {string} stato - Nuovo stato
- * @returns {Promise<Object>} Ticket aggiornato
- */
-export const aggiornaStatoTicket = async (ticketId, stato, note = null) => {
-    const token = localStorage.getItem('bivacs_token');
-    const payload = {stato};
-
-    if(note){
-      payload.note = note;
-    }
-
-    const response = await fetch(`${API_URL}/supporto/ticket/${ticketId}/stato`, {
-        method: 'PATCH',
-        headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}` 
-        },
-        body: JSON.stringify({payload})
-    });
-    if (!response.ok) throw new Error('Errore aggiornamento stato ticket');
-    return response.json();
-};
-
-/**
- * @description Archivia un ticket
- * @param {string} ticketId - ID ticket (CHE DEVE ESSERE CHIUSO) da archiviare
- * @returns {Promise<Object>} Esito operazione
- */
-export const archiviaTicket = async (ticketId) => {
-    const token = localStorage.getItem('bivacs_token');
-    const response = await fetch(`${API_URL}/supporto/ticket/${ticketId}/archivia`, {
-        method: 'PATCH',
-        headers: {'Authorization': `Bearer ${token}`}
-    });
-    if (!response.ok) throw new Error('Errore durante l\'archiviazione del ticket. Assicurati che sia chiuso.');
-    return response.json();
-};
-
-/**
- * @description Recupera le segnalazioni non archiviate
- * @returns {Promise<Array>} Array delle segnalazioni
- */
-export const getSegnalazioniDaGestire = async () => {
-    const token = localStorage.getItem('bivacs_token');
-    const response = await fetch(`${API_URL}/supporto/segnalazioni`, {
-        headers: {'Authorization': `Bearer ${token}`}
-    });
-    if (!response.ok) throw new Error('Errore durante il recupero delle segnalazioni');
-    return response.json();
-};
-
-/**
- * @description Invia al server la richiesta di generare un ticket da una determinata segnalazione
- * @param {string} segnalazioneId - ObjectId della Segnalazione
- * @param {number} priorita - Priorità assegnata al ticket
- * @returns {Promise<Object>} Ticket creato
- */
-export const generaTicketDaSegnalazione = async (segnalazioneId, priority) => {
-    const token = localStorage.getItem('bivacs_token');
-    const response = await fetch(`${API_URL}/supporto/ticket`, {
-        method: 'POST',
-        headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}` 
-        },
-        body: JSON.stringify({segnalazioneId, priority})
-    });
-    if (!response.ok) throw new Error('Impossibile generare il ticket.');
-    return response.json();
-};
-
-/**
- * @description Richiede al server il dataset delle segnalazioni
- * @returns {Promise<void>}
- */
-export const esportaCSV = async () => {
-    const token = localStorage.getItem('bivacs_token');
-
-    const resp = await fetch(`${API_URL}/supporto/segnalazioni/export/csv`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'text/csv'                          // bugfix: segnalo al server che aspettiamo un file csv 
-      }
-    });
-    if (!resp.ok) {
-      const errorData = await resp.text();                          // estraggo il testo dell'errore per debug
-      throw new Error(`Errore ${resp.status}: ${errorData || 'Impossibile generare file CSV}'}`);
-    }
-
-    const blob = await resp.blob();
-    const url = window.URL.createObjectURL(blob);
-    
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'dataset_segnalazioni_bivacs.csv';
-    document.body.appendChild(a);
-    a.click();                                      // simulo un click per far avviare il download
-    
-    document.body.removeChild(a);                   // pulisco per evitare garbage
-    setTimeout(() => {window.URL.revokeObjectURL(url);}, 100);
-};
-
-export async function getMieSegnalazioni() {
-  const response = await fetchAuth(`${API_URL}/segnalazioni/mie`)
-
-  const data = await response.json()
-
-  if (!response.ok) {
-    throw new Error(data.errore || data.message || 'Errore caricamento segnalazioni')
-  }
-
-  return data
-}
-
 export async function resendVerificationEmail(email) {
   const response = await fetch(`${API_URL}/auth/resend-verification`, {
     method: 'POST',
@@ -1008,30 +190,222 @@ export async function resendVerificationEmail(email) {
     body: JSON.stringify({ email })
   })
 
-  const text = await response.text()
-  const data = text ? JSON.parse(text) : {}
+  return parseResponse(response)
+}
 
-  if (!response.ok) {
-    throw new Error(data.errore || 'Errore invio email di verifica')
+/**
+ * Recupera tutti i bivacchi applicando eventuali filtri.
+ *
+ * @param {Object} [filters={}] - Filtri di ricerca.
+ * @returns {Promise<Array>}
+ */
+export async function getBivacchi(filters = {}) {
+  const params = new URLSearchParams()
+
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      params.append(key, value)
+    }
+  })
+
+  const query = params.toString()
+  const response = await fetch(`${API_URL}/bivacchi${query ? `?${query}` : ''}`)
+
+  return parseResponse(response)
+}
+
+/**
+ * Recupera la scheda dettagliata di un bivacco.
+ *
+ * @param {string} id - ObjectId del bivacco.
+ * @returns {Promise<Object>}
+ */
+export async function getBivaccoById(id) {
+  const response = await fetch(`${API_URL}/bivacchi/${id}`)
+  const data = await parseResponse(response)
+
+  if (data.bivacco) {
+    return {
+      ...data.bivacco,
+      ticketManutenzione: data.ticketManutenzione || [],
+      risorse: data.risorse || null
+    }
   }
 
   return data
 }
 
-export async function getStoricoSegnalazioniStaff() {
+/**
+ * Recupera il profilo dell'utente autenticato.
+ *
+ * @returns {Promise<Object>}
+ */
+export async function getProfile() {
+  const response = await fetchAuth(`${API_URL}/profilo`)
+  return parseResponse(response)
+}
+
+/**
+ * Aggiorna il profilo dell'utente autenticato.
+ *
+ * @param {Object} payload - Campi da aggiornare.
+ * @returns {Promise<Object>}
+ */
+export async function updateProfile(payload) {
+  const response = await fetchAuth(`${API_URL}/profilo`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(payload)
+  })
+
+  return parseResponse(response)
+}
+
+/**
+ * Elimina definitivamente l'account autenticato.
+ *
+ * @returns {Promise<Object>}
+ */
+export async function deleteProfile() {
+  const response = await fetchAuth(`${API_URL}/profilo`, {
+    method: 'DELETE'
+  })
+
+  return parseResponse(response)
+}
+
+/**
+ * Aggiunge un bivacco ai preferiti.
+ *
+ * @param {string} bivaccoId - ObjectId del bivacco.
+ * @returns {Promise<Object>}
+ */
+export async function addPreferito(bivaccoId) {
+  const response = await fetchAuth(`${API_URL}/profilo/preferiti/${bivaccoId}`, {
+    method: 'POST'
+  })
+
+  return parseResponse(response)
+}
+
+/**
+ * Rimuove un bivacco dai preferiti.
+ *
+ * @param {string} bivaccoId - ObjectId del bivacco.
+ * @returns {Promise<Object>}
+ */
+export async function removePreferito(bivaccoId) {
+  const response = await fetchAuth(`${API_URL}/profilo/preferiti/${bivaccoId}`, {
+    method: 'DELETE'
+  })
+
+  return parseResponse(response)
+}
+
+/**
+ * Invia una richiesta per diventare Supporto Tecnico.
+ *
+ * @param {Object} payload - Motivo e matricola richiesta.
+ * @returns {Promise<Object>}
+ */
+export async function richiediSupportoTecnico(payload) {
+  const response = await fetchAuth(`${API_URL}/profilo/richiesta-supporto-tecnico`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(payload)
+  })
+
+  return parseResponse(response)
+}
+
+/**
+ * Recupera le recensioni di un bivacco.
+ *
+ * @param {string} bivaccoId - ObjectId del bivacco.
+ * @returns {Promise<Array>}
+ */
+export async function getRecensioni(bivaccoId) {
+  const response = await fetch(`${API_URL}/recensioni/${bivaccoId}`)
+  return parseResponse(response)
+}
+
+/**
+ * Crea una nuova recensione.
+ *
+ * @param {Object} payload - Dati recensione.
+ * @returns {Promise<Object>}
+ */
+export async function createRecensione(payload) {
+  const response = await fetch(`${API_URL}/recensioni`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(payload)
+  })
+
+  return parseResponse(response)
+}
+
+/**
+ * Crea una nuova segnalazione con foto.
+ *
+ * @param {FormData} formData - FormData con bivaccoId, descrizione e foto.
+ * @returns {Promise<Object>}
+ */
+export async function creaSegnalazione(formData) {
+  const response = await fetchAuth(`${API_URL}/segnalazioni`, {
+    method: 'POST',
+    body: formData
+  })
+
+  return parseResponse(response)
+}
+
+/**
+ * Recupera le segnalazioni associate a un bivacco.
+ *
+ * @param {string} bivaccoId - ObjectId del bivacco.
+ * @returns {Promise<Array>}
+ */
+export async function getSegnalazioniBivacco(bivaccoId) {
+  const response = await fetchAuth(`${API_URL}/segnalazioni/bivacco/${bivaccoId}`)
+  return parseResponse(response)
+}
+
+/**
+ * Recupera le segnalazioni inviate dall'utente autenticato.
+ *
+ * @returns {Promise<Array>}
+ */
+export async function getMieSegnalazioni() {
+  const response = await fetchAuth(`${API_URL}/segnalazioni/mie`)
+  return parseResponse(response)
+}
+
+/**
+ * Recupera lo storico completo delle segnalazioni.
+ *
+ * @returns {Promise<Array>}
+ */
+export async function getStoricoSegnalazioni() {
   const response = await fetchAuth(`${API_URL}/segnalazioni/storico`)
-
-  const data = await response.json()
-
-  if (!response.ok) {
-    throw new Error(data.errore || data.message || 'Errore caricamento storico segnalazioni')
-  }
-
-  return data
+  return parseResponse(response)
 }
 
-export async function aggiornaStatoSegnalazione(id, nuovoStato) {
-  const response = await fetchAuth(`${API_URL}/segnalazioni/${id}/stato`, {
+/**
+ * Aggiorna lo stato di una segnalazione.
+ *
+ * @param {string} segnalazioneId - ObjectId della segnalazione.
+ * @param {string} nuovoStato - Nuovo stato.
+ * @returns {Promise<Object>}
+ */
+export async function aggiornaStatoSegnalazione(segnalazioneId, nuovoStato) {
+  const response = await fetchAuth(`${API_URL}/segnalazioni/${segnalazioneId}/stato`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json'
@@ -1039,11 +413,444 @@ export async function aggiornaStatoSegnalazione(id, nuovoStato) {
     body: JSON.stringify({ nuovoStato })
   })
 
-  const data = await response.json()
+  return parseResponse(response)
+}
+
+/**
+ * Recupera il meteo realtime di un bivacco.
+ *
+ * @param {string} bivaccoId - ObjectId del bivacco.
+ * @returns {Promise<Object>}
+ */
+export async function getMeteoBivacco(bivaccoId) {
+  const response = await fetch(`${API_URL}/meteo/${bivaccoId}`)
+  return parseResponse(response)
+}
+
+/**
+ * Recupera le previsioni a tre giorni di un bivacco.
+ *
+ * @param {string} bivaccoId - ObjectId del bivacco.
+ * @returns {Promise<Object>}
+ */
+export async function getPrevisioniBivacco(bivaccoId) {
+  const response = await fetch(`${API_URL}/meteo/${bivaccoId}/previsioni`)
+  return parseResponse(response)
+}
+
+/**
+ * Recupera meteo sintetico per una lista di bivacchi.
+ *
+ * @param {Array<string>} bivacchiIds - Lista ObjectId bivacchi.
+ * @returns {Promise<Object>}
+ */
+export async function getMeteoSintetico(bivacchiIds) {
+  const response = await fetch(`${API_URL}/meteo/sintetico`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ bivacchiIds })
+  })
+
+  return parseResponse(response)
+}
+
+/**
+ * Recupera allerte meteo sui bivacchi preferiti.
+ *
+ * @returns {Promise<Object>}
+ */
+export async function getAllertePreferiti() {
+  const response = await fetchAuth(`${API_URL}/meteo/preferiti/allerte`)
+  return parseResponse(response)
+}
+
+/**
+ * Aggiorna lo stato di acqua e legna di un bivacco.
+ *
+ * @param {string} bivaccoId - ObjectId del bivacco.
+ * @param {Object} payload - Stato acqua e legna.
+ * @returns {Promise<Object>}
+ */
+export async function aggiornaRisorseBivacco(bivaccoId, payload) {
+  const response = await fetchAuth(`${API_URL}/bivacchi/${bivaccoId}/risorse`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(payload)
+  })
+
+  return parseResponse(response)
+}
+
+/**
+ * Recupera tutti i percorsi.
+ *
+ * @returns {Promise<Array>}
+ */
+export async function getPercorsi() {
+  const response = await fetch(`${API_URL}/percorsi`)
+  return parseResponse(response)
+}
+
+/**
+ * Recupera i percorsi associati a un bivacco.
+ *
+ * @param {string} bivaccoId - ObjectId del bivacco.
+ * @returns {Promise<Array>}
+ */
+export async function getPercorsiBivacco(bivaccoId) {
+  const response = await fetch(`${API_URL}/bivacchi/${bivaccoId}/percorsi`)
+  return parseResponse(response)
+}
+
+/**
+ * Recupera automaticamente il GPX SAT più vicino al bivacco.
+ *
+ * @param {string} bivaccoId - ObjectId del bivacco.
+ * @returns {Promise<string>} Contenuto GPX in formato testo.
+ */
+export async function getAutoGpxBivacco(bivaccoId) {
+  const response = await fetch(`${API_URL}/percorsi/bivacco/${bivaccoId}/auto-gpx`)
 
   if (!response.ok) {
-    throw new Error(data.errore || data.message || 'Errore aggiornamento stato segnalazione')
+    const data = await response.json().catch(() => ({}))
+    throw new Error(data.message || 'GPX non disponibile')
   }
 
-  return data
+  return response.text()
+}
+
+/**
+ * Restituisce l'URL per scaricare automaticamente il GPX SAT più vicino.
+ *
+ * @param {string} bivaccoId - ObjectId del bivacco.
+ * @returns {string}
+ */
+export function getAutoDownloadGpxUrl(bivaccoId) {
+  return `${API_URL}/percorsi/bivacco/${bivaccoId}/auto-download`
+}
+
+/**
+ * Restituisce l'URL per scaricare il GPX di un percorso specifico.
+ *
+ * @param {string} percorsoId - ObjectId del percorso.
+ * @returns {string}
+ */
+export function getDownloadGpxUrl(percorsoId) {
+  return `${API_URL}/percorsi/${percorsoId}/download`
+}
+
+/**
+ * Recupera i log delle API esterne per il Supporto Tecnico.
+ *
+ * @returns {Promise<Array>}
+ */
+export async function getLogApi() {
+  const response = await fetchAuth(`${API_URL}/supporto/log-api`)
+  return parseResponse(response)
+}
+
+/**
+ * Recupera le configurazioni dei provider API.
+ *
+ * @returns {Promise<Array>}
+ */
+export async function getConfigApi() {
+  const response = await fetchAuth(`${API_URL}/supporto/config-api`)
+  return parseResponse(response)
+}
+
+/**
+ * Crea una nuova configurazione API.
+ *
+ * @param {Object} payload - Dati configurazione.
+ * @returns {Promise<Object>}
+ */
+export async function creaConfigApi(payload) {
+  const response = await fetchAuth(`${API_URL}/supporto/config-api`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(payload)
+  })
+
+  return parseResponse(response)
+}
+
+/**
+ * Aggiorna una configurazione API.
+ *
+ * @param {string} configId - ObjectId configurazione.
+ * @param {Object} payload - Campi aggiornati.
+ * @returns {Promise<Object>}
+ */
+export async function aggiornaConfigApi(configId, payload) {
+  const response = await fetchAuth(`${API_URL}/supporto/config-api/${configId}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(payload)
+  })
+
+  return parseResponse(response)
+}
+
+/**
+ * Aggiorna dati tecnici di un bivacco dal pannello Supporto Tecnico.
+ *
+ * @param {string} bivaccoId - ObjectId bivacco.
+ * @param {Object} payload - Campi tecnici aggiornati.
+ * @returns {Promise<Object>}
+ */
+export async function aggiornaBivaccoTecnico(bivaccoId, payload) {
+  const response = await fetchAuth(`${API_URL}/supporto/bivacchi/${bivaccoId}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(payload)
+  })
+
+  return parseResponse(response)
+}
+
+/**
+ * Crea un bivacco dal pannello Supporto Tecnico.
+ *
+ * @param {Object} payload - Dati nuovo bivacco.
+ * @returns {Promise<Object>}
+ */
+export async function creaBivaccoTecnico(payload) {
+  const response = await fetchAuth(`${API_URL}/supporto/bivacchi`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(payload)
+  })
+
+  return parseResponse(response)
+}
+
+/**
+ * Recupera richieste pendenti di promozione a Supporto Tecnico.
+ *
+ * @returns {Promise<Array>}
+ */
+export async function getRichiesteSupportoTecnico() {
+  const response = await fetchAuth(`${API_URL}/supporto/richieste-supporto`)
+  return parseResponse(response)
+}
+
+/**
+ * Approva una richiesta di promozione a Supporto Tecnico.
+ *
+ * @param {string} utenteId - ObjectId utente.
+ * @returns {Promise<Object>}
+ */
+export async function approvaRichiestaSupportoTecnico(utenteId) {
+  const response = await fetchAuth(`${API_URL}/supporto/richieste-supporto/${utenteId}/approva`, {
+    method: 'PATCH'
+  })
+
+  return parseResponse(response)
+}
+
+/**
+ * Rifiuta una richiesta di promozione a Supporto Tecnico.
+ *
+ * @param {string} utenteId - ObjectId utente.
+ * @param {string} motivoRifiuto - Motivo opzionale.
+ * @returns {Promise<Object>}
+ */
+export async function rifiutaRichiestaSupportoTecnico(utenteId, motivoRifiuto = '') {
+  const response = await fetchAuth(`${API_URL}/supporto/richieste-supporto/${utenteId}/rifiuta`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ motivoRifiuto })
+  })
+
+  return parseResponse(response)
+}
+
+/**
+ * Geocodifica un indirizzo tramite OpenRouteService.
+ * Per il prototipo universitario la chiamata resta nel frontend;
+ * in produzione andrebbe spostata sul backend per non esporre la API key.
+ *
+ * @param {string} text - Indirizzo o luogo cercato.
+ * @returns {Promise<Array>}
+ */
+export async function geocode(text) {
+  if (!ORS_API_KEY) {
+    throw new Error('Chiave OpenRouteService non configurata')
+  }
+
+  const params = new URLSearchParams({
+    api_key: ORS_API_KEY,
+    text,
+    size: '5',
+    'boundary.country': 'IT'
+  })
+
+  const response = await fetch(`https://api.openrouteservice.org/geocode/search?${params}`)
+  const data = await parseResponse(response)
+
+  return data.features || []
+}
+
+/**
+ * Calcola la distanza in metri tra due coordinate.
+ *
+ * @param {number} lat1
+ * @param {number} lon1
+ * @param {number} lat2
+ * @param {number} lon2
+ * @returns {number}
+ */
+function haversine(lat1, lon1, lat2, lon2) {
+  const R = 6371000
+  const toRad = deg => (deg * Math.PI) / 180
+
+  const dLat = toRad(lat2 - lat1)
+  const dLon = toRad(lon2 - lon1)
+
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) *
+      Math.cos(toRad(lat2)) *
+      Math.sin(dLon / 2) ** 2
+
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
+/**
+ * Calcola il profilo distanze/elevazioni partendo dalle coordinate ORS.
+ *
+ * @param {Array<Array<number>>} coordsLonLatEle - Coordinate [lon, lat, ele].
+ * @returns {Array<{distance:number, elevation:number}>}
+ */
+function calcolaDistanzaProfilo(coordsLonLatEle) {
+  let totale = 0
+
+  return coordsLonLatEle.map((coord, index) => {
+    const [lon, lat, ele = 0] = coord
+
+    if (index > 0) {
+      const [prevLon, prevLat] = coordsLonLatEle[index - 1]
+      totale += haversine(prevLat, prevLon, lat, lon)
+    }
+
+    return {
+      distance: totale,
+      elevation: Number(ele) || 0
+    }
+  })
+}
+
+/**
+ * Calcola dislivello positivo e negativo filtrando piccoli rumori altimetrici.
+ *
+ * @param {Array<{distance:number, elevation:number}>} profile - Profilo altimetrico.
+ * @returns {{ascent:number, descent:number}}
+ */
+function calcolaDislivelliPuliti(profile) {
+  let ascent = 0
+  let descent = 0
+
+  for (let i = 1; i < profile.length; i++) {
+    const diff = profile[i].elevation - profile[i - 1].elevation
+
+    if (Math.abs(diff) < 2) continue
+
+    if (diff > 0) {
+      ascent += diff
+    } else {
+      descent += Math.abs(diff)
+    }
+  }
+
+  return {
+    ascent,
+    descent
+  }
+}
+
+/**
+ * Stima la durata escursionistica usando distanza e dislivello positivo.
+ *
+ * @param {number} distanceMeters - Distanza in metri.
+ * @param {number} ascentMeters - Dislivello positivo in metri.
+ * @returns {number} Durata stimata in secondi.
+ */
+function stimaDurataEscursionistica(distanceMeters, ascentMeters) {
+  const oreDistanza = distanceMeters / 4000
+  const oreSalita = ascentMeters / 400
+  return Math.round((oreDistanza + oreSalita) * 3600)
+}
+
+/**
+ * Calcola un tragitto escursionistico con OpenRouteService.
+ *
+ * @param {Array<number>} startCoord - Coordinate partenza [lat, lng].
+ * @param {Array<number>} endCoord - Coordinate arrivo [lat, lng].
+ * @returns {Promise<Object>}
+ */
+export async function calcolaTragitto(startCoord, endCoord) {
+  if (!ORS_API_KEY) {
+    throw new Error('Chiave OpenRouteService non configurata')
+  }
+
+  const body = {
+    coordinates: [
+      [startCoord[1], startCoord[0]],
+      [endCoord[1], endCoord[0]]
+    ],
+    elevation: true,
+    instructions: true,
+    preference: 'recommended'
+  }
+
+  const response = await fetch('https://api.openrouteservice.org/v2/directions/foot-hiking/geojson', {
+    method: 'POST',
+    headers: {
+      Authorization: ORS_API_KEY,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(body)
+  })
+
+  const data = await parseResponse(response)
+  const feature = data.features?.[0]
+
+  if (!feature) {
+    throw new Error('Percorso non trovato')
+  }
+
+  const rawCoords = feature.geometry.coordinates || []
+  const coords = rawCoords.map(([lon, lat]) => [lat, lon])
+  const profile = calcolaDistanzaProfilo(rawCoords)
+  const dislivelli = calcolaDislivelliPuliti(profile)
+
+  const distance = feature.properties?.summary?.distance || profile.at(-1)?.distance || 0
+  const duration =
+    feature.properties?.summary?.duration ||
+    stimaDurataEscursionistica(distance, dislivelli.ascent)
+
+  return {
+    coords,
+    profile,
+    distance,
+    duration,
+    ascent: dislivelli.ascent,
+    descent: dislivelli.descent,
+    instructions: feature.properties?.segments?.[0]?.steps || []
+  }
 }

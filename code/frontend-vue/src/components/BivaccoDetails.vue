@@ -7,12 +7,14 @@
 <script setup>
 import { reactive, ref, watch, computed } from 'vue'
 
-import {
-  creaRecensione,
-  getRecensioni, 
-  getToken, 
+import { 
   attivaEmergenza, 
-  revocaEmergenza
+  revocaEmergenza,
+  createRecensione,
+  getRecensioni,
+  getToken,
+  creaSegnalazione,
+  getSegnalazioniBivacco
 } from '../services/api'
 
 import TripPlanner from './TripPlanner.vue'
@@ -130,7 +132,7 @@ async function submitRecensione() {
   }
 
   try {
-    await api.creaRecensione({
+    await createRecensione({
       bivaccoId: props.bivacco._id,
       utente: nomeUtente.value,
       stelle: Number(recensioneForm.stelle),
@@ -256,21 +258,13 @@ const isStaff = computed(() => {
  */
 const loadStoricoSegnalazioni = async () => {
   if (!isStaff.value) return
+
   storicoLoading.value = true
+
   try {
-    const token = localStorage.getItem('bivacs_token')
-    const response = await fetch(`/api/v1/segnalazioni/bivacco/${props.bivacco._id}`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    })
-    if (response.ok) {
-      storicoSegnalazioni.value = await response.json()
-    }
+    storicoSegnalazioni.value = await getSegnalazioniBivacco(props.bivacco._id)
   } catch (error) {
-    console.error("Errore nel caricamento dello storico segnalazioni:", error)
+    console.error('Errore nel caricamento dello storico segnalazioni:', error)
   } finally {
     storicoLoading.value = false
   }

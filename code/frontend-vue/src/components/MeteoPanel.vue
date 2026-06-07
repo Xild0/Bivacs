@@ -1,4 +1,10 @@
-<script setup>
+
+/**
+ * @file MeteoPanel.vue
+ * @description Pannello meteo del bivacco con condizioni realtime, livello di rischio e previsioni a 3 giorni.
+ */
+ 
+ <script setup>
 import { ref, watch, computed } from 'vue'
 import { getMeteoBivacco, getPrevisioniBivacco } from '../services/api'
 

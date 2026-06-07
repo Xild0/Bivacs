@@ -15,6 +15,15 @@ const meteoTrentino = require('../utils/meteoTrentino');
 
 const OPEN_METEO_URL = 'https://api.open-meteo.com/v1/forecast';
 
+/**
+ * Calcola il livello di rischio meteo sulla base
+ * della velocità del vento e delle precipitazioni.
+ *
+ * @param {number} vento
+ * @param {number} precipitazioni
+ * @returns {string}
+ */
+
 function calcolaLivelloRischio(vento, precipitazioni) {
   if (vento >= 70 || precipitazioni >= 20) return 'forte';
   if (vento >= 50 || precipitazioni >= 10) return 'marcato';
@@ -22,9 +31,29 @@ function calcolaLivelloRischio(vento, precipitazioni) {
   return 'basso';
 }
 
+/**
+ * Determina se le condizioni meteo possono essere
+ * considerate avverse per l'escursionismo.
+ *
+ * @param {number} vento
+ * @param {number} precipitazioni
+ * @returns {boolean}
+ */
+
+
 function isMeteoAvverso(vento, precipitazioni) {
   return vento >= 50 || precipitazioni >= 10;
 }
+
+/**
+ * Registra nel database l'esito di una chiamata
+ * verso un provider API esterno.
+ *
+ * @param {string} provider
+ * @param {boolean} esito
+ * @param {string} dettaglioErrore
+ * @returns {Promise<void>}
+ */
 
 async function salvaLog(provider, esito, dettaglioErrore = '') {
   try {

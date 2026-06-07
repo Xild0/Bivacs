@@ -13,6 +13,11 @@ if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
+/**
+ * Configurazione del salvataggio locale dei file caricati.
+ * I file vengono memorizzati nella cartella uploads/segnalazioni.
+ */
+
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, uploadDir);
@@ -23,6 +28,14 @@ const storage = multer.diskStorage({
   }
 });
 
+/**
+ * Consente esclusivamente immagini JPG, PNG e WEBP.
+ *
+ * @param {import('express').Request} req
+ * @param {Express.Multer.File} file
+ * @param {Function} cb
+ */
+
 const fileFilter = function (req, file, cb) {
   const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
 
@@ -32,6 +45,12 @@ const fileFilter = function (req, file, cb) {
     cb(new Error('Formato immagine non valido. Usa JPG, PNG o WEBP.'));
   }
 };
+
+/**
+ * Middleware Multer utilizzato per il caricamento delle immagini
+ * associate alle segnalazioni degli utenti.
+ */
+
 
 const upload = multer({
   storage,

@@ -1,35 +1,32 @@
-# DIPENDENZE E VARIABILI D'AMBIENTE
+# DIPENDENZE E SEGRETI (FONDAMENTALI PER TUTTI)
+# =======================================
 **/node_modules/
 **/.env
-**/.env.*
-!**/.env.example
 
-# FILE LOG
+# CONFIGURAZIONE DOCKER LOCALE TOLLO 
+# NON RIMUOVERE ALTRIMENTI MI SI ROMPE TUTTO IL CODICE
+# ======================================= 
+docker-compose.yaml
+docker-compose.yml
+**/Dockerfile
+
+# BUILD FRONTEND 
+# =======================================
+**/dist/
+
+# LOG DI ERRORE NODE.JS
+=======================================
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-pnpm-debug.log*
 
-# BUILD FRONTEND
-**/dist 
-
-# FILE SPECIFICI DEI SISTEMI OPERATIVI
-# Windows
+# SPAZZATURA SISTEMI OPERATIVI
+# SICCOME ABBIAMO SIA WINDOWS CHE LINUX SU CUI FAR GIRARE IL CODICE
+# =======================================
 Thumbs.db
-ehthumbs.db
-Desktop.ini
-$RECYCLE.BIN/
 
-# IDE
-.vscode/.history/
+# EDITOR E IDE
+# =======================================
 .idea/
 *.suo
 *.sln
-
-# DOCKER TOLLO
-# NON RIMUOVERE O MI SI ROMPE TUTTO
-docker-data/
-db-data/
-
-# CARTELLA UPLOADS
-code/backend/uploads/segnalazioni/*

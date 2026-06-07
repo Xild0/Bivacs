@@ -9,7 +9,8 @@ const dns = require("dns");
 dns.setServers(["8.8.8.8", "1.1.1.1"]);
 
 /**
- * DA LASCIARE PER EVITARE PROBLEMI DI COMPATIBILITà
+ * Espone WebCrypto globalmente per compatibilità con librerie
+ * che richiedono global.crypto anche in ambiente Node.js.
  */
 const crypto = require('crypto');
 global.crypto = crypto.webcrypto || crypto;

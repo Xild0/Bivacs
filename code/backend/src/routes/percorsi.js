@@ -42,6 +42,13 @@ const parser = new XMLParser({
 const MAX_DISTANZA_GPX_METRI = 800
 let gpxCache = null
 
+/**
+ * Calcola la distanza in metri tra due coordinate geografiche
+ * utilizzando la formula di Haversine.
+ *
+ * @returns {number}
+ */
+
 function haversine(lat1, lon1, lat2, lon2) {
   const R = 6371000
   const toRad = deg => deg * Math.PI / 180
@@ -57,6 +64,13 @@ function haversine(lat1, lon1, lat2, lon2) {
 
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
+
+/**
+ * Estrae tutti i punti geografici presenti in un file GPX.
+ *
+ * @param {string} filePath
+ * @returns {Array<{lat:number, lon:number}>}
+ */
 
 function estraiPuntiGpx(filePath) {
   const xml = fs.readFileSync(filePath, 'utf8')
@@ -96,6 +110,13 @@ function estraiPuntiGpx(filePath) {
     .filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lon))
 }
 
+/**
+ * Carica e memorizza in cache i file GPX disponibili
+ * per velocizzare le successive ricerche.
+ *
+ * @returns {Array}
+ */
+
 function caricaGpxCache() {
   if (gpxCache) return gpxCache
 
@@ -129,6 +150,14 @@ function caricaGpxCache() {
 
   return gpxCache
 }
+
+/**
+ * Individua il file GPX SAT più vicino alle coordinate
+ * del bivacco specificato.
+ *
+ * @param {Object} bivacco
+ * @returns {Object|null}
+ */
 
 function trovaGpxPiuVicino(bivacco) {
   const lat = Number(bivacco.latitudine)

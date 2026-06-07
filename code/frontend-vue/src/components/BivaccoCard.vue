@@ -5,8 +5,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import { aggiungiPreferito, rimuoviPreferito } from '../services/api'
-import { getMeteoBivacco } from '../services/api'
+import { addPreferito, removePreferito } from '../services/api'
 
 const props = defineProps({
   bivacco: { type: Object, required: true },
@@ -59,8 +58,8 @@ async function toggleFavorite(event) {
 
   try {
     const data = props.isFavorite
-      ? await rimuoviPreferito(props.bivacco._id)
-      : await aggiungiPreferito(props.bivacco._id)
+  ? await removePreferito(props.bivacco._id)
+  : await addPreferito(props.bivacco._id)
 
     emit('favorite-changed', data.preferiti || [])
   } catch (error) {
