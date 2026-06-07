@@ -33,6 +33,7 @@ const percorsiRoutes = require('./routes/percorsi');
 const segnalazioniRoute = require('./routes/segnalazioniRoute');
 const meteoRoute = require('./routes/meteo');
 const supportoRoute = require('./routes/supporto');
+const ticketRoute = require('./routes/ticket')
 
 /**
  * Inizializzazione applicazione Express.
@@ -76,6 +77,7 @@ app.use('/api/v1/percorsi', percorsiRoutes);
 app.use('/api/v1/segnalazioni', segnalazioniRoute);
 app.use('/api/v1/meteo', meteoRoute);
 app.use('/api/v1/supporto', supportoRoute);
+app.use('api/v1/ticket', ticketRoute);
 
 /**
  * Route di test per verificare che il server sia online.

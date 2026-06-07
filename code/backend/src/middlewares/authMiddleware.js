@@ -75,16 +75,13 @@ const isStaff = (req, res, next) => {
  * @returns {void}
  */
 const isSuperUser = (req, res, next) => {
-    const tipoUtente = req.utente.discriminator;
-
-    if (tipoUtente === 'SuperUser') {
-        next();
-    } else {
-        return res.status(403).json({ 
-            errore: 'Accesso negato. Funzione riservata solo ai SuperUser.'
-        });
+    if(req.utente.discriminator === 'SuperUser'){
+        return next();
     }
+    return res.status(403).json({
+        errore: "Accesso negato. Solo SuperUser posso accedere"
+    });
 };
 
-// Esportiamo entrambi
+// Esportiamo tutto
 module.exports = { protectRoute, isStaff, isSuperUser };

@@ -854,3 +854,43 @@ export async function calcolaTragitto(startCoord, endCoord) {
     instructions: feature.properties?.segments?.[0]?.steps || []
   }
 }
+
+export async function getTicket() {
+  const resp = await fetchAuth('${API_URL}/ticket')
+  return parseResponse(resp)
+}
+
+export async function apriTicket(segnalazioneId) {
+  const resp = await fetchAuth(`${API_URL}/ticket`,{
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({segnalazioneId})
+  })
+  return parseResponse(resp)
+}
+
+export async function aggiornaStatoTicket(ticketId, nuovoStato) {
+  const resp = await fetchAuth(`${API_URL}/ticket/${ticketId}/stato`,{
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({nuovoStato})
+  })
+  return parseResponse(resp)
+}
+
+export async function chiudiTicket(ticketId, note) {
+  const resp = await fetchAuth(`${API_URL}/ticket/${ticketId}/chiudi`,{
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({note})
+  })
+  return parseResponse(resp)
+}
+
+export async function archiviaTicket(ticketId) {
+  const resp = await fetchAuth(`${API_URL}/ticket/${ticketId}/archivia`,{
+    method: 'PATCH'
+  })
+  return parseResponse(resp)
+}
+

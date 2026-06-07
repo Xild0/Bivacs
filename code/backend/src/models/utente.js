@@ -73,7 +73,8 @@ const utenteSchema = new mongoose.Schema(
             default: 'nessuna'
         },
         motivo:{
-            type: String
+            type: String, 
+            default: ''
         }
         
     }

@@ -369,17 +369,6 @@ router.patch('/richieste-supporto/:utenteId/approva', protectRoute, isSupportoTe
       utente.richiestaSupportoTecnico?.matricolaRichiesta ||
       `ST-${utente.id}`;
 
-<<<<<<< HEAD
-    utente.discriminator = 'SupportoTecnico'
-      utente.matricola = matricola
-      utente.richiestaSupportoTecnico.stato = 'approvata'
-
-      await utente.save()
-
-      const aggiornato = await Utente.findById(
-      req.params.utenteId
-    ).select('-passwordHash')
-=======
     utente.discriminator = 'SupportoTecnico';
     utente.matricola = matricola;
     utente.richiestaSupportoTecnico.stato = 'approvata';
@@ -388,7 +377,6 @@ router.patch('/richieste-supporto/:utenteId/approva', protectRoute, isSupportoTe
 
     const aggiornato = await Utente.findById(req.params.utenteId)
       .select('-passwordHash');
->>>>>>> main
 
     await inviaEmail(
       utente.email,
