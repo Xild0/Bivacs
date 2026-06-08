@@ -6,7 +6,7 @@
 -->
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, onMounted, onUnmounted, onBeforeUnmount } from 'vue'
 
 import Navbar from './components/Navbar.vue'
 import Hero from './components/Hero.vue'
