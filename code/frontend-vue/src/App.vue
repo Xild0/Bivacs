@@ -309,16 +309,6 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="app">
-    <div v-if="allerteAttive.length > 0" class="emergencyBanner">
-      <div
-        v-for="allerta in allerteAttive"
-        :key="allerta.allertaId || allerta.id"
-        class="emergencyBanner"
-      >
-        <strong>⚠️ EMERGENZA - {{ allerta.nomeBivacco || allerta.bivacco?.nome }}:</strong>
-        {{ allerta.messaggio }}
-      </div>
-    </div>
     <Navbar
       :is-logged="logged"
       @openEmergency="showEmergency = true"

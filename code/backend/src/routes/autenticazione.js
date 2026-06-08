@@ -279,7 +279,7 @@ router.post('/resend-verification', async (req, res) => {
         utente.emailToken = nuovoToken;
         await utente.save();
 
-        const linkVerifica = `http://localhost:5000/api/v1/auth/verify-email?token=${nuovoToken}`;
+        const linkVerifica = `http://localhost:3000/api/v1/auth/verify-email?token=${nuovoToken}`;
 
         await inviaEmail(
             email,

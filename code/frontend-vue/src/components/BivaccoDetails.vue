@@ -201,7 +201,7 @@ const inviaSegnalazione = async () => {
     formData.append('descrizione', segnalazioneDescrizione.value)
     formData.append('foto', segnalazioneFoto.value)
 
-    const response = await fetch('http://localhost:5000/api/v1/segnalazioni', {
+    const response = await fetch('http://localhost:3000/api/v1/segnalazioni', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`
