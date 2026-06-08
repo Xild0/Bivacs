@@ -59,6 +59,10 @@ const bivaccoSchema = new mongoose.Schema(
         type: Boolean, 
         default: false
     },
+    noteEmergenza: {
+        type: String,
+        default: ''
+    },
     acquaPresente: {
         type: Boolean,
         default: true

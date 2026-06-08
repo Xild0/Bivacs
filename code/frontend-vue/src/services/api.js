@@ -5,7 +5,7 @@
  * segnalazioni, meteo, percorsi e funzioni del Supporto Tecnico.
  */
 
-const API_URL = import.meta.env.VITE_API_BASE || 'http://localhost:5000/api/v1'
+const API_URL = import.meta.env.VITE_API_BASE || 'http://localhost:3000/api/v1'
 const ORS_API_KEY = import.meta.env.VITE_ORS_API_KEY || ''
 
 /**
@@ -681,6 +681,56 @@ export async function rifiutaRichiestaSupportoTecnico(utenteId, motivoRifiuto = 
 }
 
 /**
+ * @description invia una richiesta per ottenere ruolo di SuperUser
+ * @param {Object} payload - motivo richiesta
+ * @returns {Promise<Object>}
+ */
+export async function richiediSuperUser(payload) {
+  const resp = await fetchAuth(`${API_URL}/profilo/richiesta-superuser`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  })
+  return parseResponse(resp)
+}
+
+/**
+ * @description recupera tutte le richieste non approvate 
+ * @returns {Promise<Array>}
+ */
+export async function getRichiesteSuperUser() {
+  const resp = await fetchAuth(`${API_URL}/supporto/richieste-superuser`)
+  return parseResponse(resp)
+}
+
+/**
+ * @description approva richiesta di promozione a SuperUser
+ * @param {string} utenteId - objectId utente
+ * @returns {Promise<Object>}
+ */
+export async function approvaRichiestaSuperUser(utenteId) {
+  const resp = await fetchAuth(`${API_URL}/supporto/richieste-superuser/${utenteId}/approva`, {
+    method: 'PATCH'
+  })
+  return parseResponse(resp)
+}
+
+/**
+ * @description rifiuta richiesta di promozione a SuperUser
+ * @param {string} utenteId - objectId utente
+ * @param {string} [motivoRifiuto] - Motivo (totalmente opzionale)
+ * @returns {Promise<Object>}
+ */
+export async function rifiutaRichiestaSuperUser(utenteId, motivoRifiuto = '') {
+  const resp = await fetchAuth(`${API_URL}/supporto/richieste-superuser/${utenteId}/rifiuta`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({motivoRifiuto})
+  })
+  return parseResponse(resp)
+}
+
+/**
  * Geocodifica un indirizzo tramite OpenRouteService.
  * Per il prototipo universitario la chiamata resta nel frontend;
  * in produzione andrebbe spostata sul backend per non esporre la API key.
@@ -853,4 +903,118 @@ export async function calcolaTragitto(startCoord, endCoord) {
     descent: dislivelli.descent,
     instructions: feature.properties?.segments?.[0]?.steps || []
   }
+}
+
+/**
+ * @description recupera tutti i ticket di manutenzione
+ * @returns {Promise<Array>}
+ */
+export async function getTicket() {
+  const resp = await fetchAuth(`${API_URL}/ticket`)
+  return parseResponse(resp)
+}
+
+/**
+ * @description apre un nuivo ticket a partire da una segnalazione
+ * @param {string} segnalazioneId - objectId segnalazione
+ * @returns {Promise<Object>}
+ */
+export async function apriTicket(segnalazioneId) {
+  const resp = await fetchAuth(`${API_URL}/ticket`,{
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({segnalazioneId})
+  })
+  return parseResponse(resp)
+}
+
+/**
+ * @description aggiorna lo stato ticket
+ * @param {string} ticketId - objectId ticket
+ * @param {string} nuovoStato - nuovo stato ticket
+ * @returns {Promise<Object>}
+ */
+export async function aggiornaStatoTicket(ticketId, nuovoStato) {
+  const resp = await fetchAuth(`${API_URL}/ticket/${ticketId}/stato`,{
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({nuovoStato})
+  })
+  return parseResponse(resp)
+}
+
+/**
+ * @description chiude un ticket registrando le note di intervento fornite
+ * @param {string} ticketId - objectId ticket
+ * @param {string} note - note intervento
+ * @returns {Promise<Object>}
+ */
+export async function chiudiTicket(ticketId, note) {
+  const resp = await fetchAuth(`${API_URL}/ticket/${ticketId}/chiudi`,{
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({note})
+  })
+  return parseResponse(resp)
+}
+
+/**
+ * @description archivia un ticket GIA CHIUSO
+ * @param {string} ticketId - objectId ticket
+ * @returns {Promise<Object>}
+ */
+export async function archiviaTicket(ticketId) {
+  const resp = await fetchAuth(`${API_URL}/ticket/${ticketId}/archivia`,{
+    method: 'PATCH'
+  })
+  return parseResponse(resp)
+}
+
+/**
+ * @description attiva alerr di emergenza su un bivacco
+ * @param {string} bivaccoId - objectId bivacco
+ * @param {string} messaggio - messaggio dell'emergenza
+ * @returns {Promise<Object>}
+ */
+export async function attivaEmergenza(bivaccoId, messaggio) {
+  const resp = await fetchAuth(`${API_URL}/alert`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({bivaccoId, messaggio})
+  })
+
+  return parseResponse(resp)
+}
+
+/**
+ * @description revoca l'emergenza di un bivacco
+ * @param {string} bivaccoId - objectId bivacco
+ * @returns {Promise<Object>}
+ */
+export async function revocaEmergenza(bivaccoId) {
+  const resp = await fetchAuth(`${API_URL}/alert/${bivaccoId}/revoca`, {
+    method: 'PATCH'
+  })
+
+  return parseResponse(resp)
+}
+
+/**
+ * @description Esporta l'intero dataset delle segnalazioni in formato CSV
+ * @async
+ * @function exportCSV
+ * @route GET /api/v1/supporto/segnalazioni/export/csv
+ * @returns {Promise<string>} contenuto del file CSV
+ */
+export async function exportCSV() {
+  const resp = await fetchAuth(`${API_URL}/supporto/segnalazioni/export/csv`)
+  if (!resp.ok) {
+    let messaggio = 'Errore durante l\'esportazione del dataset'
+    try {
+      const e = await resp.json()
+      messaggio = e.errore || messaggio
+    } catch {}
+    throw new Error(messaggio)
+  }
+  return resp.text()
 }

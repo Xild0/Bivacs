@@ -59,7 +59,7 @@ const isStaff = (req, res, next) => {
    const tipoUtente = req.utente.discriminator;
 
     if (tipoUtente === 'SuperUser' || tipoUtente === 'SupportoTecnico') {
-        next(); 
+        return next(); 
     } else {
         return res.status(403).json({ 
             errore: 'Accesso negato. Solo la SAT, gli Enti o il Supporto Tecnico possono accedere.' 
@@ -67,5 +67,22 @@ const isStaff = (req, res, next) => {
     }
 };
 
+/**
+ * Verifica che l'utente autenticato abbia i privilegi di SuperUser
+ * @param {import('express').Request} req - Oggetto richiesta Express con dati utente già decodificati.
+ * @param {import('express').Response res - Oggetto risposta Express.
+ * @param {import('express').NextFunction next - Funzione per passare al middleware successivo.
+ * @returns {void}
+ */
+const isSuperUser = (req, res, next) => {
+    if(req.utente.discriminator === 'SuperUser'){
+        return next();
+    }
+    return res.status(403).json({
+        errore: "Accesso negato. Solo SuperUser posso accedere"
+    });
+};
 
-module.exports = { protectRoute, isStaff };
+
+// Esportiamo tutto
+module.exports = { protectRoute, isStaff, isSuperUser };

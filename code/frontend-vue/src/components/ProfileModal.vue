@@ -1,19 +1,16 @@
-/**
- * @file ProfileModal.vue
- * @description Modale per la gestione del profilo utente.
- */
-
 <script setup>
 import { reactive, ref, onMounted } from 'vue'
 import Modal from './Modal.vue'
 import SupportoTecnicoPanel from './SupportoTecnicoPanel.vue'
+import SuperUserPanel from './SuperUserPanel.vue'
 import {
   getProfile,
   updateProfile,
   deleteProfile,
   logoutUser,
   getAllertePreferiti,
-  richiediSupportoTecnico,
+  richiediSupportoTecnico, 
+  richiediSuperUser,
   getMieSegnalazioni
 } from '../services/api'
 
@@ -26,12 +23,17 @@ const profile = reactive({
   password: '',
   discriminator: '',
   preferiti: [],
-  richiestaSupportoTecnico: null
+  richiestaSupportoTecnico: null, 
+  richiestaSuperUser: null
 })
 
 const richiestaST = reactive({
   motivo: '',
   matricola: ''
+})
+
+const richiestaSU = reactive({
+  motivo: ''
 })
 
 const message = ref('')
@@ -41,6 +43,12 @@ const allerteMap = ref({})
 const mieSegnalazioni = ref([])
 const segnalazioniLoading = ref(false)
 
+
+/**
+ * @description Carica i dati dell'utente dal backend e 
+ * carica le allerte meteo dei preferiti SOLO se utente ha 
+ * discriminator === UtenteRegistrato
+ */
 async function loadProfile() {
   try {
     const data = await getProfile()
@@ -52,6 +60,12 @@ async function loadProfile() {
     profile.password = ''
     profile.preferiti = data.preferiti || []
     profile.richiestaSupportoTecnico = data.richiestaSupportoTecnico || null
+    profile.richiestaSuperUser = data.richiestaSuperUser || null
+
+    // bugfix: allerte meteo richieste solo se utente è UtenteRegistrato
+    if(profile.discriminator === 'UtenteRegistrato' || !profile.discriminator){
+      await loadAllerte()
+    }
 
     loaded.value = true
     message.value = ''
@@ -108,6 +122,19 @@ async function inviaRichiestaSupporto() {
     await loadProfile()
   } catch (error) {
     messageType.value = 'error'
+    message.value = error.message
+  }
+}
+
+async function inviaRichiestaSU(){
+  try {
+    await richiediSuperUser({motivo: richiestaSU.motivo})
+    messageType.value='success'
+    message.value = 'Richiesta SuperUser inviata correttamente, attendi approvazione'
+    richiestaSU.motivo = ''
+    await loadProfile()
+  } catch (error) {
+    messageType.value='error'
     message.value = error.message
   }
 }
@@ -380,6 +407,46 @@ onMounted(() => {
       class="support-section"
     >
       <SupportoTecnicoPanel />
+    </section>
+
+    <section 
+    v-if="profile.discriminator === 'SuperUser'"
+    class="support-section"
+    >
+      <SuperUserPanel />
+    </section>  
+
+    <section
+      v-if="profile.discriminator === 'UtenteRegistrato'"
+      class="support-request-section"
+    >
+      <h3>Richiedi ruolo Super User</h3>
+      <p
+        v-if="profile.richiestaSuperUser?.stato === 'in_attesa'"
+        class="request-status"
+      >
+        Richiesta già inviata: in attesa di approvazione.
+      </p>
+
+      <form
+        v-else
+        class="form"
+        @submit.prevent="inviaRichiestaSU"
+      >
+        <label class="field">
+          <span class="field-label">Motivo richiesta</span>
+          <textarea
+            v-model="richiestaSU.motivo"
+            class="textarea"
+            placeholder="Spiega perché richiedi il ruolo di Super User"
+            required
+          ></textarea>
+        </label>
+
+        <button class="btn btn-primary btn-block" type="submit" :disabled="!richiestaSU.motivo">
+          Invia richiesta
+        </button>
+      </form>
     </section>
 
     <div class="divider"></div>

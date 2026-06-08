@@ -10,19 +10,23 @@ import {
   getBivacchi,
   getRichiesteSupportoTecnico,
   approvaRichiestaSupportoTecnico,
-  getStoricoSegnalazioni,
-  aggiornaStatoSegnalazione
+  rifiutaRichiestaSupportoTecnico,
+  getRichiesteSuperUser, 
+  approvaRichiestaSuperUser, 
+  rifiutaRichiestaSuperUser
 } from '../services/api'
 
 const logs = ref([])
 const configs = ref([])
 const bivacchi = ref([])
 const richieste = ref([])
-const segnalazioniStaff = ref([])
 
 const loading = ref(false)
 const message = ref('')
 const messageType = ref('info')
+
+const richiesteSupporto = ref([])
+const richiesteSuperUser = ref([])
 
 const configForm = reactive({
   provider: 'Open-Meteo',
@@ -113,7 +117,7 @@ async function submitNuovoBivacco() {
     message.value = error.message
   }
 }
-const richiesteSupporto = ref([])
+
 
 async function loadRichiesteSupporto() {
   richiesteSupporto.value = await getRichiesteSupportoTecnico()
@@ -131,6 +135,42 @@ async function approvaRichiesta(utenteId) {
   }
 }
 
+async function approvaSU(utenteId) {
+  try {
+    await approvaRichiestaSuperUser(utenteId)
+    messageType.value='success'
+    message.value='Utente riconosciuto come SuperUser'
+    richiesteSuperUser.value=await getRichiesteSuperUser()
+  } catch (error) {
+    messageType.value='error'
+    message.value=error.message
+  }
+}
+
+async function rifiutaSU(utenteId) {
+  try {
+    await rifiutaRichiestaSuperUser(utenteId)
+    messageType.value='success'
+    message.value='Richiesta SuperUser rifiutata'
+    richiesteSuperUser.value=await getRichiesteSuperUser()
+  } catch (error) {
+    messageType.value='error'
+    message.value=error.message
+  }
+}
+
+async function rifiutaRichiesta(utenteId) {
+  try {
+    await rifiutaRichiestaSupportoTecnico(utenteId)
+    messageType.value= 'success'
+    message.value= 'Richiesta Supporto Tecnico rifiutata'
+    await loadRichiesteSupporto()
+  } catch (error) {
+    messageType.value= 'error'
+    message.value= error.message
+  }
+}
+
 async function loadSupportoData() {
   loading.value = true
   message.value = ''
@@ -139,8 +179,8 @@ async function loadSupportoData() {
     logs.value = await getLogApi()
     configs.value = await getConfigApi()
     bivacchi.value = await getBivacchi()
-    richiesteSupporto.value = await getRichiesteSupporto()
-    segnalazioniStaff.value = await getStoricoSegnalazioni()
+    richiesteSupporto.value = await getRichiesteSupportoTecnico()
+    richiesteSuperUser.value=await getRichiesteSuperUser()
   } catch (error) {
     messageType.value = 'error'
     message.value = error.message
@@ -230,38 +270,20 @@ async function submitBivacco() {
   }
 }
 
-async function handleCambioStato(idSegnalazione, nuovoStato) {
-  try {
-    loading.value = true
-    message.value = ''
-    await aggiornaStatoSegnalazione(idSegnalazione, nuovoStato)
-    const idx = segnalazioniStaff.value.findIndex(s => s._id === idSegnalazione)
-    if (idx !== -1) {
-      segnalazioniStaff.value[idx].statoSegnalazione = nuovoStato
-    }
-    message.value = 'Stato della segnalazione modificato con successo.'
-    messageType.value = 'success'
-  } catch (error) {
-    message.value = error.message || 'Errore durante la modifica dello stato.'
-    messageType.value = 'danger'
-  } finally {
-    loading.value = false
-  }
-}
 
 onMounted(() => {
-  loadGpxOverlay()
+  loadSupportoData()
 })
+
 </script>
 
 <template>
   <section class="support-panel">
     <header class="support-head">
-  <div>
-    <p class="label">Supporto Tecnico</p>
-    <h3>Area gestione tecnica</h3>
-  </div>
-
+      <div>
+        <p class="label">Supporto Tecnico</p>
+        <h3>Area gestione tecnica</h3>
+      </div>
       <button class="btn btn-ghost" @click="loadSupportoData">
         Aggiorna
       </button>
@@ -276,131 +298,7 @@ onMounted(() => {
     </p>
 
     <div v-else class="support-layout">
-      
-      <section
-        v-if="segnalazioniStaff.some(s => ['inviata', 'presa_in_carico', 'in_corso'].includes(s.statoSegnalazione))"
-        class="alert-segnalazioni"
-      >
-        <div>
-          <strong>⚠️ Segnalazioni attive presenti</strong>
-          <p>
-            Ci sono
-            {{
-              segnalazioniStaff.filter(s =>
-                ['inviata', 'presa_in_carico', 'in_corso'].includes(s.statoSegnalazione)
-              ).length
-            }}
-            segnalazioni ancora aperte da controllare.
-          </p>
-        </div>
 
-        <h4>Segnalazioni Attive</h4>
-
-        <div 
-          v-for="segnalazione in segnalazioniStaff" 
-          :key="segnalazione._id" 
-          class="segnalazione-card" 
-          v-show="['inviata', 'presa_in_carico', 'in_corso'].includes(segnalazione.statoSegnalazione)"
-          style="border: 1px solid var(--danger-border); padding: 16px; border-radius: var(--r); margin-top: 10px;"
-        >
-          
-          <p><strong>Bivacco ID:</strong> {{ segnalazione.bivaccoId?.nome || segnalazione.bivaccoId }}</p>
-          <p><strong>Descrizione:</strong> {{ segnalazione.descrizione }}</p>
-
-          <div class="field" style="margin-top: 12px; max-width: 250px;">
-            <span>Stato Segnalazione</span>
-            <select 
-              :value="segnalazione.statoSegnalazione" 
-              @change="handleCambioStato(segnalazione._id, $event.target.value)"
-              :disabled="loading"
-            >
-              <option value="inviata" style="color: black;">Inviata</option>
-              <option value="presa_in_carico" style="color: black;">Presa in Carico</option>
-              <option value="in_corso" style="color: black;">In Corso</option>
-              <option value="risolta" style="color: black;">Risolta</option>
-              <option value="archiviata" style="color: black;">Archiviata</option>
-            </select>
-          </div>
-        </div>
-        
-        <h4 style="margin-top: 24px; color: var(--success);">Segnalazioni Risolte / Archiviate</h4>
-
-        <div 
-          v-for="segnalazione in segnalazioniStaff" 
-          :key="'risolta-' + segnalazione._id" 
-          class="segnalazione-card" 
-          v-show="['risolta', 'archiviata'].includes(segnalazione.statoSegnalazione)"
-          style="border: 1px solid var(--border-subtle); background-color: var(--bg-surface-2); padding: 16px; border-radius: var(--r); margin-top: 10px; opacity: 0.8;"
-        >
-          
-          <p><strong>Bivacco ID:</strong> {{ segnalazione.bivaccoId?.nome || segnalazione.bivaccoId }}</p>
-          <p><strong>Descrizione:</strong> {{ segnalazione.descrizione }}</p>
-
-          <div class="field" style="margin-top: 12px; max-width: 250px;">
-            <span>Stato Segnalazione</span>
-            <select 
-              :value="segnalazione.statoSegnalazione" 
-              @change="handleCambioStato(segnalazione._id, $event.target.value)"
-              :disabled="loading"
-              style="color: black; background-color: white;"
-            >
-              <option value="inviata" style="color: black;">Inviata</option>
-              <option value="presa_in_carico" style="color: black;">Presa in Carico</option>
-              <option value="in_corso" style="color: black;">In Corso</option>
-              <option value="risolta" style="color: black;">Risolta</option>
-              <option value="archiviata" style="color: black;">Archiviata</option>
-            </select>
-          </div>
-          
-        </div>
-      </section>
-
-
-<section class="support-card support-card-wide">
-  <h4>Segnalazioni utenti</h4>
-
-  <div v-if="segnalazioniStaff.length" class="log-list">
-    <div
-      v-for="segnalazione in segnalazioniStaff"
-      :key="segnalazione._id"
-      class="log-row"
-    >
-      <strong>
-        {{ segnalazione.bivaccoId?.nome || 'Bivacco non disponibile' }}
-      </strong>
-
-      <small>
-        Stato:
-        {{ segnalazione.statoSegnalazione?.replaceAll('_', ' ').toUpperCase() }}
-      </small>
-
-      <small>
-        Utente:
-        {{ segnalazione.utenteId?.email || 'utente non disponibile' }}
-      </small>
-
-      <small>
-        Data:
-        {{ new Date(segnalazione.createdAt).toLocaleString('it-IT') }}
-      </small>
-
-      <p>{{ segnalazione.descrizione }}</p>
-
-      <a
-        v-if="segnalazione.foto"
-        :href="`http://localhost:5000${segnalazione.foto}`"
-        target="_blank"
-        class="foto-link"
-      >
-        Apri foto allegata
-      </a>
-    </div>
-  </div>
-
-  <p v-else class="empty">
-    Nessuna segnalazione disponibile.
-  </p>
-</section>
       <section class="support-card">
         <h4>Log API esterne</h4>
 
@@ -425,39 +323,78 @@ onMounted(() => {
           Nessun log API disponibile.
         </p>
       </section>
+
       <section class="support-card support-card-wide">
-  <h4>Richieste Supporto Tecnico</h4>
+        <h4>Richieste Supporto Tecnico</h4>
 
-  <div v-if="richiesteSupporto.length" class="log-list">
-    <div
-      v-for="utente in richiesteSupporto"
-      :key="utente._id"
-      class="log-row"
-    >
-      <strong>{{ utente.email }}</strong>
-      <small>
-        {{ utente.richiestaSupportoTecnico?.motivo || 'Nessun motivo indicato' }}
-      </small>
-      <small>
-        Matricola: {{ utente.richiestaSupportoTecnico?.matricolaRichiesta || 'non indicata' }}
-      </small>
+        <div v-if="richiesteSupporto.length" class="log-list">
+          <div
+            v-for="utente in richiesteSupporto"
+            :key="utente._id"
+            class="log-row"
+          >
+            <strong>{{ utente.email }}</strong>
+            <small>
+              {{ utente.richiestaSupportoTecnico?.motivo || 'Nessun motivo indicato' }}
+            </small>
+            <small>
+              Matricola: {{ utente.richiestaSupportoTecnico?.matricolaRichiesta || 'non indicata' }}
+            </small>
 
-      <button
-        class="btn btn-primary"
-        type="button"
-        @click="approvaRichiesta(utente._id)"
-      >
-        Approva
-      </button>
-    </div>
-  </div>
+            <div class="azioni-richiesta">
+              <button
+                class="btn btn-primary"
+                type="button"
+                @click="approvaRichiesta(utente._id)"
+              >
+                Approva
+              </button>
+              <button
+                class="btn btn-danger"
+                type="button"
+                @click="rifiutaRichiesta(utente._id)"
+              >
+                rifiuta
+              </button>
+            </div>
+          </div>
+        </div>
 
-  <p v-else class="empty">
-    Nessuna richiesta in attesa.
-  </p>
-</section>
+        <p v-else class="empty">
+          Nessuna richiesta in attesa.
+        </p>
+      </section>
 
-      <!-- US39 -->
+      <section class="support-card support-card-wide">
+        <h4>Richieste Super User</h4>
+
+        <div v-if="richiesteSuperUser.length" class="log-list">
+          <div
+            v-for="utente in richiesteSuperUser"
+            :key="utente._id"
+            class="log-row"
+          >
+            <strong>{{ utente.email }}</strong>
+            <small>
+              {{ utente.richiestaSuperUser?.motivo || 'Nessun motivo indicato' }}
+            </small>
+
+            <div class="azioni-richiesta">
+              <button class="btn btn-primary" type="button" @click="approvaSU(utente._id)">
+                Approva
+              </button>
+              <button class="btn btn-danger" type="button" @click="rifiutaSU(utente._id)">
+                Rifiuta
+              </button>
+            </div>
+          </div>
+        </div>
+        <p v-else class="empty">
+          Nessuna richiesta in attesa.
+        </p>
+      </section>
+
+      <!-- Configurazione API -->
       <section class="support-card">
         <h4>Configurazione API</h4>
 
@@ -498,193 +435,198 @@ onMounted(() => {
         </div>
       </section>
 
+      <!-- Gestione Bivacchi -->
       <section class="support-card support-card-wide">
-  <div class="bivacco-tabs">
-    <button
-      :class="{ active: bivaccoMode === 'creazione' }"
-      @click="bivaccoMode = 'creazione'"
-    >
-      Aggiungi nuovo
-    </button>
-    <button
-      :class="{ active: bivaccoMode === 'modifica' }"
-      @click="bivaccoMode = 'modifica'"
-    >
-      Modifica esistente
-    </button>
-  </div>
+        <div class="bivacco-tabs">
+          <button
+            :class="{ active: bivaccoMode === 'creazione' }"
+            @click="bivaccoMode = 'creazione'"
+          >
+            Aggiungi nuovo
+          </button>
+          <button
+            :class="{ active: bivaccoMode === 'modifica' }"
+            @click="bivaccoMode = 'modifica'"
+          >
+            Modifica esistente
+          </button>
+        </div>
 
-  <!-- Modalità creazione -->
-  <form
-    v-if="bivaccoMode === 'creazione'"
-    class="form"
-    @submit.prevent="submitNuovoBivacco"
-  >
-    <div class="form-grid">
-      <label class="field">
-        <span>Nome *</span>
-        <input v-model="nuovoBivaccoForm.nome" class="input" placeholder="Bivacco Mario Rossi" />
-      </label>
-
-      <label class="field">
-        <span>Zona *</span>
-        <input v-model="nuovoBivaccoForm.zona" class="input" placeholder="Adamello / Brenta / …" />
-      </label>
-
-      <label class="field">
-        <span>Latitudine * (decimali)</span>
-        <input v-model="nuovoBivaccoForm.latitudine" type="number" step="0.000001" class="input" placeholder="46.123456" />
-      </label>
-
-      <label class="field">
-        <span>Longitudine *</span>
-        <input v-model="nuovoBivaccoForm.longitudine" type="number" step="0.000001" class="input" placeholder="10.987654" />
-      </label>
-
-      <label class="field">
-        <span>Altitudine * (m)</span>
-        <input v-model="nuovoBivaccoForm.altitudine" type="number" class="input" placeholder="2350" />
-      </label>
-
-      <label class="field">
-        <span>Posti letto</span>
-        <input v-model="nuovoBivaccoForm.postiLetto" type="number" class="input" placeholder="4" />
-      </label>
-
-      <label class="field">
-        <span>Tipo struttura</span>
-        <select v-model="nuovoBivaccoForm.tipoStruttura" class="select">
-          <option value="fisso">Fisso</option>
-          <option value="mobile">Mobile</option>
-          <option value="invernale">Locale invernale</option>
-        </select>
-      </label>
-    </div>
-
-    <label class="field">
-      <span>Dotazioni</span>
-      <textarea
-        v-model="nuovoBivaccoForm.dotazioni"
-        class="textarea"
-        placeholder="Stufa a legna, brande, coperte, tavolo…"
-      ></textarea>
-    </label>
-
-    <div class="checks">
-      <label class="check">
-        <input v-model="nuovoBivaccoForm.acquaPresente" type="checkbox" />
-        Acqua presente
-      </label>
-
-      <label class="check">
-        <input v-model="nuovoBivaccoForm.legnaDisponibile" type="checkbox" />
-        Legna disponibile
-      </label>
-
-      <label class="check danger-check">
-        <input v-model="nuovoBivaccoForm.emergenza" type="checkbox" />
-        Stato emergenza
-      </label>
-    </div>
-
-    <button class="btn btn-primary btn-block" type="submit">
-      Crea bivacco
-    </button>
-
-    <small class="form-hint">
-      * Campi obbligatori. Le coordinate devono essere nei limiti della PAT (lat 45.6–46.6, lng 10.4–12.0).
-    </small>
-  </form>
-
-  <!-- Modalità modifica (form esistente) -->
-  <form
-    v-else
-    class="form"
-    @submit.prevent="submitBivacco"
-  >
-    <label class="field">
-      <span>Bivacco</span>
-      <select
-        v-model="bivaccoForm.bivaccoId"
-        class="select"
-        @change="selezionaBivacco"
-      >
-        <option value="">Seleziona bivacco</option>
-        <option
-          v-for="bivacco in bivacchi"
-          :key="bivacco._id"
-          :value="bivacco._id"
+        <!-- Modalità creazione -->
+        <form
+          v-if="bivaccoMode === 'creazione'"
+          class="form"
+          @submit.prevent="submitNuovoBivacco"
         >
-          {{ bivacco.nome }}
-        </option>
-      </select>
-    </label>
+          <div class="form-grid">
+            <label class="field">
+              <span>Nome *</span>
+              <input v-model="nuovoBivaccoForm.nome" class="input" placeholder="Bivacco Mario Rossi" />
+            </label>
 
-    <div class="form-grid">
-      <label class="field">
-        <span>Nome</span>
-        <input v-model="bivaccoForm.nome" class="input" />
-      </label>
+            <label class="field">
+              <span>Zona *</span>
+              <input v-model="nuovoBivaccoForm.zona" class="input" placeholder="Adamello / Brenta / …" />
+            </label>
 
-      <label class="field">
-        <span>Zona</span>
-        <input v-model="bivaccoForm.zona" class="input" />
-      </label>
+            <label class="field">
+              <span>Latitudine * (decimali)</span>
+              <input v-model="nuovoBivaccoForm.latitudine" type="number" step="0.000001" class="input" placeholder="46.123456" />
+            </label>
 
-      <label class="field">
-        <span>Latitudine</span>
-        <input v-model="bivaccoForm.latitudine" type="number" step="0.000001" class="input" />
-      </label>
+            <label class="field">
+              <span>Longitudine *</span>
+              <input v-model="nuovoBivaccoForm.longitudine" type="number" step="0.000001" class="input" placeholder="10.987654" />
+            </label>
 
-      <label class="field">
-        <span>Longitudine</span>
-        <input v-model="bivaccoForm.longitudine" type="number" step="0.000001" class="input" />
-      </label>
+            <label class="field">
+              <span>Altitudine * (m)</span>
+              <input v-model="nuovoBivaccoForm.altitudine" type="number" class="input" placeholder="2350" />
+            </label>
 
-      <label class="field">
-        <span>Altitudine</span>
-        <input v-model="bivaccoForm.altitudine" type="number" class="input" />
-      </label>
+            <label class="field">
+              <span>Posti letto</span>
+              <input v-model="nuovoBivaccoForm.postiLetto" type="number" class="input" placeholder="4" />
+            </label>
 
-      <label class="field">
-        <span>Posti letto</span>
-        <input v-model="bivaccoForm.postiLetto" type="number" class="input" />
-      </label>
-    </div>
+            <label class="field">
+              <span>Tipo struttura</span>
+              <select v-model="nuovoBivaccoForm.tipoStruttura" class="select">
+                <option value="fisso">Fisso</option>
+                <option value="mobile">Mobile</option>
+                <option value="invernale">Locale invernale</option>
+              </select>
+            </label>
+          </div>
 
-    <label class="field">
-      <span>Dotazioni</span>
-      <textarea v-model="bivaccoForm.dotazioni" class="textarea"></textarea>
-    </label>
+          <label class="field">
+            <span>Dotazioni</span>
+            <textarea
+              v-model="nuovoBivaccoForm.dotazioni"
+              class="textarea"
+              placeholder="Stufa a legna, brande, coperte, tavolo…"
+            ></textarea>
+          </label>
 
-    <div class="checks">
-      <label class="check">
-        <input v-model="bivaccoForm.acquaPresente" type="checkbox" />
-        Acqua presente
-      </label>
+          <div class="checks">
+            <label class="check">
+              <input v-model="nuovoBivaccoForm.acquaPresente" type="checkbox" />
+              Acqua presente
+            </label>
 
-      <label class="check">
-        <input v-model="bivaccoForm.legnaDisponibile" type="checkbox" />
-        Legna disponibile
-      </label>
+            <label class="check">
+              <input v-model="nuovoBivaccoForm.legnaDisponibile" type="checkbox" />
+              Legna disponibile
+            </label>
 
-      <label class="check danger-check">
-        <input v-model="bivaccoForm.emergenza" type="checkbox" />
-        Stato emergenza
-      </label>
-    </div>
+            <label class="check danger-check">
+              <input v-model="nuovoBivaccoForm.emergenza" type="checkbox" />
+              Stato emergenza
+            </label>
+          </div>
 
-    <button class="btn btn-primary btn-block" type="submit">
-      Aggiorna bivacco
-    </button>
-  </form>
-</section>
+          <button class="btn btn-primary btn-block" type="submit">
+            Crea bivacco
+          </button>
+
+          <small class="form-hint">
+          </small>
+        </form>
+
+        <form
+          v-else
+          class="form"
+          @submit.prevent="submitBivacco"
+        >
+          <label class="field">
+            <span>Bivacco</span>
+            <select
+              v-model="bivaccoForm.bivaccoId"
+              class="select"
+              @change="selezionaBivacco"
+            >
+              <option value="">Seleziona bivacco</option>
+              <option
+                v-for="bivacco in bivacchi"
+                :key="bivacco._id"
+                :value="bivacco._id"
+              >
+                {{ bivacco.nome }}
+              </option>
+            </select>
+          </label>
+
+          <div class="form-grid">
+            <label class="field">
+              <span>Nome</span>
+              <input v-model="bivaccoForm.nome" class="input" />
+            </label>
+
+            <label class="field">
+              <span>Zona</span>
+              <input v-model="bivaccoForm.zona" class="input" />
+            </label>
+
+            <label class="field">
+              <span>Latitudine</span>
+              <input v-model="bivaccoForm.latitudine" type="number" step="0.000001" class="input" />
+            </label>
+
+            <label class="field">
+              <span>Longitudine</span>
+              <input v-model="bivaccoForm.longitudine" type="number" step="0.000001" class="input" />
+            </label>
+
+            <label class="field">
+              <span>Altitudine</span>
+              <input v-model="bivaccoForm.altitudine" type="number" class="input" />
+            </label>
+
+            <label class="field">
+              <span>Posti letto</span>
+              <input v-model="bivaccoForm.postiLetto" type="number" class="input" />
+            </label>
+          </div>
+
+          <label class="field">
+            <span>Dotazioni</span>
+            <textarea v-model="bivaccoForm.dotazioni" class="textarea"></textarea>
+          </label>
+
+          <div class="checks">
+            <label class="check">
+              <input v-model="bivaccoForm.acquaPresente" type="checkbox" />
+              Acqua presente
+            </label>
+
+            <label class="check">
+              <input v-model="bivaccoForm.legnaDisponibile" type="checkbox" />
+              Legna disponibile
+            </label>
+
+            <label class="check danger-check">
+              <input v-model="bivaccoForm.emergenza" type="checkbox" />
+              Stato emergenza
+            </label>
+          </div>
+
+          <button class="btn btn-primary btn-block" type="submit">
+            Aggiorna bivacco
+          </button>
+        </form>
+      </section>
 
     </div>
   </section>
 </template>
 
 <style scoped>
+.azioni-richiesta{
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+
 .support-panel {
   display: flex;
   flex-direction: column;
@@ -897,26 +839,6 @@ onMounted(() => {
   .support-card-wide {
     grid-column: auto;
   }
-}
-
-.alert-segnalazioni {
-  padding: 18px;
-  border-radius: var(--r-lg);
-  background: var(--danger-bg);
-  border: 1px solid var(--danger-border);
-  color: var(--danger);
-  animation: lampeggiaSegnalazioni 1.4s infinite;
-}
-
-.alert-segnalazioni strong {
-  font-size: 15px;
-  color: var(--danger);
-}
-
-.alert-segnalazioni p {
-  margin-top: 4px;
-  font-size: 13px;
-  color: var(--text-secondary);
 }
 
 @keyframes lampeggiaSegnalazioni {

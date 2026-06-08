@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  # Database MongoDB ufficiale
+  mongo:
+    image: mongo:6.0
+    container_name: bivacs-db
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+
+  # Backend Node.js
+  backend:
+    build: ./code/backend
+    container_name: bivacs-backend
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./code/backend/.env
+    environment:
+      - PORT=3000
+    volumes:
+      - ./code/backend:/app
+      - /app/node_modules
+    depends_on:
+      - mongo
+
+  # Frontend Vue
+  frontend:
+    build: ./code/frontend-vue
+    container_name: bivacs-frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./code/frontend-vue:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+
+volumes:
+  mongo-data:

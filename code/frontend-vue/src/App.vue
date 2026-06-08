@@ -275,7 +275,7 @@ function gestisciSessioneScaduta() {
   mostraNotTemp('La tua sessione è scaduta. Effettua di nuovo l’accesso.', 'error', 6000)
 }
 
-onMounted(() => {
+onMounted(async () => {
   loadBivacchi()
   loadUserData()
   gestisciQueryString()

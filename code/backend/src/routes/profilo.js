@@ -205,8 +205,6 @@ router.delete('/preferiti/:bivaccoId', protectRoute, async (req, res) => {
  * @param {import('express').Response} res
  * @returns {Promise<void>}
  */
-
-
 router.post('/richiesta-supporto-tecnico', protectRoute, async (req, res) => {
     try {
         const { motivo, matricola } = req.body;
@@ -215,6 +213,10 @@ router.post('/richiesta-supporto-tecnico', protectRoute, async (req, res) => {
 
         if (!utente) {
             return res.status(404).json({ errore: 'Utente registrato non trovato' });
+        }
+
+        if(utente.discriminator == 'SupportoTecnico'){
+            return res.status(400).json({message: 'Possiedi già questo ruolo'})
         }
 
         utente.richiestaSupportoTecnico = {
@@ -231,6 +233,36 @@ router.post('/richiesta-supporto-tecnico', protectRoute, async (req, res) => {
     } catch (error) {
         res.status(500).json({ errore: 'Errore invio richiesta supporto tecnico' });
     }
+});
+
+/**
+ * @description Permette a UtenteRegistrato di richiedere ruolo SuperUser
+ * @route POST /richiedi-super-user
+ */
+router.post('/richiesta-superuser', protectRoute, async (req, res) => {
+  try {
+    const {motivo} = req.body;
+    const utente = await UtenteRegistrato.findById(req.utente.mongoId);
+    if (!utente) {
+      return res.status(404).json({message: 'Utente non trovato'});
+    }
+
+    if (utente.discriminator === 'SuperUser') {                                             // per sicurezza aggiungo questa parte
+      return res.status(400).json({message: 'Possiedi già questo ruolo'});
+    }
+
+    utente.richiestaSuperUser={
+        stato: 'in_attesa', 
+        motivo: motivo || ''
+    };
+
+    await utente.save();
+
+    res.status(200).json({message: 'Richiesta inviata, attendi approvazione', utente});
+  } catch (error) {
+    console.error('Errore durante la richiesta Super User:', error);
+    res.status(500).json({message: 'Errore interno del server'});
+  }
 });
 
 
