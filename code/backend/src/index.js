@@ -78,8 +78,8 @@ app.use('/api/v1/percorsi', percorsiRoutes);
 app.use('/api/v1/segnalazioni', segnalazioniRoute);
 app.use('/api/v1/meteo', meteoRoute);
 app.use('/api/v1/supporto', supportoRoute);
-app.use('api/v1/ticket', ticketRoute);
-app.use('api/v1/alert', alertRoute);
+app.use('/api/v1/ticket', ticketRoute);
+app.use('/api/v1/alert', alertRoute);
 
 /**
  * Route di test per verificare che il server sia online.

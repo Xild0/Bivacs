@@ -365,18 +365,26 @@ router.patch('/richieste-supporto/:utenteId/approva', protectRoute, isSupportoTe
       });
     }
 
-    const matricola =
-      utente.richiestaSupportoTecnico?.matricolaRichiesta ||
-      `ST-${utente.id}`;
+    const matricola = utente.richiestaSupportoTecnico?.matricolaRichiesta || `ST-${utente.id}`;
 
-    utente.discriminator = 'SupportoTecnico';
-    utente.matricola = matricola;
-    utente.richiestaSupportoTecnico.stato = 'approvata';
+    /**
+     * (TOLLO)
+     * aggiornamento "grezzo" bypassando il controllo di mongoose 
+     * che impedisce l'aggiornamento dei dati (discriminator in questo caso)
+     * tramite il solo comando .save()
+     */
+    await Utente.collection.updateOne(
+      {_id: utente._id},
+      {
+        $set:{
+          discriminator: 'SupportoTecnico',
+          matricola, 
+          'richiestaSupportoTecnico.stato': 'approvata'
+        }
+      }
+    );
 
-    await utente.save();
-
-    const aggiornato = await Utente.findById(req.params.utenteId)
-      .select('-passwordHash');
+    const aggiornato = await Utente.findById(req.params.utenteId).select('-passwordHash');
 
     await inviaEmail(
       utente.email,
@@ -478,9 +486,22 @@ router.patch('/richieste-superuser/:utenteId/approva', protectRoute, isSupportoT
     if (!utente) {
       return res.status(404).json({ message: 'Utente non trovato' });
     }
-    utente.discriminator = 'SuperUser';
-    utente.richiestaSuperUser.stato = 'approvata';
-    await utente.save();
+    
+    /**
+     * (TOLLO)
+     * aggiornamento "grezzo" bypassando il controllo di mongoose 
+     * che impedisce l'aggiornamento dei dati (discriminator in questo caso)
+     * tramite il solo comando .save()
+     */
+    await Utente.collection.updateOne(
+      {_id: utente._id},
+      {
+        $set:{
+          discriminator: 'SuperUser',
+          'richiestaSuperUser.stato': 'approvata'
+        }
+      }
+    );
 
     const aggiornato = await Utente.findById(req.params.utenteId).select('-passwordHash');
 

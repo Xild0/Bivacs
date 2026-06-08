@@ -10,8 +10,10 @@ import {
   getBivacchi,
   getRichiesteSupportoTecnico,
   approvaRichiestaSupportoTecnico,
+  rifiutaRichiestaSupportoTecnico,
   getRichiesteSuperUser, 
-  approvaRichiestaSuperUser
+  approvaRichiestaSuperUser, 
+  rifiutaRichiestaSuperUser
 } from '../services/api'
 
 const logs = ref([])
@@ -133,15 +135,39 @@ async function approvaRichiesta(utenteId) {
   }
 }
 
-async function approvaSU() {
+async function approvaSU(utenteId) {
   try {
     await approvaRichiestaSuperUser(utenteId)
     messageType.value='success'
-    message,value='Utente riconosciuto come SuperUser'
-    richiesteSuperUser=await getRichiesteSuperUser()
+    message.value='Utente riconosciuto come SuperUser'
+    richiesteSuperUser.value=await getRichiesteSuperUser()
   } catch (error) {
     messageType.value='error'
     message.value=error.message
+  }
+}
+
+async function rifiutaSU(utenteId) {
+  try {
+    await rifiutaRichiestaSuperUser(utenteId)
+    messageType.value='success'
+    message.value='Richiesta SuperUser rifiutata'
+    richiesteSuperUser.value=await getRichiesteSuperUser()
+  } catch (error) {
+    messageType.value='error'
+    message.value=error.message
+  }
+}
+
+async function rifiutaRichiesta(utenteId) {
+  try {
+    await rifiutaRichiestaSupportoTecnico(utenteId)
+    messageType.value= 'success'
+    message.value= 'Richiesta Supporto Tecnico rifiutata'
+    await loadRichiesteSupporto()
+  } catch (error) {
+    messageType.value= 'error'
+    message.value= error.message
   }
 }
 
@@ -315,16 +341,54 @@ onMounted(() => {
               Matricola: {{ utente.richiestaSupportoTecnico?.matricolaRichiesta || 'non indicata' }}
             </small>
 
-            <button
-              class="btn btn-primary"
-              type="button"
-              @click="approvaRichiesta(utente._id)"
-            >
-              Approva
-            </button>
+            <div class="azioni-richiesta">
+              <button
+                class="btn btn-primary"
+                type="button"
+                @click="approvaRichiesta(utente._id)"
+              >
+                Approva
+              </button>
+              <button
+                class="btn btn-danger"
+                type="button"
+                @click="rifiutaRichiesta(utente._id)"
+              >
+                rifiuta
+              </button>
+            </div>
           </div>
         </div>
 
+        <p v-else class="empty">
+          Nessuna richiesta in attesa.
+        </p>
+      </section>
+
+      <section class="support-card support-card-wide">
+        <h4>Richieste Super User</h4>
+
+        <div v-if="richiesteSuperUser.length" class="log-list">
+          <div
+            v-for="utente in richiesteSuperUser"
+            :key="utente._id"
+            class="log-row"
+          >
+            <strong>{{ utente.email }}</strong>
+            <small>
+              {{ utente.richiestaSuperUser?.motivo || 'Nessun motivo indicato' }}
+            </small>
+
+            <div class="azioni-richiesta">
+              <button class="btn btn-primary" type="button" @click="approvaSU(utente._id)">
+                Approva
+              </button>
+              <button class="btn btn-danger" type="button" @click="rifiutaSU(utente._id)">
+                Rifiuta
+              </button>
+            </div>
+          </div>
+        </div>
         <p v-else class="empty">
           Nessuna richiesta in attesa.
         </p>
@@ -557,6 +621,12 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.azioni-richiesta{
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+
 .support-panel {
   display: flex;
   flex-direction: column;

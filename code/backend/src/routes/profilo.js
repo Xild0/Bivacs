@@ -205,8 +205,6 @@ router.delete('/preferiti/:bivaccoId', protectRoute, async (req, res) => {
  * @param {import('express').Response} res
  * @returns {Promise<void>}
  */
-
-
 router.post('/richiesta-supporto-tecnico', protectRoute, async (req, res) => {
     try {
         const { motivo, matricola } = req.body;
@@ -241,7 +239,7 @@ router.post('/richiesta-supporto-tecnico', protectRoute, async (req, res) => {
  * @description Permette a UtenteRegistrato di richiedere ruolo SuperUser
  * @route POST /richiedi-super-user
  */
-router.post('/richiesta-super-user', protectRoute, async (req, res) => {
+router.post('/richiesta-superuser', protectRoute, async (req, res) => {
   try {
     const {motivo} = req.body;
     const utente = await UtenteRegistrato.findById(req.utente.mongoId);

@@ -6,7 +6,7 @@
 -->
 
 <script setup>
-import { ref, onMounted, onUnmounted, onBeforeUnmount } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 
 import Navbar from './components/Navbar.vue'
 import Hero from './components/Hero.vue'
@@ -280,26 +280,6 @@ onMounted(async () => {
   loadUserData()
   gestisciQueryString()
   window.addEventListener('bivacs:auth-expired', gestisciSessioneScaduta)
-  
-  socketServer = io('http://localhost:3000')
-
-  socketServer.on('connessione', () => {
-    console.log('Connesso al server socket.io con ID:', socketServer.id);
-  })
-
-  socketServer.on('erroreConnessione', (err) => {
-    console.log('Errore di connessione socket:', err)
-  })
-
-  socketServer.onAny((event, ...args) => {
-    console.log('Ricevuto evento socket: ${event}', args)
-  })
-})
-
-onUnmounted(() => {
-  if(socketServer){
-    socketServer.disconnect()
-  }
 })
 
 onBeforeUnmount(() => {
