@@ -36,9 +36,32 @@ async function loadData() {
   loading.value = true
   message.value = ''
   try {
-    segnalazioni.value = await getStoricoSegnalazioni()
-    ticket.value = await getTicket()
-    bivacchi.value = await getBivacchi()
+
+    /*
+    
+    // aggiunta per rendere il frontend un po' più solido evitando crash per array codaticket
+    const varSegnalazioni = await getStoricoSegnalazioni()
+    const varTicket = await getTicket()
+    const varBivacchi = await getBivacchi()
+
+    segnalazioni.value = Array.isArray(varSegnalazioni)?varSegnalazioni:[]
+    ticket.value = Array.isArray(varTicket)?varTicket:[]
+    bivacchi.value = Array.isArray(varBivacchi)?varBivacchi:[]
+    */
+
+    const seg = await getStoricoSegnalazioni()
+    console.log('SEGNALAZIONI:', seg)
+
+    const tk = await getTicket()
+    console.log('TICKET:', tk)
+
+    const biv = await getBivacchi()
+    console.log('BIVACCHI:', biv)
+
+    segnalazioni.value = Array.isArray(seg) ? seg : []
+    ticket.value = Array.isArray(tk) ? tk : []
+    bivacchi.value = Array.isArray(biv) ? biv : []
+  
   } catch (error) {
     messageType.value = 'error'
     message.value = error.message

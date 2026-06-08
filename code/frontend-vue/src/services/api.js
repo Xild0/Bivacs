@@ -910,7 +910,7 @@ export async function calcolaTragitto(startCoord, endCoord) {
  * @returns {Promise<Array>}
  */
 export async function getTicket() {
-  const resp = await fetchAuth('${API_URL}/ticket')
+  const resp = await fetchAuth(`${API_URL}/ticket`)
   return parseResponse(resp)
 }
 

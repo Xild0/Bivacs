@@ -25,12 +25,10 @@ const STATO_SEGNALAZIONE = {
  */
 router.get('/', protectRoute, isSuperUser, async (req, res) => {
     try {
-        const ticket = await TicketManutenzione.find()
-            .populate({
+        const ticket = await TicketManutenzione.find().populate({
                 path: 'segnalazione',
                 populate: {path: 'bivaccoId', select: 'nome zona'}
-            })
-            .sort({dataApertura: -1});
+            }).sort({dataApertura: -1});
 
         res.status(200).json(ticket);
     } catch (error) {
