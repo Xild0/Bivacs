@@ -1,679 +1,275 @@
 <script setup>
-
-import {ref, onMounted} from 'vue'
-import{
-    getBivacchi,
-    getCodaTicket,
-    aggiornaStatoTicket,
-    archiviaTicket,
-    getSegnalazioniDaGestire,
-    generaTicketDaSegnalazione,
-    esportaCSV
+import { ref, computed, onMounted } from 'vue'
+import {
+  getStoricoSegnalazioni,
+  getTicket,
+  apriTicket,
+  aggiornaStatoTicket,
+  chiudiTicket,
+  archiviaTicket,
+  getBivacchi,
+  attivaEmergenza,
+  revocaEmergenza
 } from '../services/api'
 
-const codaTicket = ref([])
-const codaSegnalazioni = ref([])
+const segnalazioni = ref([])
+const ticket = ref([])
+const bivacchi = ref([])
 const loading = ref(false)
 const message = ref('')
 const messageType = ref('info')
-const listaBivacchi = ref([])               // tutti i bivacchi
-const alertAttivi = ref([])                 // alert con attivo = true
-const caricamentoEmergenze = ref(false)
-const mostraModaleNote = ref(false)
-const ticketDaChiudere = ref(null)
-const noteChiusura = ref('')
-const saving = ref(false)
+const noteChiusura = ref({})
+const alertForm = ref({ bivaccoId: '', messaggio: '' })
 
-/**
- * @description Chiama API per aggiungere elementi nella coda ticket 
- */
-async function caricaTicket() {
-  try{
-    codaTicket.value=await getCodaTicket()
-  } catch(error) {
-    console.error('Errore recupero ticket:', error)
+function ticketDiSegnalazione(segnalazioneId) {
+  return ticket.value.find(t => {
+    const segId = t.segnalazione?._id || t.segnalazione
+    return segId === segnalazioneId
+  })
+}
+
+const codaTicketAperti = computed(() =>
+  ticket.value.filter(t => t.stato === 'aperto' || t.stato === 'in_lavorazione')
+)
+
+async function loadData() {
+  loading.value = true
+  message.value = ''
+  try {
+    segnalazioni.value = await getStoricoSegnalazioni()
+    ticket.value = await getTicket()
+    bivacchi.value = await getBivacchi()
+  } catch (error) {
+    messageType.value = 'error'
+    message.value = error.message
+  } finally {
+    loading.value = false
   }
 }
 
-/**
- * @description Gestisce logica bottoni
- * di avanzamento di stato o di archiviazione
- * @param {String} id - ObjectId del ticket
- * @param {String} nuovoStato - 'in_lavorazione' o 'chiuso'
- */
-async function avanzamentoTicket(id, nuovoStato) {
-  if(nuovoStato === 'archivia'){
-    console.warn('Usa archiviaTicketManuale per archiviare')
+function mostraOk(msg) {
+  messageType.value = 'success'
+  message.value = msg
+}
+function mostraErrore(error) {
+  messageType.value = 'error'
+  message.value = error.message || 'Errore'
+}
+
+async function handleApri(segnalazioneId) {
+  try {
+    await apriTicket(segnalazioneId)
+    mostraOk('Ticket aperto: segnalazione presa in carico')
+    await loadData()
+  } catch (error) { mostraErrore(error) }
+}
+
+async function handleAvanza(ticketId) {
+  try {
+    await aggiornaStatoTicket(ticketId, 'in_lavorazione')
+    mostraOk('Ticket in lavorazione')
+    await loadData()
+  } catch (error) { mostraErrore(error) }
+}
+
+async function handleChiudi(ticketId) {
+  const note = noteChiusura.value[ticketId]
+  if (!note || note.trim().length === 0) {
+    mostraErrore({ message: 'Inserisci le note di intervento prima di chiudere' })
     return
   }
-
   try {
-    loading.value=true
-    message.value=''
-    await aggiornaStatoTicket(id, nuovoStato)
-    const idx = codaTicket.value.findIndex(t => t._id === id)             // trovo il ticket in coda locale e lo aggiorno
-    if (idx !== -1){
-      codaTicket.value[idx].stato = nuovoStato
-    }
-    
-    message.value = 'Ticket ora in stato ${nuovoStato}'
-    messageType.value = 'success'
-  } catch (error) {
-    console.error("Errore avanzamento ticket:", error)
-    message.value=error.message || "Errore avanzamento ticket"
-    messageType.value="danger"
-  } finally {
-    loading.value=false
-  }
+    await chiudiTicket(ticketId, note)
+    noteChiusura.value[ticketId] = ''
+    mostraOk('Ticket chiuso con note di intervento')
+    await loadData()
+  } catch (error) { mostraErrore(error) }
 }
 
-/**
- * @description Chiama API per popolare la coda delle segnalazioni
- */
-async function caricaSegnalazioni() {
+async function handleArchivia(ticketId) {
   try {
-    codaSegnalazioni.value = await getSegnalazioniDaGestire();
-  } catch (error) {
-    console.error("Errore recupero segnalazioni:", error);
-  }
+    await archiviaTicket(ticketId)
+    mostraOk('Ticket archiviato nello storico')
+    await loadData()
+  } catch (error) { mostraErrore(error) }
 }
 
-/**
- * @description Crea un ticket e ricarica le schermate per far comparire 
- * il ticket nella coda inferiore
- * @param {string} segnalazioneId - ID segnalazione
- */
-async function gestisciCreazioneTicket(segnalazioneId) {
-    try {
-        await generaTicketDaSegnalazione(segnalazioneId, 5);
-        await caricaSegnalazioni(); 
-        await caricaTicket();
-    } catch (error) {
-        alert(error.message);
-    }
-}
-
-
-
-// LASCIARE COMMENTATA, SE CI SONO PROBLEMI LA DECOMMENTIAMO (TOLLO)
-/**
- * @description funzione wrapper per intercettare eventuali errori durante l'esportazione dati
- *
-async function gestisciEsportazione() {
-  try {
-    await esportaCSV();
-  } catch (error) {
-    alert(error.message);
-  }
-}
-*/
-
-
-
-/**
- * @description Gestisce l'evento del click automatico per 
- * l'esportazione del dataset CSV. Chiama l'API per l'esportazione 
- * e blocca temporaneamente l'UI intercettando gli eventuali errori.
- * @returns {Promise<void>}
- */
-const handleEsportaCSV = async () => {
-    loading.value = true;
-    message.value = '';                                         // Resetta eventuali messaggi precedenti
-    
-    try {
-        await esportaCSV();
-        message.value = 'Dataset CSV esportato con successo!';
-        messageType.value = 'success';                          
-    } catch (error) {
-        console.error("Fallimento durante l'esportazione del CSV:", error);
-        message.value = error.message || 'Si è verificato un errore imprevisto durante il download.';
-        messageType.value = 'danger';
-    } finally {
-        loading.value = false;
-    }
-};
-
-/**
- * @description Carica l'elenco di tutti i bivacchi (serve alert emergenze)
- * @returns {Promise<void>}
- */
-async function fetchBivacchiPerEmergenza() {
-  try {
-    const resp = await getBivacchi()   
-    listaBivacchi.value = resp
-  } catch (error) {
-    console.error('Errore recupero bivacchi per emergenza:', error)
-    listaBivacchi.value = []
-  }
-}
-
-/**
- *@description Recupera tutti gli alert attivi 
- */
-async function caricaAlertAttivi() {
-  try {
-    const token = localStorage.getItem('bivacs_token')
-    const resp = await fetch(`${API_URL}/bivacchi/emergenze_attive`, {
-      headers: {Authorization: `Bearer ${token}`}
-    })
-    if (!resp.ok) throw new Error('Fallito caricamento allerte')
-    alertAttivi.value = await resp.json()
-  } catch (error) {
-    console.warn('Impossibile caricare allerte attive:', error)
-    alertAttivi.value = []
-  }
-}
-
-/**
- *@description Serve per scrivere le note prima di chiudere un ticket
- * @param {Object} ticket - Il ticket da chiudere
- */
-function apriModaleNote(ticket) {
-  ticketDaChiudere.value = ticket
-  noteChiusura.value = ''
-  mostraModaleNote.value = true
-}
-
-/**
- *@description Conferma la chiusura del ticket con le note inserite usando
- * aggiornaStatoTicket con il campo note
- */
-async function confermaChiusuraConNote() {
-  if (!ticketDaChiudere.value) return
-  if (!noteChiusura.value || noteChiusura.value.trim() === '') {
-    message.value = 'Inserisci una nota per la chiusura'
-    messageType.value = 'danger'
+async function handleAttivaEmergenza() {
+  if (!alertForm.value.bivaccoId || !alertForm.value.messaggio.trim()) {
+    mostraErrore({ message: 'Seleziona un bivacco e scrivi un messaggio' })
     return
   }
-  saving.value = true
   try {
-    await aggiornaStatoTicket(ticketDaChiudere.value._id, 'chiuso', noteChiusura.value.trim())
-    const idx = codaTicket.value.findIndex(t => t._id === ticketDaChiudere.value._id)                 // aggiorna locale
-    if (idx !== -1) codaTicket.value[idx].stato = 'chiuso'
-    message.value = 'Ticket chiuso con successo'
-    messageType.value = 'success'
-    mostraModaleNote.value = false
-    ticketDaChiudere.value = null
-  } catch (error) {
-    console.error(error)
-    message.value = error.message || 'Errore durante la chiusura'
-    messageType.value = 'danger'
-  } finally {
-    saving.value = false
-  }
+    await attivaEmergenza(alertForm.value.bivaccoId, alertForm.value.messaggio)
+    mostraOk('Emergenza attivata: banner rosso visibile a tutti')
+    alertForm.value = { bivaccoId: '', messaggio: '' }
+    await loadData()
+  } catch (error) { mostraErrore(error) }
 }
 
-/**
- *@description Archivia un ticket CHIUSO
- * @param {string} ticketId - ObjectId del ticket
- */
-async function archiviaTicketManuale(ticketId) {
-  if (!ticketId) return
-  try {
-    const res = await archiviaTicket(ticketId)  
-    codaTicket.value = codaTicket.value.filter(t => t._id !== ticketId)
-    message.value = `Ticket ${res.ticket?.id || ''} archiviato`
-    messageType.value = 'success'
-  } catch (error) {
-    console.error(error)
-    message.value = error.message || 'Archiviazione fallita'
-    messageType.value = 'danger'
-  }
-}
-
-/**
- *@description Attiva stato di emergenza per un bivacco
- * @param {Object} bivacco - Bivacco su cui attivare l'alert
- */
-async function attivaEmergenzaBivacco(bivacco) {
-  let messaggioEmergenza = prompt(`Inserisci il messaggio di emergenza per ${bivacco.nome || bivacco.id}:\n(max 140 caratteri)`, 'Pericolo valanga / struttura danneggiata')
-  if (!messaggioEmergenza) return
-  if (messaggioEmergenza.length > 140) messaggioEmergenza = messaggioEmergenza.slice(0,140)
-  try {
-    await attivaEmergenza(bivacco._id, messaggioEmergenza)
-    alert(`✅ Emergenza attivata su ${bivacco.nome}`)
-    await caricaAlertAttivi()                                                       // ricarica lista alert
-    await fetchBivacchiPerEmergenza()                                               // per aggiornare eventuale flag locale
-  } catch (error) {
-    console.error('Errore attivazione', error)
-    alert(`❌ Impossibile attivare: ${error.message}`)
-  }
-}
-
-/**
- *@description Revoca un alert emergenza attivo
- * @param {string} bivaccoId - ID bivacco
- * @param {string} bivaccoNome - solo per messaggio
- */
-async function revocaEmergenzaBivacco(bivaccoId, bivaccoNome) {
-  if (!confirm(`Sei sicuro di revocare l'emergenza su ${bivaccoNome}? Il banner sparirà dalla mappa.`)) return
+async function handleRevoca(bivaccoId) {
   try {
     await revocaEmergenza(bivaccoId)
-    alert(`✅ Emergenza revocata per ${bivaccoNome}`)
-    await caricaAlertAttivi()
-    await fetchBivacchiPerEmergenza()
-  } catch (error) {
-    console.warn(error)
-    alert(`❌ Revoca fallita: ${error.message}`)
-  }
+    mostraOk('Emergenza revocata')
+    await loadData()
+  } catch (error) { mostraErrore(error) }
 }
 
-/**
- * @description ricarica ticket e segnalazioni 
- */
-async function refreshData() {
-    loading.value=true
-    try{
-        await caricaTicket()
-        await caricaSegnalazioni()
-    }finally{
-        loading.value=false
-    }
+function formattaStato(s) {
+  return (s || '').replaceAll('_', ' ').toUpperCase()
 }
 
-/**
- * @description Inizializza i dati nel pannello di supporto
- */
-onMounted(async()=>{
-    loading.value=true
-    try {
-        await caricaTicket()
-        await caricaSegnalazioni()
-        await fetchBivacchiPerEmergenza()
-        await caricaAlertAttivi()
-    } catch (error) {
-        console.error("Errore caricamento dati Super User:", error)
-        message.value = "Impossibile caricare pannello"
-        messageType.value = 'danger'
-    } finally {
-        loading.value=false
-    }
-}) 
+const bivacchiInEmergenza = computed(() => bivacchi.value.filter(b => b.emergenza))
 
-
+onMounted(loadData)
 </script>
 
 <template>
-  <section class="support-panel">
-    <header class="support-head">
+  <section class="su-panel">
+    <header class="su-head">
       <div>
-        <p class="label">Super User</p>
-        <h3>Area amministrazione avanzata</h3>
+        <p class="label">SuperUser</p>
+        <h3>Area gestione segnalazioni ed emergenze</h3>
       </div>
-      <button class="btn btn-ghost" @click="refreshData">
-        Aggiorna
-      </button>
+      <button class="btn btn-ghost" @click="loadData">Aggiorna</button>
     </header>
 
-    <p v-if="message" class="msg" :class="`msg-${messageType}`">
-      {{ message }}
-    </p>
+    <p v-if="message" class="msg" :class="`msg-${messageType}`">{{ message }}</p>
+    <p v-if="loading" class="dim">Caricamento…</p>
 
-    <p v-if="loading" class="loading-text">
-      Caricamento dati Super User…
-    </p>
+    <template v-else>
+      <section class="su-card">
+        <h4>Coda ticket aperti ({{ codaTicketAperti.length }})</h4>
+        <p v-if="!codaTicketAperti.length" class="dim">Nessun ticket aperto.</p>
+        <div v-for="t in codaTicketAperti" :key="t._id" class="ticket-row">
+          <div class="ticket-info">
+            <strong>{{ t.segnalazione?.bivaccoId?.nome || 'Bivacco' }}</strong>
+            <span class="badge">{{ formattaStato(t.stato) }}</span>
+            <p class="dim">{{ t.segnalazione?.descrizione }}</p>
+          </div>
 
-    <div v-else class="support-layout">
+          <div class="ticket-actions">
+            <button
+              v-if="t.stato === 'aperto'"
+              class="btn btn-ghost"
+              @click="handleAvanza(t._id)"
+            >
+              Metti in lavorazione
+            </button>
 
-      <!-- Segnalazioni in attesa di valutazione (con Genera Ticket) -->
-      <div class="panel-section">
-        <h3>Segnalazioni in attesa di Valutazione</h3>
-
-        <div v-if="codaSegnalazioni.length === 0">
-          <p>Nessuna segnalazione utente in coda.</p>
-        </div>
-
-        <div v-else class="config-list">
-          <div v-for="seg in codaSegnalazioni" :key="seg._id" class="log-row">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-              <div>
-                <strong>Bivacco: {{ seg.bivaccoId?.nome || 'Dato Rimosso' }}</strong> - Stato: {{ seg.statoSegnalazione }}<br>
-                <small>Autore: {{ seg.utenteId?.nome || 'Anonimo' }} | Difficoltà: {{ seg.descrizione }}</small>
-              </div>
-
-              <button
-                v-if="seg.statoSegnalazione === 'inviata'"
-                class="btn btn-primary"
-                @click="gestisciCreazioneTicket(seg._id)"
-              >
-                Genera Ticket
-              </button>
-            </div>
+            <textarea
+              v-model="noteChiusura[t._id]"
+              class="textarea"
+              placeholder="Note di intervento (obbligatorie per chiudere)"
+            ></textarea>
+            <button class="btn btn-primary" @click="handleChiudi(t._id)">
+              Chiudi con note
+            </button>
           </div>
         </div>
-      </div>
+      </section>
 
-      <!-- Coda Ticket Manutenzione -->
-      <div class="panel-section">
-        <h3>Coda Ticket Manutenzione</h3>
-
-        <div v-if="codaTicket.length === 0">
-          <p>Nessun ticket in coda.</p>
-        </div>
-
-        <div v-else class="config-list">
-          <div v-for="ticket in codaTicket" :key="ticket._id" class="log-row">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-              <div>
-                <strong>Ticket #{{ ticket.id }}</strong> -
-                <span :class="{'ok': ticket.stato === 'chiuso', 'ko': ticket.stato === 'aperto'}">
-                  Stato: {{ ticket.stato.toUpperCase() }}
-                </span>
-                <br>
-                <small>Priorità: {{ ticket.priorita }} | Aperto il: {{ new Date(ticket.dataApertura).toLocaleDateString() }}</small>
-              </div>
-
-              <div style="display: flex; gap: 8px;">
-                <button
-                  v-if="ticket.stato === 'aperto'"
-                  class="btn btn-primary"
-                  @click="avanzamentoTicket(ticket._id, 'in_lavorazione')"
-                >
-                  Prendi in carico
-                </button>
-
-                <button
-                  v-if="ticket.stato === 'in_lavorazione'"
-                  class="btn btn-primary"
-                  @click="apriModaleNote(ticket)"
-                >
-                  Chiudi Ticket
-                </button>
-
-                <button
-                  v-if="ticket.stato === 'chiuso'"
-                  class="btn btn-warning"
-                  @click="archiviaTicketManuale(ticket._id)"
-                >
-                  Archivia
-                </button>
-              </div>
-            </div>
+      <section class="su-card">
+        <h4>Ticket chiusi</h4>
+        <div
+          v-for="t in ticket.filter(x => x.stato === 'chiuso')"
+          :key="t._id"
+          class="ticket-row"
+        >
+          <div class="ticket-info">
+            <strong>{{ t.segnalazione?.bivaccoId?.nome || 'Bivacco' }}</strong>
+            <span class="badge ok">CHIUSO</span>
+            <p class="dim">Note: {{ t.note }}</p>
           </div>
+          <button class="btn btn-ghost" @click="handleArchivia(t._id)">Archivia</button>
         </div>
-      </div>
+        <p v-if="!ticket.filter(x => x.stato === 'chiuso').length" class="dim">
+          Nessun ticket chiuso in attesa di archiviazione.
+        </p>
+      </section>
 
-      <!-- Esportazione CSV -->
-      <div class="panel-section">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <h3>Esportazione dati</h3>
-          <button @click="handleEsportaCSV" :disabled="loading">
-            {{ loading ? 'Esportazione in corso...' : 'Esporta Dataset CSV' }}
+      <section class="su-card">
+        <h4>Segnalazioni ricevute</h4>
+        <p v-if="!segnalazioni.length" class="dim">Nessuna segnalazione.</p>
+        <div v-for="s in segnalazioni" :key="s._id" class="ticket-row">
+          <div class="ticket-info">
+            <strong>{{ s.bivaccoId?.nome || s.bivaccoId }}</strong>
+            <span class="badge">{{ formattaStato(s.statoSegnalazione) }}</span>
+            <p class="dim">{{ s.descrizione }}</p>
+          </div>
+          <button
+            v-if="!ticketDiSegnalazione(s._id)"
+            class="btn btn-primary"
+            @click="handleApri(s._id)"
+          >
+            Prendi in carico (apri ticket)
+          </button>
+          <span v-else class="dim">Ticket già aperto</span>
+        </div>
+      </section>
+      
+      <section class="su-card">
+        <h4>Alert di emergenza</h4>
+
+        <div class="form">
+          <label class="field">
+            <span>Bivacco</span>
+            <select v-model="alertForm.bivaccoId" class="select">
+              <option value="">Seleziona bivacco</option>
+              <option v-for="b in bivacchi" :key="b._id" :value="b._id">{{ b.nome }}</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Messaggio</span>
+            <input v-model="alertForm.messaggio" class="input" placeholder="Es. Frana sul sentiero di accesso" />
+          </label>
+          <button class="btn btn-danger btn-block" @click="handleAttivaEmergenza">
+            Attiva emergenza
           </button>
         </div>
-      </div>
 
-      <!-- GESTIONE EMERGENZE (solo SuperUser) -->
-      <div class="panel-section">
-        <h3>🚨 Gestione emergenze bivacchi</h3>
-        <p style="font-size:13px; margin-bottom:12px;">Attiva o revoca un banner rosso su un bivacco. Visibile a tutti gli utenti in tempo reale.</p>
-
-        <div v-if="caricamentoEmergenze" class="loading-text">Caricamento bivacchi...</div>
-        <div v-else class="emergenze-list">
-          <div v-for="biv in listaBivacchi" :key="biv._id" class="emergenza-row">
-            <div>
-              <strong>{{ biv.nome }}</strong>
-              <small>{{ biv.zona }}</small>
-            </div>
-            <div>
-              <template v-if="alertAttivi.some(a => a.bivacco?._id === biv._id || a.bivacco === biv._id)">
-                <span class="badge-emergenza-attiva">⚠️ EMERGENZA ATTIVA</span>
-                <button class="btn btn-sm btn-outline" @click="revocaEmergenzaBivacco(biv._id, biv.nome)">
-                  Revoca
-                </button>
-              </template>
-              <button v-else class="btn btn-sm btn-danger" @click="attivaEmergenzaBivacco(biv)">
-                Attiva emergenza
-              </button>
-            </div>
+        <div class="emergenze-attive">
+          <h4>Emergenze attive</h4>
+          <p v-if="!bivacchiInEmergenza.length" class="dim">Nessuna emergenza attiva.</p>
+          <div v-for="b in bivacchiInEmergenza" :key="b._id" class="ticket-row">
+            <strong>{{ b.nome }}</strong>
+            <button class="btn btn-ghost" @click="handleRevoca(b._id)">Revoca</button>
           </div>
         </div>
-      </div>
-
-    </div>
-
-    <!-- Modale note chiusura ticket -->
-    <div v-if="mostraModaleNote" class="modal-overlay" @click.self="mostraModaleNote = false">
-      <div class="modal-card">
-        <h3>Chiudi ticket</h3>
-        <p><strong>Ticket #{{ ticketDaChiudere?.id }}</strong> — inserisci una nota operativa</p>
-        <textarea
-          v-model="noteChiusura"
-          rows="4"
-          class="input"
-          placeholder="Es: intervento effettuato, struttura riparata, contattato gestore..."
-        ></textarea>
-        <div style="display: flex; gap: 12px; margin-top: 18px; justify-content: flex-end;">
-          <button class="btn btn-ghost" @click="mostraModaleNote = false">Annulla</button>
-          <button class="btn btn-primary" @click="confermaChiusuraConNote" :disabled="staSalvando">
-            {{ staSalvando ? 'Salvataggio...' : 'Conferma chiusura' }}
-          </button>
-        </div>
-      </div>
-    </div>
+      </section>
+    </template>
   </section>
 </template>
 
 <style scoped>
-.support-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-
-.support-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 14px;
-}
-
-.support-head h3 {
-  margin-top: 4px;
-  font-size: 1.2rem;
-}
-
-.loading-text,
-.empty {
-  color: var(--text-tertiary);
-  font-size: 13px;
-}
-
-.msg {
-  padding: 12px 14px;
-  border-radius: var(--r);
-  font-size: 13px;
-}
-
-.msg-info {
-  background: var(--accent-bg);
-  border: 1px solid var(--accent-border);
-  color: var(--accent-hi);
-}
-
-.msg-success {
-  background: var(--success-bg);
-  border: 1px solid rgba(52,211,153,0.28);
-  color: var(--success);
-}
-
-.msg-error,
-.msg-danger {
-  background: var(--danger-bg);
-  border: 1px solid var(--danger-border);
-  color: var(--danger);
-}
-
-.support-layout {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-
-.panel-section {
+.su-panel { display: flex; flex-direction: column; gap: 18px; }
+.su-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; }
+.su-head h3 { margin-top: 4px; font-size: 1.2rem; }
+.su-card {
   background: var(--bg-surface-2);
   border: 1px solid var(--border-subtle);
   border-radius: var(--r-lg);
-  padding: 20px;
+  padding: 16px;
 }
-
-.panel-section h3 {
-  font-size: 1.15rem;
-  margin-bottom: 16px;
-}
-
-.config-list,
-.log-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-height: 360px;
-  overflow-y: auto;
-}
-
-.log-row {
+.su-card h4 { font-size: 1rem; margin-bottom: 14px; }
+.ticket-row {
+  display: flex; flex-direction: column; gap: 10px;
   background: var(--bg-surface-3);
   border: 1px solid var(--border-subtle);
-  border-radius: var(--r);
-  padding: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  border-radius: var(--r); padding: 12px; margin-bottom: 10px;
 }
-
-.log-row strong {
-  font-size: 13px;
-  color: var(--text-primary);
+.ticket-info { display: flex; flex-direction: column; gap: 6px; }
+.ticket-actions { display: flex; flex-direction: column; gap: 8px; }
+.badge {
+  width: fit-content; padding: 3px 8px; border-radius: var(--r-full);
+  font-size: 11px; font-weight: 700; background: var(--accent-bg); color: var(--accent-hi);
 }
-
-.log-row small {
-  font-size: 11px;
-  color: var(--text-tertiary);
-  word-break: break-word;
-}
-
-.ok {
-  color: var(--success);
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.ko {
-  color: var(--danger);
-  font-size: 11px;
-  font-weight: 700;
-}
-
-/* emergenze lista */
-.emergenze-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-height: 280px;
-  overflow-y: auto;
-  margin-top: 12px;
-}
-
-.emergenza-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: var(--bg-surface-3);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--r);
-  padding: 10px 12px;
-}
-
-.emergenza-row strong {
-  display: block;
-  font-size: 14px;
-}
-
-.emergenza-row small {
-  font-size: 11px;
-  color: var(--text-tertiary);
-}
-
-.badge-emergenza-attiva {
-  background: var(--danger-bg);
-  color: var(--danger);
-  font-size: 11px;
-  font-weight: bold;
-  padding: 4px 8px;
-  border-radius: 20px;
-  margin-right: 12px;
-}
-
-.btn-sm {
-  padding: 6px 14px;
-  font-size: 12px;
-}
-
-.btn-outline {
-  background: transparent;
-  border: 1px solid var(--danger);
-  color: var(--danger);
-}
-
-.btn-outline:hover {
-  background: var(--danger-bg);
-}
-
-.btn-danger {
-  background: var(--danger);
-  border: none;
-  color: white;
-}
-
-.btn-danger:hover {
-  background: #dc2626;
-}
-
-/* Modale note */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2000;
-}
-
-.modal-card {
-  background: var(--bg-surface);
-  border-radius: var(--r-lg);
-  padding: 24px;
-  width: 90%;
-  max-width: 460px;
-  box-shadow: var(--shadow-xl);
-}
-
-.modal-card h3 {
-  margin-bottom: 12px;
-}
-
-.modal-card textarea {
-  width: 100%;
-  padding: 8px;
-  border-radius: var(--r);
-  border: 1px solid var(--border-subtle);
-  background: var(--bg-surface-2);
-  color: var(--text-primary);
-}
-
-@media (max-width: 780px) {
-  .support-layout {
-    gap: 12px;
-  }
-  .emergenza-row {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-  }
-}
+.badge.ok { background: var(--success-bg); color: var(--success); }
+.form { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field span { font-size: 11px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.06em; }
+.msg { padding: 12px 14px; border-radius: var(--r); font-size: 13px; }
+.msg-info { background: var(--accent-bg); border: 1px solid var(--accent-border); color: var(--accent-hi); }
+.msg-success { background: var(--success-bg); border: 1px solid rgba(52,211,153,0.28); color: var(--success); }
+.msg-error { background: var(--danger-bg); border: 1px solid var(--danger-border); color: var(--danger); }
 </style>
-

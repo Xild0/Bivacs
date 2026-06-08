@@ -1,12 +1,8 @@
-/**
- * @file ProfileModal.vue
- * @description Modale per la gestione del profilo utente.
- */
-
 <script setup>
 import { reactive, ref, onMounted } from 'vue'
 import Modal from './Modal.vue'
 import SupportoTecnicoPanel from './SupportoTecnicoPanel.vue'
+import SuperUserPanel from './SuperUserPanel.vue'
 import {
   getProfile,
   updateProfile,
@@ -130,27 +126,16 @@ async function inviaRichiestaSupporto() {
   }
 }
 
-/**
- * @description Gestische l'invio della richiesta per SuperUser
- */
 async function inviaRichiestaSU(){
-  if(!richiestaSU.motivo) return
-
-  try{
-    await richiediSuperUser({
-      motivo: richiestaSU.motivo
-    })
-    profile.richiestaSuperUser={
-      stato: 'IN ATTESA'
-    }
+  try {
+    await richiediSuperUser({motivo: richiestaSU.motivo})
+    messageType.value='success'
+    message.value = 'Richiesta SuperUser inviata correttamente, attendi approvazione'
     richiestaSU.motivo = ''
-
-    message.value = 'Richiesta per il ruolo di Super User inviata con successo'
-    messageType.value = 'success'
-  } catch(error){
-    console.error(error)
-    message.value = 'Si è verificato un errore durante l\'invio della richiesta'
-    messageType.value = 'error'
+    await loadProfile()
+  } catch (error) {
+    messageType.value='error'
+    message.value = error.message
   }
 }
 
@@ -424,38 +409,45 @@ onMounted(() => {
       <SupportoTecnicoPanel />
     </section>
 
-<section
-  v-if="profile.discriminator !== 'SuperUser'"
-  class="support-request-section"
->
-  <h3>Richiedi ruolo Super User</h3>
-  <p
-    v-if="profile.richiestaSuperUser?.stato === 'In attesa'"
-    class="request-status"
-  >
-    Richiesta già inviata: in attesa di approvazione.
-  </p>
+    <section 
+    v-if="profile.discriminator === 'SuperUser'"
+    class="support-section"
+    >
+      <SuperUserPanel />
+    </section>  
 
-  <form
-    v-else
-    class="form"
-    @submit.prevent="inviaRichiestaSU"
-  >
-    <label class="field">
-      <span class="field-label">Motivo richiesta</span>
-      <textarea
-        v-model="richiestaSU.motivo"
-        class="textarea"
-        placeholder="Spiega perché richiedi il ruolo di Super User"
-        required
-      ></textarea>
-    </label>
+    <section
+      v-if="profile.discriminator === 'UtenteRegistrato'"
+      class="support-request-section"
+    >
+      <h3>Richiedi ruolo Super User</h3>
+      <p
+        v-if="profile.richiestaSuperUser?.stato === 'in_attesa'"
+        class="request-status"
+      >
+        Richiesta già inviata: in attesa di approvazione.
+      </p>
 
-    <button class="btn btn-primary btn-block" type="submit" :disabled="!richiestaSU.motivo">
-      Invia richiesta
-    </button>
-  </form>
-</section>
+      <form
+        v-else
+        class="form"
+        @submit.prevent="inviaRichiestaSU"
+      >
+        <label class="field">
+          <span class="field-label">Motivo richiesta</span>
+          <textarea
+            v-model="richiestaSU.motivo"
+            class="textarea"
+            placeholder="Spiega perché richiedi il ruolo di Super User"
+            required
+          ></textarea>
+        </label>
+
+        <button class="btn btn-primary btn-block" type="submit" :disabled="!richiestaSU.motivo">
+          Invia richiesta
+        </button>
+      </form>
+    </section>
 
     <div class="divider"></div>
 
