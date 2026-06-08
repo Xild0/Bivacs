@@ -998,3 +998,23 @@ export async function revocaEmergenza(bivaccoId) {
 
   return parseResponse(resp)
 }
+
+/**
+ * @description Esporta l'intero dataset delle segnalazioni in formato CSV
+ * @async
+ * @function exportCSV
+ * @route GET /api/v1/supporto/segnalazioni/export/csv
+ * @returns {Promise<string>} contenuto del file CSV
+ */
+export async function exportCSV() {
+  const resp = await fetchAuth(`${API_URL}/supporto/segnalazioni/export/csv`)
+  if (!resp.ok) {
+    let messaggio = 'Errore durante l\'esportazione del dataset'
+    try {
+      const e = await resp.json()
+      messaggio = e.errore || messaggio
+    } catch {}
+    throw new Error(messaggio)
+  }
+  return resp.text()
+}

@@ -13,7 +13,7 @@ const ConfigAPI = require('../models/configAPI');
 const Bivacco = require('../models/bivacco');
 const Utente = require('../models/utente');
 
-const { protectRoute } = require('../middlewares/authMiddleware');
+const { protectRoute, isStaff } = require('../middlewares/authMiddleware');
 const getNextSequence = require('../utils/getNewSequence');
 const inviaEmail = require('../utils/emailService');
 
@@ -689,7 +689,7 @@ router.patch('/ticket/:id/archivia', protectRoute, isSupportoTecnico, async (req
  * @description Genera e scarica un file CSV contenente l'intero dataset delle segnalazioni
  * @returns {string} File CSV come stream HTTP
  */
-router.get('/segnalazioni/export/csv', protectRoute, isSupportoTecnico, async (req, res) => {
+router.get('/segnalazioni/export/csv', protectRoute, isStaff, async (req, res) => {
     try {
         const segnalazioni = await Segnalazione.find()        // Recupero tutte le segnalazioni
             .populate('utenteId', 'email')

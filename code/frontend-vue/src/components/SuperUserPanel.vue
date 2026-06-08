@@ -9,7 +9,8 @@ import {
   archiviaTicket,
   getBivacchi,
   attivaEmergenza,
-  revocaEmergenza
+  revocaEmergenza,
+  exportCSV
 } from '../services/api'
 
 const segnalazioni = ref([])
@@ -20,6 +21,7 @@ const message = ref('')
 const messageType = ref('info')
 const noteChiusura = ref({})
 const alertForm = ref({ bivaccoId: '', messaggio: '' })
+const bivacchiInEmergenza = computed(() => bivacchi.value.filter(b => b.emergenza))
 
 function ticketDiSegnalazione(segnalazioneId) {
   return ticket.value.find(t => {
@@ -38,26 +40,18 @@ async function loadData() {
   try {
 
     /*
-    
     // aggiunta per rendere il frontend un po' più solido evitando crash per array codaticket
     const varSegnalazioni = await getStoricoSegnalazioni()
     const varTicket = await getTicket()
     const varBivacchi = await getBivacchi()
-
-    segnalazioni.value = Array.isArray(varSegnalazioni)?varSegnalazioni:[]
-    ticket.value = Array.isArray(varTicket)?varTicket:[]
-    bivacchi.value = Array.isArray(varBivacchi)?varBivacchi:[]
     */
 
     const seg = await getStoricoSegnalazioni()
     console.log('SEGNALAZIONI:', seg)
-
     const tk = await getTicket()
     console.log('TICKET:', tk)
-
     const biv = await getBivacchi()
     console.log('BIVACCHI:', biv)
-
     segnalazioni.value = Array.isArray(seg) ? seg : []
     ticket.value = Array.isArray(tk) ? tk : []
     bivacchi.value = Array.isArray(biv) ? biv : []
@@ -142,7 +136,22 @@ function formattaStato(s) {
   return (s || '').replaceAll('_', ' ').toUpperCase()
 }
 
-const bivacchiInEmergenza = computed(() => bivacchi.value.filter(b => b.emergenza))
+async function handleExportCSV() {
+  try {
+    const csv = await exportCSV()
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })    // '\uFEFF', fa aprire gli accenti correttamente in Excel, molto comodo secondo me (TOLLO)
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'dataset_segnalazioni.csv'
+    a.click()
+    URL.revokeObjectURL(url)
+    mostraOk('Dataset segnalazioni esportato in CSV')
+  } catch (error) {
+    mostraErrore(error)
+  }
+}
+
 
 onMounted(loadData)
 </script>
@@ -154,7 +163,10 @@ onMounted(loadData)
         <p class="label">SuperUser</p>
         <h3>Area gestione segnalazioni ed emergenze</h3>
       </div>
-      <button class="btn btn-ghost" @click="loadData">Aggiorna</button>
+      <div class="su-head-actions">
+        <button class="btn btn-ghost" @click="handleExportCSV">Esporta CSV</button>
+        <button class="btn btn-ghost" @click="loadData">Aggiorna</button>
+      </div>
     </header>
 
     <p v-if="message" class="msg" :class="`msg-${messageType}`">{{ message }}</p>
@@ -267,6 +279,7 @@ onMounted(loadData)
 <style scoped>
 .su-panel { display: flex; flex-direction: column; gap: 18px; }
 .su-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; }
+.su-head-actions { display: flex; gap: 8px; }
 .su-head h3 { margin-top: 4px; font-size: 1.2rem; }
 .su-card {
   background: var(--bg-surface-2);

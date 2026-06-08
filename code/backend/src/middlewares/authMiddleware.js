@@ -59,7 +59,7 @@ const isStaff = (req, res, next) => {
    const tipoUtente = req.utente.discriminator;
 
     if (tipoUtente === 'SuperUser' || tipoUtente === 'SupportoTecnico') {
-        next(); 
+        return next(); 
     } else {
         return res.status(403).json({ 
             errore: 'Accesso negato. Solo la SAT, gli Enti o il Supporto Tecnico possono accedere.' 
@@ -82,6 +82,7 @@ const isSuperUser = (req, res, next) => {
         errore: "Accesso negato. Solo SuperUser posso accedere"
     });
 };
+
 
 // Esportiamo tutto
 module.exports = { protectRoute, isStaff, isSuperUser };
