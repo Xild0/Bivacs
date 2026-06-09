@@ -1,42 +1,49 @@
 version: '3.8'
 
 services:
-  # Database MongoDB ufficiale
-  mongo:
-    image: mongo:6.0
-    container_name: bivacs-db
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongo-data:/data/db
-
-  # Backend Node.js
   backend:
     build: ./code/backend
-    container_name: bivacs-backend
-    ports:
-      - "3000:3000"
+    ports: 
+      - "5000:5000"
     env_file:
       - ./code/backend/.env
-    environment:
-      - PORT=3000
-    volumes:
-      - ./code/backend:/app
-      - /app/node_modules
     depends_on:
       - mongo
+    networks:
+      - bivacs-network
+    volumes: 
+      - ./code/backend:/app
+      - /app/node_modules
 
-  # Frontend Vue
   frontend:
     build: ./code/frontend-vue
-    container_name: bivacs-frontend
     ports:
       - "5173:5173"
-    volumes:
-      - ./code/frontend-vue:/app
-      - /app/node_modules
+    # Forza Vite a esporre la porta al di fuori del container Docker
+    command: npm run dev -- --host 0.0.0.0
     depends_on:
       - backend
+    networks:
+      - bivacs-network
+    volumes:
+      # Collega la cartella locale al container (Hot-Reload)
+      - ./code/frontend-vue:/app
+      # Protegge i node_modules
+      - /app/node_modules
+
+  mongo:
+    image: mongo:6.0
+    ports:
+      - "27017:27017"
+    networks:
+      - bivacs-network
+    volumes:
+      # Unico volume nominale vero e proprio, per salvare i dati del Database
+      - bivacs_mongo-data:/data/db
+
+networks:
+  bivacs-network:
+    driver: bridge
 
 volumes:
-  mongo-data:
+  bivacs_mongo-data:
