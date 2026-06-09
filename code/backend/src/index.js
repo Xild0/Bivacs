@@ -35,9 +35,11 @@ const connectDB = require('./config/db');
  */
 const httpServer = http.createServer(app);
 
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+
 const socketServer = new Server(httpServer, {
     cors: {
-        origin: 'http://localhost:5173',
+        origin: FRONTEND_URL,
         methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
         credentials: true
     }
