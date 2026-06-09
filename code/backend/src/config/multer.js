@@ -14,14 +14,31 @@ if (!fs.existsSync(uploadDir)) {
 }
 
 /**
- * Configurazione del salvataggio locale dei file caricati.
- * I file vengono memorizzati nella cartella uploads/segnalazioni.
+ * Strategia di persistenza dei file caricati tramite Multer.
+ *
+ * @type {import('multer').StorageEngine}
  */
 
 const storage = multer.diskStorage({
+  /**
+   * Determina la cartella di destinazione del file caricato.
+   *
+   * @param {import('express').Request} req
+   * @param {Express.Multer.File} file
+   * @param {Function} cb
+   * @returns {void}
+   */
   destination: function (req, file, cb) {
     cb(null, uploadDir);
   },
+  /**
+   * Genera un nome univoco per il file caricato.
+   *
+   * @param {import('express').Request} req
+   * @param {Express.Multer.File} file
+   * @param {Function} cb
+   * @returns {void}
+   */
   filename: function (req, file, cb) {
     const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1e9)}${path.extname(file.originalname)}`;
     cb(null, uniqueName);
@@ -47,10 +64,13 @@ const fileFilter = function (req, file, cb) {
 };
 
 /**
- * Middleware Multer utilizzato per il caricamento delle immagini
- * associate alle segnalazioni degli utenti.
+ * Istanza Multer configurata per l'upload delle immagini
+ * associate alle segnalazioni.
+ *
+ * Limite massimo file: 5 MB.
+ *
+ * @type {import('multer').Multer}
  */
-
 
 const upload = multer({
   storage,

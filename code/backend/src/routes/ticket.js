@@ -1,6 +1,13 @@
 /**
  * @file ticket.js
- * @description Route gestione TicketManutenzione (solo SuperUser)
+ * @description API REST per la gestione dei ticket di manutenzione.
+ *
+ * Include:
+ * - consultazione della coda ticket;
+ * - creazione di ticket da segnalazioni;
+ * - aggiornamento dello stato dei ticket;
+ * - chiusura dei ticket con note di intervento;
+ * - archiviazione dei ticket chiusi.
  */
 
 const express = require('express');
@@ -10,8 +17,10 @@ const Segnalazione = require('../models/segnalazione');
 const getNextSequence = require('../utils/getNewSequence');
 const {protectRoute, isSuperUser} = require('../middlewares/authMiddleware');
 
-// meglio mappare lo stato ticket in funzione dello stato segnalazione
-// in questo modo possiamo far sincronizzare le due cose
+/**
+ * Mappa gli stati dei ticket agli stati corrispondenti
+ * delle segnalazioni collegate.
+ */
 const STATO_SEGNALAZIONE = {
     aperto: 'presa_in_carico',
     in_lavorazione: 'in_corso',
@@ -20,8 +29,16 @@ const STATO_SEGNALAZIONE = {
 };
 
 /**
- *@description lista coda ticket, il frontend li filtrerà per stato
+ * Recupera la coda dei ticket di manutenzione.
+ *
+ * L'operazione:
+ * - recupera tutti i ticket;
+ * - include la segnalazione associata;
+ * - include il bivacco collegato alla segnalazione;
+ * - ordina i risultati per data di apertura.
+ *
  * @route GET /api/v1/ticket
+ * @access Private - SuperUser
  */
 router.get('/', protectRoute, isSuperUser, async (req, res) => {
     try {
@@ -37,9 +54,16 @@ router.get('/', protectRoute, isSuperUser, async (req, res) => {
 });
 
 /**
- *@description Crea un ticket (aperto) da una segnalazione (stato cambia)
- * un ticket può avere solo una segnalazione e vicversa
+ * Crea un nuovo ticket da una segnalazione.
+ *
+ * L'operazione:
+ * - verifica che la segnalazione esista;
+ * - controlla che non esista già un ticket associato;
+ * - crea il ticket in stato aperto;
+ * - aggiorna la segnalazione come presa in carico.
+ *
  * @route POST /api/v1/ticket
+ * @access Private - SuperUser
  */
 router.post('/', protectRoute, isSuperUser, async (req, res) => {
     try {
@@ -73,8 +97,15 @@ router.post('/', protectRoute, isSuperUser, async (req, res) => {
 });
 
 /**
- *@description Aggiorna stato di un ticket e sincronizza segnalazione inerente
+ * Aggiorna lo stato di un ticket.
+ *
+ * L'operazione:
+ * - cerca il ticket tramite ObjectId MongoDB;
+ * - aggiorna lo stato del ticket;
+ * - sincronizza lo stato della segnalazione collegata.
+ *
  * @route PATCH /api/v1/ticket/:id/stato
+ * @access Private - SuperUser
  */
 router.patch('/:id/stato', protectRoute, isSuperUser, async (req, res) => {
     try {
@@ -101,8 +132,16 @@ router.patch('/:id/stato', protectRoute, isSuperUser, async (req, res) => {
 });
 
 /**
- *@description chiude un ticket registrando le note di intervento (segnalazione sincronizzata su "risolta")
+ * Chiude un ticket di manutenzione.
+ *
+ * L'operazione:
+ * - richiede le note di intervento;
+ * - imposta il ticket come chiuso;
+ * - registra la data di chiusura;
+ * - sincronizza la segnalazione come risolta.
+ *
  * @route PATCH /api/v1/ticket/:id/chiudi
+ * @access Private - SuperUser
  */
 router.patch('/:id/chiudi', protectRoute, isSuperUser, async (req, res) => {
     try {
@@ -132,8 +171,16 @@ router.patch('/:id/chiudi', protectRoute, isSuperUser, async (req, res) => {
 });
 
 /**
- * @description Archivia ticket SOLO se stato è "chiuso"
+ * Archivia un ticket chiuso.
+ *
+ * L'operazione:
+ * - verifica che il ticket esista;
+ * - controlla che sia già chiuso;
+ * - imposta il ticket come archiviato;
+ * - sincronizza la segnalazione come archiviata.
+ *
  * @route PATCH /api/v1/ticket/:id/archivia
+ * @access Private - SuperUser
  */
 router.patch('/:id/archivia', protectRoute, isSuperUser, async (req, res) => {
     try {

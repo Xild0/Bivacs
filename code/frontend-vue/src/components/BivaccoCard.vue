@@ -1,9 +1,8 @@
+<script setup>
 /**
  * @file BivaccoCard.vue
  * @description Card riassuntiva di un bivacco mostrata nei risultati ricerca.
  */
-
-<script setup>
 import { ref, computed } from 'vue'
 import { addPreferito, removePreferito } from '../services/api'
 
@@ -18,6 +17,8 @@ const emit = defineEmits(['open', 'favorite-changed'])
 
 /**
  * Genera le iniziali del nome del bivacco.
+ *
+ * @returns {string}
  */
 
 const initials = computed(() => {
@@ -27,6 +28,8 @@ const initials = computed(() => {
 
 /**
  * Genera un colore deterministico per la card del bivacco.
+ *
+ * @returns {number}
  */
 
 const hue = computed(() => {
@@ -38,6 +41,11 @@ const hue = computed(() => {
   return h
 })
 
+/**
+ * Calcola la valutazione media del bivacco.
+ *
+ * @returns {number}
+ */
 const rating = computed(() => Number(props.bivacco.mediaStelle) || 0)
 
 const favoriteLoading = ref(false)
@@ -73,7 +81,6 @@ async function toggleFavorite(event) {
 
 <template>
   <article class="bcard" @click="emit('open', bivacco)">
-    <!-- Header band with gradient + monogram -->
     <div
       class="bcard-header"
       :style="{
@@ -97,7 +104,6 @@ async function toggleFavorite(event) {
         ♥
       </button>
 
-      <!-- Topo lines decoration -->
       <svg class="topo" viewBox="0 0 200 100" preserveAspectRatio="none" aria-hidden="true">
         <path d="M0,80 Q50,60 100,70 T200,55" stroke="currentColor" stroke-width="0.5" fill="none" opacity="0.4" />
         <path d="M0,90 Q50,72 100,82 T200,68" stroke="currentColor" stroke-width="0.5" fill="none" opacity="0.3" />
@@ -218,7 +224,6 @@ async function toggleFavorite(event) {
   transform: translateX(4px);
 }
 
-/* —— Header band —— */
 .bcard-header {
   position: relative;
   height: 132px;
@@ -262,7 +267,6 @@ async function toggleFavorite(event) {
   animation: pulseGlow 2.5s infinite;
 }
 
-/* —— Body —— */
 .bcard-body {
   padding: 22px;
 }
@@ -283,7 +287,6 @@ h3 {
   margin-bottom: 18px;
 }
 
-/* —— Stats —— */
 .stats {
   display: flex;
   gap: 16px;
@@ -332,7 +335,6 @@ h3 {
 }
 .stars .filled { color: #FBBF24; }
 
-/* —— Dotazioni —— */
 .dotazioni {
   font-size: 13px;
   color: var(--text-secondary);
@@ -340,11 +342,11 @@ h3 {
   margin-bottom: 14px;
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
 
-/* —— Resources —— */
 .resources {
   display: flex;
   gap: 8px;
@@ -375,7 +377,6 @@ h3 {
 
 .chip-ko svg { opacity: 0.5; }
 
-/* —— CTA —— */
 .bcard-cta {
   display: inline-flex;
   align-items: center;

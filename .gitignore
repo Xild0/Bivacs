@@ -15,7 +15,7 @@ docker-compose.yml
 **/dist/
 
 # LOG DI ERRORE NODE.JS
-=======================================
+# =======================================
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -30,3 +30,8 @@ Thumbs.db
 .idea/
 *.suo
 *.sln
+
+# FILE GENERATI AUTOMATICAMENTE
+# =======================================
+code/backend/coverage/
+code/backend/uploads/

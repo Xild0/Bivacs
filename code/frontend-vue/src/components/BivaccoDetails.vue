@@ -1,20 +1,22 @@
+<script setup>
 /**
  * @file BivaccoDetails.vue
- * @description Visualizza informazioni dettagliate di un bivacco,
- * recensioni, risorse disponibili e pianificazione tragitto.
+ * @description Visualizza il dettaglio di un bivacco, incluse recensioni,
+ * risorse disponibili, emergenze, segnalazioni, storico staff e download GPX.
  */
 
-<script setup>
 import { reactive, ref, watch, computed } from 'vue'
 
-import { 
-  attivaEmergenza, 
+import {
+  attivaEmergenza,
   revocaEmergenza,
   createRecensione,
   getRecensioni,
-  getToken,
   creaSegnalazione,
-  getSegnalazioniBivacco
+  getSegnalazioniBivacco,
+  aggiornaRisorseBivacco,
+  getAutoDownloadGpxUrl,
+  getToken
 } from '../services/api'
 
 import TripPlanner from './TripPlanner.vue'
@@ -37,67 +39,21 @@ const props = defineProps({
 
 const emit = defineEmits(['route-calculated', 'clear-route', 'bivacco-updated'])
 
-/**
- * @description Verifica se l'utwnte attualmente loggato possiede il ruolo di SuperUser
- */
-const isSuperUser = computed(() => {
-  return props.currentUser?.discriminator === 'SuperUser'
-})
-
-/**
- * Gestisce la procedura asincrona di attivazione dello stato di emergenza.
- * @async
- * @returns {Promise<void>}
- */
-async function gestisciAttivazioneEmergenza() {
-  const descr = prompt('Inserisci la descrizione o causa dell\'emergenza:')
-  if (descr === null) return 
-
-  try {
-    // Usa la funzione API passandogli l'id numerico corretto e la descrizione
-    const data = await attivaEmergenza(props.bivacco.id, descr || 'Allerta meteo o emergenza generica')
-    
-    if (data.success) {
-      props.bivacco.emergenza = true
-      emit('bivacco-updated')
-      alert('Stato di emergenza attivato con successo')
-    }
-  } catch (error) {
-    console.error('Errore nell\'attivazione dell\'alert:', error)
-    alert('Impossibile attivare lo stato di emergenza. Verificare la connessione o i permessi.')
-  }
-}
-
-/**
- * Gestisce la procedura asincrona di revoca dello stato di emergenza attivo.
- * @async
- * @returns {Promise<void>}
- */
-async function gestisciRevocaEmergenza() {
-  if (!confirm('Sei sicuro di voler revocare lo stato di emergenza per questo bivacco?')) return
-
-  try {
-    // Usa la funzione API passandogli l'id numerico
-    const data = await revocaEmergenza(props.bivacco.id)
-    
-    if (data.success) {
-      props.bivacco.emergenza = false
-      emit('bivacco-updated')
-      alert('Stato di emergenza revocato con successo')
-    }
-  } catch (error) {
-    console.error('Errore nella revoca dell\'alert:', error)
-    alert('Impossibile revocare lo stato di emergenza. Verificare la connessione o i permessi.')
-  }
-}
-
 const recensioni = ref([])
 const message = ref('')
-const nomeUtente = computed(() => {
-  if (!props.currentUser) return 'Escursionista'
 
-  return `${props.currentUser.nome || ''} ${props.currentUser.cognome || ''}`.trim() || 'Escursionista'
+const risorseForm = reactive({
+  acqua: 'disponibile',
+  legna: 'disponibile'
 })
+
+const risorseOverride = ref(null)
+const risorseMsg = ref('')
+const risorseMsgType = ref('info')
+
+const downloadLoading = ref(false)
+const downloadMsg = ref('')
+const downloadMsgType = ref('info')
 
 const recensioneForm = reactive({
   stelle: 5,
@@ -105,26 +61,185 @@ const recensioneForm = reactive({
   anonima: false
 })
 
+const mostrandoFormSegnalazione = ref(false)
+const segnalazioneDescrizione = ref('')
+const segnalazioneFoto = ref(null)
+const segnalazioneLoading = ref(false)
+const segnalazioneErrore = ref('')
+const segnalazioneSuccesso = ref('')
+
+const mostrandoStoricoStaff = ref(false)
+const storicoSegnalazioni = ref([])
+const storicoLoading = ref(false)
+
 /**
- * Recupera le recensioni associate al bivacco corrente.
+ * Verifica se l'utente corrente ha ruolo SuperUser.
+ *
+ * @returns {boolean} True se l'utente è SuperUser.
+ */
+const isSuperUser = computed(() => {
+  return props.currentUser?.discriminator === 'SuperUser'
+})
+
+/**
+ * Verifica se l'utente corrente appartiene allo staff.
+ *
+ * @returns {boolean} True se l'utente è SuperUser o SupportoTecnico.
+ */
+const isStaff = computed(() => {
+  if (!props.isLogged || !props.currentUser) return false
+
+  const role = props.currentUser.discriminator
+  return role === 'SuperUser' || role === 'SupportoTecnico'
+})
+
+/**
+ * Restituisce il nome visualizzato dell'utente corrente.
+ *
+ * @returns {string} Nome completo dell'utente oppure valore predefinito.
+ */
+const nomeUtente = computed(() => {
+  if (!props.currentUser) return 'Escursionista'
+
+  return `${props.currentUser.nome || ''} ${props.currentUser.cognome || ''}`.trim() || 'Escursionista'
+})
+
+/**
+ * Calcola la media delle recensioni del bivacco.
+ *
+ * @returns {number} Media delle stelle oppure 0 se non sono presenti recensioni.
+ */
+const mediaRecensioni = computed(() => {
+  const mediaDaBivacco = Number(props.bivacco.mediaStelle)
+
+  if (Number.isFinite(mediaDaBivacco) && mediaDaBivacco > 0) {
+    return mediaDaBivacco
+  }
+
+  if (!recensioni.value.length) return 0
+
+  const totale = recensioni.value.reduce((sum, r) => {
+    return sum + Number(r.stelle || 0)
+  }, 0)
+
+  return totale / recensioni.value.length
+})
+
+/**
+ * Calcola il numero totale di recensioni disponibili.
+ *
+ * @returns {number} Numero di recensioni del bivacco.
+ */
+const numeroRecensioni = computed(() => {
+  return Number(props.bivacco.numRecensioni) || recensioni.value.length || 0
+})
+
+/**
+ * Restituisce lo stato corrente delle risorse del bivacco.
+ *
+ * @returns {{ acqua: string, legna: string }} Stato corrente di acqua e legna.
+ */
+const risorseCorrenti = computed(() => {
+  if (risorseOverride.value) {
+    return risorseOverride.value
+  }
+
+  if (props.bivacco.risorse) {
+    return {
+      acqua: props.bivacco.risorse.acqua || statoDaBooleano(props.bivacco.acquaPresente),
+      legna: props.bivacco.risorse.legna || statoDaBooleano(props.bivacco.legnaDisponibile)
+    }
+  }
+
+  return {
+    acqua: statoDaBooleano(props.bivacco.acquaPresente),
+    legna: statoDaBooleano(props.bivacco.legnaDisponibile)
+  }
+})
+
+/**
+ * Converte un valore booleano nello stato testuale di una risorsa.
+ *
+ * @param {boolean} value - Valore booleano della risorsa.
+ * @returns {string} Stato della risorsa.
+ */
+function statoDaBooleano(value) {
+  return value ? 'disponibile' : 'assente'
+}
+
+/**
+ * Restituisce l'etichetta leggibile di una risorsa.
+ *
+ * @param {string} stato - Stato tecnico della risorsa.
+ * @returns {string} Etichetta visualizzata nell'interfaccia.
+ */
+function labelRisorsa(stato) {
+  if (stato === 'disponibile') return 'Disponibile'
+  if (stato === 'scarsa') return 'Scarsa'
+  if (stato === 'assente') return 'Assente'
+  if (stato === 'non_verificata') return 'Non verificata'
+  return 'Non verificata'
+}
+
+/**
+ * Restituisce la classe CSS associata allo stato di una risorsa.
+ *
+ * @param {string} stato - Stato della risorsa.
+ * @returns {string} Classe CSS da applicare.
+ */
+function classeRisorsa(stato) {
+  if (stato === 'disponibile') return 'res-ok'
+  if (stato === 'scarsa') return 'res-warning'
+  if (stato === 'assente') return 'res-ko'
+  return 'res-unknown'
+}
+
+/**
+ * Determina il nome da mostrare per una recensione.
+ *
+ * @param {Object} recensione - Recensione del bivacco.
+ * @returns {string} Nome del recensore o valore anonimo/predefinito.
+ */
+function nomeRecensore(recensione) {
+  if (recensione.anonima) return 'Anonimo'
+
+  if (recensione.nomeVisualizzato) {
+    return recensione.nomeVisualizzato
+  }
+
+  if (typeof recensione.utente === 'string') {
+    return recensione.utente
+  }
+
+  if (recensione.utente?.nome || recensione.utente?.cognome) {
+    return `${recensione.utente.nome || ''} ${recensione.utente.cognome || ''}`.trim()
+  }
+
+  if (recensione.utente?.email) {
+    return recensione.utente.email
+  }
+
+  return 'Escursionista'
+}
+
+/**
+ * Carica le recensioni associate al bivacco corrente.
  *
  * @returns {Promise<void>}
  */
-
 async function loadRecensioni() {
   try {
-    recensioni.value = await api.getRecensioni(props.bivacco._id)
+    recensioni.value = await getRecensioni(props.bivacco._id)
   } catch (error) {
     console.error(error)
   }
 }
 
 /**
- * Invia una nuova recensione al backend.
+ * Invia una nuova recensione per il bivacco corrente.
  *
  * @returns {Promise<void>}
  */
-
 async function submitRecensione() {
   if (!props.isLogged) {
     message.value = 'Accedi per lasciare una recensione.'
@@ -153,110 +268,195 @@ async function submitRecensione() {
   }
 }
 
-// —— STATO PER LA GESTIONE DELLA SEGNALAZIONE ——
-const mostrandoFormSegnalazione = ref(false)
-const segnalazioneDescrizione = ref('')
-const segnalazioneFoto = ref(null)
-const segnalazioneLoading = ref(false)
-const segnalazioneErrore = ref('')
-const segnalazioneSuccesso = ref('')
+/**
+ * Aggiorna lo stato delle risorse disponibili del bivacco.
+ *
+ * @returns {Promise<void>}
+ */
+async function inviaRisorse() {
+  risorseMsg.value = ''
+  risorseMsgType.value = 'info'
+
+  try {
+    const data = await aggiornaRisorseBivacco(props.bivacco._id, {
+      acqua: risorseForm.acqua,
+      legna: risorseForm.legna
+    })
+
+    risorseOverride.value = {
+      acqua: data.risorse?.acqua || risorseForm.acqua,
+      legna: data.risorse?.legna || risorseForm.legna
+    }
+
+    risorseMsgType.value = 'success'
+    risorseMsg.value = 'Stato risorse aggiornato'
+
+    emit('bivacco-updated')
+  } catch (e) {
+    risorseMsgType.value = 'error'
+    risorseMsg.value = e.message
+  }
+}
 
 /**
- * Gestisce la selezione del file immagine per la segnalazione
+ * Scarica il file GPX SAT associato al bivacco corrente.
+ *
+ * @returns {Promise<void>}
  */
-const handleSegnalazioneFileChange = (e) => {
+async function scaricaGpx() {
+  downloadMsg.value = ''
+  downloadMsgType.value = 'info'
+
+  const token = getToken()
+
+  if (!token) {
+    downloadMsgType.value = 'error'
+    downloadMsg.value = 'Accedi per scaricare il GPX.'
+    return
+  }
+
+  downloadLoading.value = true
+
+  try {
+    const response = await fetch(getAutoDownloadGpxUrl(props.bivacco._id), {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    })
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}))
+      throw new Error(data.message || 'Download GPX non disponibile per questo bivacco.')
+    }
+
+    const blob = await response.blob()
+    const url = URL.createObjectURL(blob)
+
+    const nomePulito = (props.bivacco.nome || 'bivacco')
+      .replace(/[^a-zA-Z0-9_-]/g, '_')
+
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${nomePulito}_SAT.gpx`
+    a.click()
+
+    URL.revokeObjectURL(url)
+
+    downloadMsgType.value = 'success'
+    downloadMsg.value = 'Download GPX avviato.'
+  } catch (error) {
+    downloadMsgType.value = 'error'
+    downloadMsg.value = error.message
+  } finally {
+    downloadLoading.value = false
+  }
+}
+
+/**
+ * Attiva lo stato di emergenza per il bivacco corrente.
+ *
+ * @returns {Promise<void>}
+ */
+async function gestisciAttivazioneEmergenza() {
+  const descr = prompt('Inserisci la descrizione o causa dell\'emergenza:')
+
+  if (descr === null) return
+
+  try {
+    await attivaEmergenza(props.bivacco._id, descr || 'Allerta meteo o emergenza generica')
+    props.bivacco.emergenza = true
+    props.bivacco.noteEmergenza = descr
+    emit('bivacco-updated')
+    alert('Stato di emergenza attivato con successo')
+  } catch (error) {
+    console.error('Errore nell\'attivazione dell\'alert:', error)
+    alert('Impossibile attivare lo stato di emergenza. Verificare la connessione o i permessi.')
+  }
+}
+
+/**
+ * Revoca lo stato di emergenza del bivacco corrente.
+ *
+ * @returns {Promise<void>}
+ */
+async function gestisciRevocaEmergenza() {
+  if (!confirm('Sei sicuro di voler revocare lo stato di emergenza per questo bivacco?')) return
+
+  try {
+    await revocaEmergenza(props.bivacco._id)
+    props.bivacco.emergenza = false
+    emit('bivacco-updated')
+    alert('Stato di emergenza revocato con successo')
+  } catch (error) {
+    console.error('Errore nella revoca dell\'alert:', error)
+    alert('Impossibile revocare lo stato di emergenza. Verificare la connessione o i permessi.')
+  }
+}
+
+/**
+ * Salva il file selezionato per una segnalazione.
+ *
+ * @param {Event} e - Evento di cambio file dell'input.
+ * @returns {void}
+ */
+function handleSegnalazioneFileChange(e) {
   const file = e.target.files[0]
+
   if (file) {
     segnalazioneFoto.value = file
   }
 }
 
 /**
- * Esegue la chiamata multipart/form-data al backend
+ * Invia una segnalazione con descrizione e foto al team di supporto.
+ *
+ * @returns {Promise<void>}
  */
-const inviaSegnalazione = async () => {
+async function inviaSegnalazione() {
   segnalazioneErrore.value = ''
   segnalazioneSuccesso.value = ''
 
-  // Validazione locale (coerente con i vincoli del modello Mongoose)
   if (segnalazioneDescrizione.value.trim().length < 20) {
     segnalazioneErrore.value = 'La descrizione deve avere almeno 20 caratteri per essere specifica.'
     return
   }
+
   if (!segnalazioneFoto.value) {
     segnalazioneErrore.value = 'La foto della segnalazione è obbligatoria.'
     return
   }
+
   segnalazioneLoading.value = true
 
   try {
-    // Recupera il token JWT salvato durante l'autenticazione
-    const token = getToken()
-    if (!token) {
-      throw new Error('Devi effettuare il login per inviare una segnalazione.')
-    }
-
     const formData = new FormData()
-    formData.append('bivaccoId', props.bivacco._id) // Utilizza la prop esistente del bivacco
+    formData.append('bivaccoId', props.bivacco._id)
     formData.append('descrizione', segnalazioneDescrizione.value)
     formData.append('foto', segnalazioneFoto.value)
 
-    const response = await fetch('http://localhost:3000/api/v1/segnalazioni', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`
-        // Nota: Nessun Content-Type manuale, ci pensa il browser con FormData
-      },
-      body: formData
-    })
+    await creaSegnalazione(formData)
 
-        const text = await response.text()
-    const data = text ? JSON.parse(text) : {}
-
-    if (!response.ok) {
-      throw new Error(data.errore || data.message || 'Impossibile inviare la segnalazione.')
-    }
-
-    // Successo: reset dei campi del modulo
     segnalazioneSuccesso.value = 'Segnalazione inviata con successo al team di supporto!'
     segnalazioneDescrizione.value = ''
     segnalazioneFoto.value = null
-    
-    // Svuota l'input file nel DOM
+
     const fileInput = document.getElementById('segnalazione-file-input')
     if (fileInput) fileInput.value = ''
 
-    // Sfrutta l'emit già dichiarato nel tuo file per notificare che il bivacco ha subito modifiche/aggiornamenti
     emit('bivacco-updated')
-
   } catch (err) {
     segnalazioneErrore.value = err.message
-    } finally {
+  } finally {
     segnalazioneLoading.value = false
-    }
+  }
 }
 
 /**
- * Storico Segnalazioni per SuperUser e Supporto Tecnico
+ * Carica lo storico delle segnalazioni visibile allo staff.
+ *
+ * @returns {Promise<void>}
  */
-
-const mostrandoStoricoStaff = ref(false)
-const storicoSegnalazioni = ref([])
-const storicoLoading = ref(false)
-
-/**
- * Computed property per verificare se l'utente corrente fa parte dello staff
- */
-const isStaff = computed(() => {
-  if (!props.isLogged || !props.currentUser) return false
-  const role = props.currentUser.discriminator
-  return role === 'SuperUser' || role === 'SupportoTecnico'
-})
-
-/**
- * Recupera le segnalazioni del bivacco corrente (endpoint protetto)
- */
-const loadStoricoSegnalazioni = async () => {
+async function loadStoricoSegnalazioni() {
   if (!isStaff.value) return
 
   storicoLoading.value = true
@@ -271,37 +471,54 @@ const loadStoricoSegnalazioni = async () => {
 }
 
 /**
- * Formatta la stringa dello stato rendendola leggibile
+ * Formatta lo stato tecnico di una segnalazione.
+ *
+ * @param {string} stato - Stato della segnalazione.
+ * @returns {string} Stato formattato.
  */
-const formattaStato = (stato) => {
+function formattaStato(stato) {
   if (!stato) return 'Inviata'
   return stato.replace(/_/g, ' ').toUpperCase()
 }
 
 /**
- * Propaga il percorso calcolato al componente padre.
+ * Propaga al componente padre il percorso calcolato.
  *
- * @param {Object} res - Risultato percorso.
+ * @param {Object} res - Risultato del calcolo del percorso.
  * @returns {void}
  */
-
 function onRouteCalculated(res) {
   emit('route-calculated', res)
 }
 
+/**
+ * Richiede al componente padre la rimozione del percorso dalla mappa.
+ *
+ * @returns {void}
+ */
 function onClearRoute() {
   emit('clear-route')
 }
 
+/**
+ * Aggiorna dati locali e contenuti collegati quando cambia il bivacco selezionato.
+ */
 watch(
   () => props.bivacco,
   () => {
+    risorseOverride.value = null
+    risorseMsg.value = ''
+    downloadMsg.value = ''
+
+    risorseForm.acqua = risorseCorrenti.value.acqua
+    risorseForm.legna = risorseCorrenti.value.legna
+
     loadRecensioni()
-    //Carico storico segnalazioni se utente è parte dello Staff
+
     if (isStaff.value) {
       loadStoricoSegnalazioni()
     }
-    // Quando cambio bivacco, pulisco un eventuale tragitto precedente
+
     emit('clear-route')
   },
   { immediate: true }
@@ -312,7 +529,9 @@ watch(
   <aside class="details card card-header-glow">
     <header class="details-head">
       <p class="label">Scheda bivacco</p>
+
       <h2>{{ bivacco.nome }}</h2>
+
       <p class="zona-tag">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
@@ -322,18 +541,26 @@ watch(
       </p>
     </header>
 
-    <p v-if="message" class="toast">{{ message }}</p>
+    <p v-if="message" class="toast">
+      {{ message }}
+    </p>
 
     <div v-if="bivacco.emergenza" class="emergency-banner-active">
-      <span class="emergency-icon">⚠️</span>
-      <div class="emergency-content">
-          <h3>STATO DI EMERGENZA ATTIVO</h3>
-          <p>Questo bivacco è attualmente in stato di emergenza.</p>
-      </div>"
-    </div>
+  <span class="emergency-icon">⚠️</span>
 
+  <div class="emergency-content">
+    <h3>STATO DI EMERGENZA ATTIVO</h3>
 
-    <!-- Banner ticket aperti: visibile se ci sono segnalazioni attive sul bivacco (US24, RF18, RF36) -->
+    <p v-if="bivacco.noteEmergenza">
+      {{ bivacco.noteEmergenza }}
+    </p>
+
+    <p v-else>
+      Questo bivacco è attualmente in stato di emergenza.
+    </p>
+  </div>
+</div>
+
     <div v-if="bivacco.ticketAperti" class="ticket-banner">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
@@ -346,26 +573,37 @@ watch(
           {{ bivacco.numeroTicketAperti || 0 }}
           ticket {{ (bivacco.numeroTicketAperti || 0) === 1 ? 'aperto' : 'aperti' }}
         </strong>
-        <small>Sono stati segnalati problemi su questo bivacco da altri escursionisti</small>
+
+        <small>
+          Sono stati segnalati problemi su questo bivacco da altri escursionisti.
+        </small>
       </div>
     </div>
 
-    <!-- Quick facts grid -->
     <div class="facts">
       <div class="fact">
         <span class="fact-label">Quota</span>
         <strong class="mono">{{ bivacco.altitudine }} <small>m</small></strong>
       </div>
+
       <div class="fact">
         <span class="fact-label">Posti letto</span>
         <strong class="mono">{{ bivacco.postiLetto }}</strong>
       </div>
+
       <div class="fact">
-        <span class="fact-label">Rating</span>
-        <strong class="mono">{{ bivacco.mediaStelle || 0 }}<small>/5</small></strong>
+        <span class="fact-label">Media recensioni</span>
+        <strong class="mono">
+          {{ mediaRecensioni ? mediaRecensioni.toFixed(1) : '0.0' }}<small>/5</small>
+        </strong>
+        <p class="fact-sub">
+          {{ numeroRecensioni }} {{ numeroRecensioni === 1 ? 'recensione' : 'recensioni' }}
+        </p>
       </div>
+
       <div class="fact">
         <span class="fact-label">Stato</span>
+
         <strong>
           <span class="status-pill" :class="bivacco.emergenza ? 'status-danger' : 'status-ok'">
             {{ bivacco.emergenza ? 'Emergenza' : 'Operativo' }}
@@ -375,6 +613,7 @@ watch(
 
       <div class="fact">
         <span class="fact-label">Tipo</span>
+
         <strong>
           <span class="status-pill status-ok">
             {{ bivacco.tipoStruttura || 'fisso' }}
@@ -383,31 +622,80 @@ watch(
       </div>
     </div>
 
-    <!-- Meteo (US17, US19) -->
     <section class="section">
       <MeteoPanel :bivacco="bivacco" />
     </section>
 
-    <!-- Risorse -->
     <section class="section">
       <h3 class="section-title">Risorse disponibili</h3>
+
       <div class="resource-list">
         <div class="resource-row">
           <span>Acqua</span>
-          <span :class="bivacco.acquaPresente ? 'res-ok' : 'res-ko'">
-            {{ bivacco.acquaPresente ? 'Disponibile' : 'Non disponibile' }}
+
+          <span :class="classeRisorsa(risorseCorrenti.acqua)">
+            {{ labelRisorsa(risorseCorrenti.acqua) }}
           </span>
         </div>
+
         <div class="resource-row">
           <span>Legna</span>
-          <span :class="bivacco.legnaDisponibile ? 'res-ok' : 'res-ko'">
-            {{ bivacco.legnaDisponibile ? 'Disponibile' : 'Non disponibile' }}
+
+          <span :class="classeRisorsa(risorseCorrenti.legna)">
+            {{ labelRisorsa(risorseCorrenti.legna) }}
           </span>
         </div>
       </div>
+
+      <div v-if="isLogged" class="risorse-form">
+        <select v-model="risorseForm.acqua" class="select">
+          <option value="disponibile">Acqua: disponibile</option>
+          <option value="scarsa">Acqua: scarsa</option>
+          <option value="assente">Acqua: assente</option>
+        </select>
+
+        <select v-model="risorseForm.legna" class="select">
+          <option value="disponibile">Legna: disponibile</option>
+          <option value="scarsa">Legna: scarsa</option>
+          <option value="assente">Legna: assente</option>
+        </select>
+
+        <button class="btn btn-ghost btn-block" type="button" @click="inviaRisorse">
+          Aggiorna risorse
+        </button>
+
+        <p v-if="risorseMsg" class="inline-msg" :class="`inline-${risorseMsgType}`">
+          {{ risorseMsg }}
+        </p>
+      </div>
     </section>
 
-    <!-- Pianificatore tragitto: sostituisce profilo altimetrico fisso + sezione GPX -->
+    <section class="section">
+      <h3 class="section-title">Download GPX</h3>
+
+      <p class="dim download-note">
+        Scarica il tracciato GPX SAT più vicino al bivacco per consultarlo offline.
+      </p>
+
+      <button
+        v-if="isLogged"
+        class="btn btn-primary btn-block"
+        type="button"
+        :disabled="downloadLoading"
+        @click="scaricaGpx"
+      >
+        {{ downloadLoading ? 'Download in corso…' : 'Scarica GPX' }}
+      </button>
+
+      <div v-else class="login-hint">
+        Accedi per scaricare il file GPX.
+      </div>
+
+      <p v-if="downloadMsg" class="inline-msg" :class="`inline-${downloadMsgType}`">
+        {{ downloadMsg }}
+      </p>
+    </section>
+
     <section class="section">
       <TripPlanner
         :bivacco="bivacco"
@@ -416,7 +704,6 @@ watch(
       />
     </section>
 
-    <!-- Contatti emergenza -->
     <section class="section">
       <h3 class="section-title">Contatti di emergenza</h3>
 
@@ -438,44 +725,68 @@ watch(
       </div>
     </section>
 
-    <!-- Legenda CAI -->
     <section class="section">
       <h3 class="section-title">Legenda CAI</h3>
+
       <div class="cai-grid">
-        <div class="cai-row"><span class="cai-code">T</span><span>Turistico</span></div>
-        <div class="cai-row"><span class="cai-code">E</span><span>Escursionistico</span></div>
-        <div class="cai-row"><span class="cai-code">EE</span><span>Escursionisti esperti</span></div>
-        <div class="cai-row"><span class="cai-code">EEA</span><span>Attrezzatura richiesta</span></div>
+        <div class="cai-row">
+          <span class="cai-code">T</span>
+          <span>Turistico</span>
+        </div>
+
+        <div class="cai-row">
+          <span class="cai-code">E</span>
+          <span>Escursionistico</span>
+        </div>
+
+        <div class="cai-row">
+          <span class="cai-code">EE</span>
+          <span>Escursionisti esperti</span>
+        </div>
+
+        <div class="cai-row">
+          <span class="cai-code">EEA</span>
+          <span>Attrezzatura richiesta</span>
+        </div>
       </div>
     </section>
 
-    <!-- Segnalazione problemi -->
     <section class="section">
       <h3 class="section-title">Segnala un problema o un guasto</h3>
-      
+
       <div v-if="!isLogged" class="login-hint">
         Accedi per poter inviare una segnalazione sullo stato di questo bivacco.
       </div>
 
       <div v-else>
-        <button 
-          type="button" 
-          @click="mostrandoFormSegnalazione = !mostrandoFormSegnalazione" 
-          class="btn btn-block"
-          style="background: var(--bg-surface-2); border: 1px solid var(--border-subtle); color: var(--text-secondary); text-align: left; display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; margin-bottom: 12px;"
+        <button
+          type="button"
+          class="toggle-form-btn"
+          @click="mostrandoFormSegnalazione = !mostrandoFormSegnalazione"
         >
-          <span>{{ mostrandoFormSegnalazione ? 'Chiudi modulo' : 'Invia una segnalazione per questo bivacco' }}</span>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" :style="{ transform: mostrandoFormSegnalazione ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }">
+          <span>
+            {{ mostrandoFormSegnalazione ? 'Chiudi modulo' : 'Invia una segnalazione per questo bivacco' }}
+          </span>
+
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            :style="{ transform: mostrandoFormSegnalazione ? 'rotate(180deg)' : 'none' }"
+          >
             <polyline points="6 9 12 15 18 9"></polyline>
           </svg>
         </button>
 
-        <div v-if="mostrandoFormSegnalazione" style="margin-top: 14px; display: flex; flex-direction: column; gap: 14px;">
-          
-          <p v-if="segnalazioneErrore" class="toast" style="background: var(--danger-bg); border-color: var(--danger-border); color: var(--danger); margin-bottom: 0;">
+        <div v-if="mostrandoFormSegnalazione" class="segnalazione-box">
+          <p v-if="segnalazioneErrore" class="toast toast-error">
             {{ segnalazioneErrore }}
           </p>
-          <p v-if="segnalazioneSuccesso" class="toast" style="background: var(--success-bg); border-color: var(--success-border); color: var(--success); margin-bottom: 0;">
+
+          <p v-if="segnalazioneSuccesso" class="toast toast-success">
             {{ segnalazioneSuccesso }}
           </p>
 
@@ -484,28 +795,33 @@ watch(
               <textarea
                 v-model="segnalazioneDescrizione"
                 class="textarea"
-                placeholder="Descrivi dettagliatamente il problema (es: infiltrazioni dal tetto, finestra rotta, rifiuti accumulati...). Minimo 20 caratteri."
+                placeholder="Descrivi dettagliatamente il problema. Minimo 20 caratteri."
                 required
               />
-              <div style="font-size: 11px; text-align: right; color: var(--text-tertiary); margin-top: 4px;">
+
+              <div class="char-counter">
                 Caratteri: {{ segnalazioneDescrizione.trim().length }}/20
               </div>
             </div>
 
-            <div style="display: flex; flex-direction: column; gap: 6px; background: var(--bg-surface-2); padding: 12px; border-radius: var(--r); border: 1px solid var(--border-subtle);">
-              <span style="font-size: 13px; color: var(--text-secondary); font-weight: 500;">Foto prova del danno (Obbligatoria) *</span>
-              <input 
+            <div class="file-box">
+              <span>Foto prova del danno (obbligatoria)</span>
+
+              <input
                 id="segnalazione-file-input"
-                type="file" 
-                accept="image/*" 
-                @change="handleSegnalazioneFileChange"
-                style="font-size: 13px; color: var(--text-primary); cursor: pointer;"
+                type="file"
+                accept="image/*"
                 required
+                @change="handleSegnalazioneFileChange"
               />
             </div>
 
-            <button type="submit" :disabled="segnalazioneLoading" class="btn btn-primary btn-block" style="margin-top: 6px;">
-              {{ segnalazioneLoading ? 'Invio in corso...' : 'Invia Segnalazione' }}
+            <button
+              type="submit"
+              :disabled="segnalazioneLoading"
+              class="btn btn-primary btn-block"
+            >
+              {{ segnalazioneLoading ? 'Invio in corso…' : 'Invia segnalazione' }}
             </button>
           </form>
         </div>
@@ -513,18 +829,70 @@ watch(
     </section>
 
     <div v-if="isSuperUser" class="superuser-actions">
-      <h4>PAnnelllo Stato Emergenze</h4>
-      <button v-if="!bivacco.emergenza" @click="gestisciAttivazioneEmergenza" class="btn-mergency-trigger">
-        Attiva Allerta Emergenza
-      </button> 
-      <button v-else @click="gestisciRevocaEmergenza" class="btn-emergency-revoke">
-        Revoca Allerta Emergenza
+      <h4>Pannello stato emergenze</h4>
+
+      <button
+        v-if="!bivacco.emergenza"
+        type="button"
+        class="btn-emergency-trigger"
+        @click="gestisciAttivazioneEmergenza"
+      >
+        Attiva allerta emergenza
+      </button>
+
+      <button
+        v-else
+        type="button"
+        class="btn-emergency-revoke"
+        @click="gestisciRevocaEmergenza"
+      >
+        Revoca allerta emergenza
       </button>
     </div>
 
-    <!-- Recensioni -->
+    <section v-if="isStaff" class="section">
+      <button
+        type="button"
+        class="toggle-form-btn"
+        @click="mostrandoStoricoStaff = !mostrandoStoricoStaff"
+      >
+        <span>Storico segnalazioni staff</span>
+        <span>{{ mostrandoStoricoStaff ? '−' : '+' }}</span>
+      </button>
+
+      <div v-if="mostrandoStoricoStaff" class="staff-history">
+        <p v-if="storicoLoading" class="dim">
+          Caricamento storico…
+        </p>
+
+        <p v-else-if="!storicoSegnalazioni.length" class="empty">
+          Nessuna segnalazione per questo bivacco.
+        </p>
+
+        <div
+          v-for="s in storicoSegnalazioni"
+          :key="s._id"
+          class="review"
+        >
+          <div class="review-head">
+            <strong>{{ formattaStato(s.statoSegnalazione) }}</strong>
+          </div>
+
+          <p>{{ s.descrizione }}</p>
+        </div>
+      </div>
+    </section>
+
     <section class="section">
-      <h3 class="section-title">Recensioni ({{ recensioni.length }})</h3>
+      <h3 class="section-title">
+        Recensioni (<span class="mono">{{ recensioni.length }}</span>)
+      </h3>
+
+      <p class="rating-summary">
+        Valutazione media:
+        <strong>{{ mediaRecensioni ? mediaRecensioni.toFixed(1) : '0.0' }}/5</strong>
+        su {{ numeroRecensioni }} {{ numeroRecensioni === 1 ? 'recensione' : 'recensioni' }}.
+      </p>
 
       <div v-if="!isLogged" class="login-hint">
         Accedi per lasciare una recensione.
@@ -568,11 +936,19 @@ watch(
           class="review"
         >
           <div class="review-head">
-            <strong>{{ recensione.utente }}</strong>
+            <strong>{{ nomeRecensore(recensione) }}</strong>
+
             <div class="stars">
-              <span v-for="n in 5" :key="n" :class="{ filled: n <= recensione.stelle }">★</span>
+              <span
+                v-for="n in 5"
+                :key="n"
+                :class="{ filled: n <= recensione.stelle }"
+              >
+                ★
+              </span>
             </div>
           </div>
+
           <p>{{ recensione.testo }}</p>
         </div>
 
@@ -616,7 +992,18 @@ watch(
   margin-bottom: 18px;
 }
 
-/* —— Quick facts —— */
+.toast-error {
+  background: var(--danger-bg);
+  border-color: var(--danger-border);
+  color: var(--danger);
+}
+
+.toast-success {
+  background: var(--success-bg);
+  border-color: rgba(52, 211, 153, 0.28);
+  color: var(--success);
+}
+
 .facts {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -655,6 +1042,12 @@ watch(
   margin-left: 2px;
 }
 
+.fact-sub {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
 .status-pill {
   display: inline-block;
   padding: 4px 10px;
@@ -663,14 +1056,18 @@ watch(
   font-weight: 600;
   letter-spacing: 0.02em;
 }
-.status-ok { background: var(--success-bg); color: var(--success); }
+
+.status-ok {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
 .status-danger {
   background: var(--danger-bg);
   color: var(--danger);
   animation: pulseGlow 2s infinite;
 }
 
-/* —— Sections —— */
 .section {
   border-top: 1px solid var(--border-subtle);
   padding-top: 22px;
@@ -685,7 +1082,6 @@ watch(
   letter-spacing: -0.01em;
 }
 
-/* —— Risorse —— */
 .resource-list {
   display: flex;
   flex-direction: column;
@@ -705,10 +1101,55 @@ watch(
   color: var(--text-secondary);
 }
 
-.res-ok { color: var(--success); font-weight: 600; }
-.res-ko { color: var(--text-tertiary); }
+.res-ok {
+  color: var(--success);
+  font-weight: 700;
+}
 
-/* —— Legenda CAI —— */
+.res-warning {
+  color: var(--warning);
+  font-weight: 700;
+}
+
+.res-ko {
+  color: var(--danger);
+  font-weight: 700;
+}
+
+.res-unknown {
+  color: var(--text-tertiary);
+  font-weight: 600;
+}
+
+.risorse-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.inline-msg {
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+.inline-success {
+  color: var(--success);
+}
+
+.inline-error {
+  color: var(--danger);
+}
+
+.inline-info {
+  color: var(--text-tertiary);
+}
+
+.download-note {
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+
 .cai-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -740,12 +1181,34 @@ watch(
   font-weight: 600;
 }
 
-/* —— Review form —— */
 .review-form {
   display: flex;
   flex-direction: column;
   gap: 10px;
   margin-bottom: 18px;
+}
+
+.review-author {
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
+.review-author strong {
+  color: var(--text-primary);
+}
+
+.rating-summary {
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r);
+  padding: 12px 14px;
+  font-size: 13px;
+  margin-bottom: 14px;
+  color: var(--text-secondary);
+}
+
+.rating-summary strong {
+  color: var(--accent-hi);
 }
 
 .checkbox {
@@ -790,7 +1253,6 @@ watch(
   transform: rotate(45deg) translate(-1px, -1px);
 }
 
-/* —— Reviews list —— */
 .reviews {
   display: flex;
   flex-direction: column;
@@ -828,7 +1290,10 @@ watch(
   font-size: 13px;
   color: var(--text-dim);
 }
-.stars .filled { color: #FBBF24; }
+
+.stars .filled {
+  color: #FBBF24;
+}
 
 .empty {
   text-align: center;
@@ -837,11 +1302,6 @@ watch(
   padding: 20px;
   background: var(--bg-surface-2);
   border-radius: var(--r-md);
-}
-
-@media (max-width: 480px) {
-  .facts { grid-template-columns: 1fr; }
-  .cai-grid { grid-template-columns: 1fr; }
 }
 
 .emergency-grid {
@@ -877,16 +1337,6 @@ watch(
   grid-column: 1 / -1;
 }
 
-@media (max-width: 480px) {
-  .emergency-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .emergency-wide {
-    grid-column: auto;
-  }
-}
-
 .login-hint {
   background: var(--bg-surface-2);
   border: 1px solid var(--border-subtle);
@@ -895,15 +1345,6 @@ watch(
   color: var(--text-tertiary);
   font-size: 13px;
   margin-bottom: 18px;
-}
-
-.review-author {
-  font-size: 13px;
-  color: var(--text-tertiary);
-}
-
-.review-author strong {
-  color: var(--text-primary);
 }
 
 .ticket-banner {
@@ -936,7 +1377,6 @@ watch(
   line-height: 1.4;
 }
 
-/* ALERT BANNER */ 
 .emergency-banner-active {
   display: flex;
   align-items: center;
@@ -1015,4 +1455,81 @@ watch(
   background-color: #059669;
 }
 
+.toggle-form-btn {
+  width: 100%;
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  text-align: left;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  border-radius: var(--r);
+}
+
+.toggle-form-btn svg {
+  transition: transform 0.2s;
+}
+
+.segnalazione-box {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.char-counter {
+  font-size: 11px;
+  text-align: right;
+  color: var(--text-tertiary);
+  margin-top: 4px;
+}
+
+.file-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--bg-surface-2);
+  padding: 12px;
+  border-radius: var(--r);
+  border: 1px solid var(--border-subtle);
+}
+
+.file-box span {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.file-box input {
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.staff-history {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+@media (max-width: 480px) {
+  .facts {
+    grid-template-columns: 1fr;
+  }
+
+  .cai-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .emergency-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .emergency-wide {
+    grid-column: auto;
+  }
+}
 </style>

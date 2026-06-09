@@ -1,12 +1,18 @@
 /**
  * @file emailService.js
- * @description Servizio per l'invio di email tramite Nodemailer e SMTP Google
+ * @description Servizio per l'invio delle email automatiche di sistema.
+ *
+ * Include:
+ * - configurazione del transporter Nodemailer;
+ * - invio di email tramite SMTP Gmail;
+ * - gestione degli errori di invio.
  */
 
 const nodemailer = require('nodemailer');
 
 /**
- * Utilizza le credenziali salvate nel file .env per inviare le mail automatiche
+ * Transporter Nodemailer configurato con le credenziali
+ * definite nelle variabili d'ambiente.
  */
 const postino = nodemailer.createTransport({
     service: 'gmail',
@@ -17,10 +23,16 @@ const postino = nodemailer.createTransport({
 });
 
 /**
- * Invia una email di sistema
- * * @param {string} destinatario - Indirizzo email utente
- * @param {string} oggetto - Oggetto della mail
- * @param {string} testoHtml - Contenuto della mail
+ * Invia una email automatica di sistema.
+ *
+ * L'operazione:
+ * - imposta mittente, destinatario e oggetto;
+ * - inserisce il contenuto HTML ricevuto;
+ * - invia la email tramite Nodemailer.
+ *
+ * @param {string} destinatario - Indirizzo email del destinatario.
+ * @param {string} oggetto - Oggetto della email.
+ * @param {string} testoHtml - Contenuto HTML della email.
  * @returns {Promise<void>}
  */
 const inviaEmail = async (destinatario, oggetto, testoHtml) => {

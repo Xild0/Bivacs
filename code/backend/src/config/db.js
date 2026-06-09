@@ -6,9 +6,14 @@
 const mongoose = require('mongoose');
 
 /**
- * Stabilisce la connessione al database MongoDB usando la variabile d'ambiente MONGO_URI.
- * In caso di errore blocca l'avvio del server.
+ * Connette l'applicazione al database MongoDB tramite Mongoose.
  *
+ * Legge l'URI di connessione dalla variabile d'ambiente `MONGO_URI`.
+ * In caso di errore termina il processo Node.js per evitare
+ * l'avvio del server senza connessione al database.
+ *
+ * @async
+ * @function connectDB
  * @returns {Promise<void>}
  */
 

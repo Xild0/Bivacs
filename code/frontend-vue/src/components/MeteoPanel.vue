@@ -1,10 +1,4 @@
-
-/**
- * @file MeteoPanel.vue
- * @description Pannello meteo del bivacco con condizioni realtime, livello di rischio e previsioni a 3 giorni.
- */
- 
- <script setup>
+<script setup>
 import { ref, watch, computed } from 'vue'
 import { getMeteoBivacco, getPrevisioniBivacco } from '../services/api'
 
@@ -20,6 +14,11 @@ const previsioni = ref([])
 const loading = ref(false)
 const error = ref('')
 
+/**
+ * Seleziona l'icona meteo in base alle condizioni rilevate.
+ *
+ * @returns {string} Emoji rappresentativa delle condizioni meteo.
+ */
 const icona = computed(() => {
   if (!meteo.value) return '⛰️'
   if (meteo.value.precipitazioni >= 10) return '🌧️'
@@ -28,6 +27,11 @@ const icona = computed(() => {
   return '☀️'
 })
 
+/**
+ * Carica condizioni meteo e previsioni del bivacco corrente.
+ *
+ * @returns {Promise<void>}
+ */
 async function loadMeteo() {
   if (!props.bivacco?._id) return
 
@@ -47,6 +51,9 @@ async function loadMeteo() {
   }
 }
 
+/**
+ * Ricarica il meteo quando cambia il bivacco selezionato.
+ */
 watch(
   () => props.bivacco._id,
   () => loadMeteo(),

@@ -8,6 +8,12 @@ const mongoose = require('mongoose');
 
 const Utente = require('./utente');
 
+/**
+ * Schema dei dati aggiuntivi associati a un utente registrato.
+ *
+ * @type {mongoose.Schema}
+ */
+
 const utenteRegistratoSchema = new mongoose.Schema(
 {
     nome: {
@@ -31,5 +37,5 @@ const utenteRegistratoSchema = new mongoose.Schema(
     timestamps: true
 });
 
-// utenteRegistrato extends utente with discriminator
+// UtenteRegistrato estende il modello base Utente tramite discriminator.
 module.exports = Utente.discriminator('UtenteRegistrato', utenteRegistratoSchema);

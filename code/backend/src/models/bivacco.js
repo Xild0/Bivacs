@@ -1,11 +1,22 @@
 /**
  * @file bivacco.js
  * @description Modello Mongoose principale per i bivacchi.
- * Contiene dati geografici, dotazioni, risorse disponibili, stato emergenza,
- * rating medio e collegamenti ai percorsi associati.
+ *
+ * Include:
+ * - dati geografici e tecnici della struttura;
+ * - dotazioni e zona di appartenenza;
+ * - percorsi GPX associati;
+ * - stato di emergenza;
+ * - disponibilità di acqua e legna;
+ * - rating medio e numero di recensioni.
  */
-
 const mongoose = require('mongoose');
+
+/**
+ * Schema principale dei bivacchi registrati nel sistema.
+ *
+ * @type {mongoose.Schema}
+ */
 
 const bivaccoSchema = new mongoose.Schema(
 {

@@ -29,29 +29,60 @@ const navigationActive = ref(false)
 
 const logged = ref(isLoggedIn())
 
+/**
+ * Restituisce il primo percorso disponibile associato al bivacco.
+ *
+ * @returns {Object|null} Percorso disponibile oppure null.
+ */
 const percorso = computed(() => {
   return percorsi.value[0] || props.bivacco.percorsi?.[0] || null
 })
 
+/**
+ * Indica se è disponibile un percorso calcolato da OpenRouteService.
+ *
+ * @returns {boolean} True se il risultato contiene coordinate valide.
+ */
 const orsDisponibile = computed(() => {
   return props.result?.coords?.length > 1
 })
 
+/**
+ * Restituisce le coordinate da mostrare sulla mappa.
+ *
+ * @returns {Array<Array<number>>} Coordinate del percorso ORS o GPX.
+ */
 const routeCoords = computed(() => {
   if (orsDisponibile.value) return props.result.coords
   return gpxCoords.value
 })
 
+/**
+ * Restituisce la coordinata di partenza del percorso.
+ *
+ * @returns {Array<number>} Coordinata di partenza.
+ */
 const startCoord = computed(() => {
-  return routeCoords.value?.[0] || [Number(props.bivacco.latitudine), Number(props.bivacco.longitudine)]
+  return props.result.startCoord || routeCoords.value?.[0]
 })
 
+/**
+ * Restituisce la coordinata finale del percorso.
+ *
+ * @returns {Array<number>} Coordinata finale del bivacco.
+ */
 const endCoord = computed(() => {
-  const coords = routeCoords.value
-  if (coords?.length) return coords[coords.length - 1]
-  return [Number(props.bivacco.latitudine), Number(props.bivacco.longitudine)]
+  return props.result.endCoord || [
+    Number(props.bivacco.latitudine),
+    Number(props.bivacco.longitudine)
+  ]
 })
 
+/**
+ * Restituisce il profilo altimetrico da visualizzare.
+ *
+ * @returns {Array<Object>} Profilo altimetrico ORS o GPX.
+ */
 const profile = computed(() => {
   if (orsDisponibile.value && props.result.profile?.length) {
     return props.result.profile
@@ -60,6 +91,11 @@ const profile = computed(() => {
   return gpxProfile.value
 })
 
+/**
+ * Calcola la distanza totale del percorso in chilometri.
+ *
+ * @returns {number} Distanza totale in km.
+ */
 const totalDistanceKm = computed(() => {
   if (orsDisponibile.value) {
     return (props.result.distance || 0) / 1000
@@ -73,21 +109,31 @@ const totalDistanceKm = computed(() => {
   return 0
 })
 
+/**
+ * Calcola la durata stimata del percorso in minuti.
+ *
+ * @returns {number} Durata stimata in minuti.
+ */
 const totalDurationMinutes = computed(() => {
   if (orsDisponibile.value) {
     return Math.round((props.result.duration || 0) / 60)
   }
 
-  // fallback GPX: stima 25 min/km
   return Math.round(totalDistanceKm.value * 25)
 })
 
+/**
+ * Calcola il dislivello positivo totale del percorso.
+ *
+ * @returns {number} Dislivello positivo in metri.
+ */
 const totalAscent = computed(() => {
   if (orsDisponibile.value) {
     return Math.round(props.result.ascent || 0)
   }
 
   let ascent = 0
+
   for (let i = 1; i < gpxProfile.value.length; i++) {
     const diff = gpxProfile.value[i].elevation - gpxProfile.value[i - 1].elevation
     if (diff > 0) ascent += diff
@@ -96,6 +142,11 @@ const totalAscent = computed(() => {
   return Math.round(ascent)
 })
 
+/**
+ * Genera il nome del file GPX da scaricare.
+ *
+ * @returns {string} Nome del file GPX.
+ */
 const downloadFileName = computed(() => {
   const nome = props.bivacco.nome
     ? props.bivacco.nome.replace(/[^a-zA-Z0-9_-]/g, '_')
@@ -104,6 +155,15 @@ const downloadFileName = computed(() => {
   return `${nome}.gpx`
 })
 
+/**
+ * Calcola la distanza in metri tra due coordinate geografiche.
+ *
+ * @param {number} lat1 - Latitudine del primo punto.
+ * @param {number} lon1 - Longitudine del primo punto.
+ * @param {number} lat2 - Latitudine del secondo punto.
+ * @param {number} lon2 - Longitudine del secondo punto.
+ * @returns {number} Distanza in metri.
+ */
 function haversine(lat1, lon1, lat2, lon2) {
   const R = 6371000
   const toRad = deg => deg * Math.PI / 180
@@ -119,6 +179,12 @@ function haversine(lat1, lon1, lat2, lon2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
 
+/**
+ * Converte un file GPX in coordinate e profilo altimetrico.
+ *
+ * @param {string} xmlText - Contenuto XML del file GPX.
+ * @returns {{ coords: Array<Array<number>>, profile: Array<{ distance: number, elevation: number }> }} Dati estratti dal GPX.
+ */
 function parseGpx(xmlText) {
   const parser = new DOMParser()
   const xml = parser.parseFromString(xmlText, 'application/xml')
@@ -171,6 +237,11 @@ function parseGpx(xmlText) {
   }
 }
 
+/**
+ * Carica e interpreta il tracciato GPX SAT associato al bivacco.
+ *
+ * @returns {Promise<void>}
+ */
 async function loadGpxOverlay() {
   loadingGpx.value = true
   gpxError.value = ''
@@ -193,6 +264,12 @@ async function loadGpxOverlay() {
   }
 }
 
+/**
+ * Formatta una durata espressa in minuti.
+ *
+ * @param {number} minutes - Durata in minuti.
+ * @returns {string} Durata formattata.
+ */
 function formatDuration(minutes) {
   const h = Math.floor(minutes / 60)
   const m = minutes % 60
@@ -202,20 +279,53 @@ function formatDuration(minutes) {
   return `${h} h ${m} min`
 }
 
-function avviaDownload() {
+/**
+ * Scarica il file GPX SAT del bivacco corrente.
+ *
+ * @returns {Promise<void>}
+ */
+async function avviaDownload() {
   downloadError.value = ''
 
-  if (!getToken()) {
+  const token = getToken()
+
+  if (!token) {
     downloadError.value = 'Accedi per scaricare il GPX.'
     return
   }
 
-  window.open(getAutoDownloadGpxUrl(props.bivacco._id), '_blank')
+  downloadInCorso.value = true
+
+  try {
+    const response = await fetch(getAutoDownloadGpxUrl(props.bivacco._id), {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+
+    if (!response.ok) {
+      throw new Error('Download del GPX non disponibile per questo bivacco')
+    }
+
+    const blob = await response.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+
+    a.href = url
+    a.download = downloadFileName.value
+    a.click()
+
+    URL.revokeObjectURL(url)
+  } catch (e) {
+    downloadError.value = e.message
+  } finally {
+    downloadInCorso.value = false
+  }
 }
 
+/**
+ * Carica il tracciato GPX SAT al montaggio della modale.
+ */
 onMounted(() => {
-  // GPX automatico disattivato: i file SAT completi possono partire da punti lontani
-  // e risultano fuorvianti come overlay.
+  loadGpxOverlay()
 })
 </script>
 
@@ -254,7 +364,7 @@ onMounted(() => {
       <div class="map-wrap">
         <RouteMap
           :route-coords="routeCoords"
-          :official-trail-coords="[]"
+          :official-trail-coords="gpxCoords"
           :start-coord="startCoord"
           :end-coord="endCoord"
           start-name="Partenza"
@@ -298,7 +408,7 @@ onMounted(() => {
           </div>
 
           <p class="segment-note">
-            Mostrato come riferimento sulla mappa. Il percorso blu resta quello consigliato dall’app.
+            Disponibile per il download. Il percorso consigliato resta quello blu calcolato dall'app.
           </p>
         </div>
 

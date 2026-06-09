@@ -1,8 +1,3 @@
-/**
- * @file Filters.vue
- * @description Pannello filtri per ricerca bivacchi.
- */
-
 <script setup>
 import { reactive, computed } from 'vue'
 
@@ -24,6 +19,11 @@ const filters = reactive({
   tipoStruttura: ''
 })
 
+/**
+ * Genera i suggerimenti automatici per il nome del bivacco.
+ *
+ * @returns {Array<Object>} Lista dei bivacchi compatibili con il testo inserito.
+ */
 const suggerimentiNome = computed(() => {
   const q = filters.nome.trim().toLowerCase()
 
@@ -41,7 +41,10 @@ const suggerimentiNome = computed(() => {
 })
 
 /**
- * Seleziona un suggerimento automatico del nome bivacco.
+ * Seleziona un suggerimento automatico e avvia la ricerca.
+ *
+ * @param {string} nome - Nome del bivacco selezionato.
+ * @returns {void}
  */
 function selezionaNome(nome) {
   filters.nome = nome
@@ -50,6 +53,8 @@ function selezionaNome(nome) {
 
 /**
  * Invia i filtri di ricerca al componente padre.
+ *
+ * @returns {void}
  */
 function submitSearch() {
   emit('search', { ...filters })
@@ -57,6 +62,8 @@ function submitSearch() {
 
 /**
  * Ripristina tutti i filtri di ricerca.
+ *
+ * @returns {void}
  */
 function resetFilters() {
   Object.keys(filters).forEach(k => { filters[k] = '' })

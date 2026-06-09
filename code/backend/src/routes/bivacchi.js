@@ -1,8 +1,14 @@
 /**
  * @file bivacchi.js
- * @description Route Express per la gestione dei bivacchi.
- * Espone endpoint per ricerca, dettaglio, creazione, eliminazione,
- * percorsi associati e aggiornamento collaborativo delle risorse.
+ * @description API REST per la gestione dei bivacchi.
+ *
+ * Include:
+ * - ricerca e filtro dei bivacchi;
+ * - dettaglio di un bivacco;
+ * - creazione ed eliminazione;
+ * - percorsi associati;
+ * - aggiornamento delle risorse utili;
+ * - gestione delle emergenze.
  */
 
 const express = require('express');
@@ -27,14 +33,17 @@ const getErrorMessage = (err) =>
   err instanceof Error ? err.message : String(err);
 
 /**
- * Recupera la lista dei bivacchi applicando eventuali filtri.
- * Supporta ricerca per nome, zona, range di altitudine,
- * numero minimo di posti letto e tipo di struttura.
+ * Recupera la lista dei bivacchi.
+ *
+ * Supporta filtri opzionali per:
+ * - nome;
+ * - zona;
+ * - altitudine minima e massima;
+ * - numero minimo di posti letto;
+ * - tipo di struttura.
  *
  * @route GET /api/v1/bivacchi
- * @param {import('express').Request} req - Richiesta HTTP con query params opzionali.
- * @param {import('express').Response} res - Risposta HTTP.
- * @returns {Promise<void>} Lista dei bivacchi filtrati.
+ * @access Public
  */
 router.get('/', async (req, res) => {
   try {
@@ -97,18 +106,35 @@ router.get('/', async (req, res) => {
 });
 
 /**
- * Recupera la scheda dettagliata di un bivacco tramite ObjectId MongoDB.
+ * Recupera tutte le emergenze attive.
+ *
+ * Restituisce la lista degli alert ancora attivi,
+ * includendo il nome del bivacco associato.
+ *
+ * @route GET /api/v1/bivacchi/emergenze_attive
+ * @access Public
+ */
+router.get('/emergenze_attive', async (req,res) => {
+  try{
+    const alerts = await Alert.find({attivo:true}).populate('bivacco', 'nome');
+    res.status(200).json(alerts);
+  } catch (error){
+    res.status(500).json({error: 'Errore interno del server'});
+  }
+});
+
+/**
+ * Recupera la scheda dettagliata di un bivacco.
+ *
  * La risposta include:
- * - dati tecnici del bivacco;
+ * - dati del bivacco;
  * - percorsi associati;
- * - numero di segnalazioni attive;
- * - ticket di manutenzione collegati;
- * - ultimo aggiornamento disponibile sullo stato di acqua e legna.
+ * - segnalazioni attive;
+ * - ticket di manutenzione;
+ * - ultimo aggiornamento su acqua e legna.
  *
  * @route GET /api/v1/bivacchi/:id
- * @param {import('express').Request} req - Richiesta HTTP con id del bivacco.
- * @param {import('express').Response} res - Risposta HTTP.
- * @returns {Promise<void>} Scheda completa del bivacco oppure errore 400/404.
+ * @access Public
  */
 router.get('/:id', async (req, res) => {
   try {
@@ -173,13 +199,15 @@ router.get('/:id', async (req, res) => {
 });
 
 /**
- * Crea un nuovo bivacco nel database.
- * Valida i campi obbligatori e controlla che l'id numerico non sia già presente.
+ * Crea un nuovo bivacco.
+ *
+ * L'operazione:
+ * - valida i campi obbligatori;
+ * - verifica che l'id numerico non sia già presente;
+ * - salva il bivacco nel database.
  *
  * @route POST /api/v1/bivacchi
- * @param {import('express').Request} req - Richiesta HTTP contenente i dati del bivacco.
- * @param {import('express').Response} res - Risposta HTTP.
- * @returns {Promise<void>} Bivacco creato oppure errore di validazione.
+ * @access Public
  */
 router.post('/', async (req, res) => {
   try {
@@ -253,12 +281,13 @@ router.post('/', async (req, res) => {
 });
 
 /**
- * Elimina un bivacco tramite ObjectId MongoDB.
+ * Elimina un bivacco.
+ *
+ * L'operazione cerca il bivacco tramite ObjectId MongoDB
+ * e lo rimuove dal database.
  *
  * @route DELETE /api/v1/bivacchi/:id
- * @param {import('express').Request} req - Richiesta HTTP con id del bivacco.
- * @param {import('express').Response} res - Risposta HTTP.
- * @returns {Promise<void>} Messaggio di conferma oppure errore 400/404.
+ * @access Public
  */
 router.delete('/:id', async (req, res) => {
   try {
@@ -288,13 +317,14 @@ router.delete('/:id', async (req, res) => {
 });
 
 /**
- * Recupera tutti i percorsi associati a un bivacco.
- * Prima verifica che il bivacco esista, poi restituisce i percorsi collegati.
+ * Recupera i percorsi associati a un bivacco.
+ *
+ * L'operazione:
+ * - verifica che il bivacco esista;
+ * - restituisce tutti i percorsi collegati.
  *
  * @route GET /api/v1/bivacchi/:id/percorsi
- * @param {import('express').Request} req - Richiesta HTTP con id del bivacco.
- * @param {import('express').Response} res - Risposta HTTP.
- * @returns {Promise<void>} Lista dei percorsi associati al bivacco.
+ * @access Public
  */
 router.get('/:id/percorsi', async (req, res) => {
   try {
@@ -327,13 +357,14 @@ router.get('/:id/percorsi', async (req, res) => {
 
 /**
  * Aggiorna lo stato delle risorse utili di un bivacco.
- * Crea un record storico in RisorseUtili e sincronizza i campi booleani
- * acquaPresente e legnaDisponibile nel documento Bivacco.
+ *
+ * L'operazione:
+ * - salva un nuovo aggiornamento storico;
+ * - collega l'autore autenticato;
+ * - sincronizza acqua e legna nel documento Bivacco.
  *
  * @route POST /api/v1/bivacchi/:id/risorse
- * @param {import('express').Request} req - Richiesta HTTP con stato di acqua e legna.
- * @param {import('express').Response} res - Risposta HTTP.
- * @returns {Promise<void>} Stato risorse aggiornato oppure errore.
+ * @access Private
  */
 router.post('/:id/risorse', protectRoute, async (req, res) => {
   try {
@@ -401,15 +432,17 @@ router.post('/:id/risorse', protectRoute, async (req, res) => {
 });
 
 /**
- * @route POST  /api/v1/bivacchi/:id/emergenza
- * @description Imposta il campo emergenza del bivacco a "true" e crea una istanza di "Alert" con il messaggio fornito
- * @param {import('express').Request} req - oggetto della richiesta Express
- * @param {string} req.params.id - ID univoco del bivacco 
- * @param {Object} req.body - corpo della richiesta HTTP
- * @param {string} req.body.msg - messaggio testuale da mostrare nel banner
- * @param {import('express').Response} res - oggetto della risposta Express
- * @returns {Promise<void>} risponde con stato 201 e oggetto Alert creato in caso di successo, 500 in caso di errore
+ * Attiva lo stato di emergenza per un bivacco.
+ *
+ * L'operazione:
+ * - aggiorna il campo emergenza;
+ * - crea un alert attivo;
+ * - notifica i client collegati tramite Socket.IO.
+ *
+ * @route POST /api/v1/bivacchi/:id/emergenza
+ * @access Private - SuperUser
  */
+
 router.post('/:id/emergenza', protectRoute, isSuperUser, async (req,res) => {
   try {
     const {note} = req.body;
@@ -454,13 +487,15 @@ router.post('/:id/emergenza', protectRoute, isSuperUser, async (req,res) => {
 });
 
 /**
+ * Revoca lo stato di emergenza di un bivacco.
+ *
+ * L'operazione:
+ * - disattiva l'emergenza;
+ * - revoca l'alert attivo associato;
+ * - notifica i client collegati tramite Socket.IO.
+ *
  * @route DELETE /api/v1/bivacchi/:id/revoca-emergenza
- * @description Imposta il campo emergenza del bivacco a false e chiama il metodo revoca() sull'istanza Alert attiva 
- * per rimuovere il banner dall'interfaccia utente.
- * @param {import('express').Request} req - oggetto della richiesta Express
- * @param {string} req.params.id - ID univoco del bivacco
- * @param {import('express').Response} res - oggetto della risposta Express
- * @returns {Promise<void>} risponde con stato 200 in caso di avvenuta revoca, 500 in caso di errore
+ * @access Private - SuperUser
  */
 router.delete('/:id/revoca-emergenza', protectRoute, isSuperUser, async (req, res) => {
   try {
@@ -489,22 +524,6 @@ router.delete('/:id/revoca-emergenza', protectRoute, isSuperUser, async (req, re
   } catch(error){
     console.error('Errore revoca emergenza:', getErrorMessage(error));
     res.status(500).json({error:'Errore interno del server'});
-  }
-});
-
-/**
- * @route GET /api/v1/bivacchi/emergenze_attive
- * @description Fornisce la lista di tutte le allerte di emergenza attive.
- * @param {import('express').Request} req - oggetto della richiesta Express
- * @param {import('express').Response} res - oggetto della risposta Express
- * @returns {Promise<void>} risponde con un array JSON contenente le allerte attive
- */
-router.get('/emergenze_attive', async (req,res) => {
-  try{
-    const alerts = await Alert.find({attivo:true}).populate('bivacco', 'nome');
-    res.status(200).json(alerts);
-  } catch (error){
-    res.status(500).json({error: 'Errore interno del server'});
   }
 });
 

@@ -1,8 +1,14 @@
 /**
  * @file profilo.js
- * @description Route Express per la gestione del profilo utente.
- * Espone endpoint per visualizzare, aggiornare ed eliminare il profilo,
- * oltre alla gestione dei bivacchi preferiti.
+ * @description API REST per la gestione del profilo utente.
+ *
+ * Include:
+ * - visualizzazione del profilo;
+ * - aggiornamento dei dati personali;
+ * - eliminazione dell'account;
+ * - gestione dei bivacchi preferiti;
+ * - richiesta di promozione a Supporto Tecnico;
+ * - richiesta di promozione a SuperUser.
  */
 
 const mongoose = require('mongoose');
@@ -11,16 +17,21 @@ const bcrypt = require('bcryptjs');
 const Utente = require('../models/utente');
 const UtenteRegistrato = require('../models/utenteRegistrato');
 const Recensione = require('../models/recensione');
+const Bivacco = require('../models/bivacco');
 const {protectRoute} = require('../middlewares/authMiddleware');
 
 const router = express.Router();
 
 /**
- * Recupera i dati del profilo dell'utente attualmente loggato
- * * @route GET /api/v1/profilo
- * @param {import('express').Request} req - Richiesta HTTP
- * @param {import('express').Response} res - Risposta HTTP
- * @returns {Promise<void>} Ritorna i dati dell'utente escludendo la password
+ * Recupera i dati del profilo dell'utente autenticato.
+ *
+ * L'operazione:
+ * - recupera l'utente tramite id presente nel token;
+ * - esclude l'hash della password;
+ * - include i bivacchi preferiti se presenti.
+ *
+ * @route GET /api/v1/profilo
+ * @access Private
  */
 router.get('/', protectRoute, async (req, res) => {
     try {
@@ -47,29 +58,29 @@ router.get('/', protectRoute, async (req, res) => {
 });
 
 /**
- * Aggiorna i dati dell'utente
- * * Permette di modificare nome, cognome, email e password. 
- * La nuova password viene automaticamente criptata prima del salvataggio.
- * * @route PATCH /api/v1/profilo
- * @param {import('express').Request} req - Richiesta HTTP (campi da aggiornare)
- * @param {import('express').Response} res - Risposta HTTP
- * @returns {Promise<void>} Ritorna il profilo aggiornato
+ * Aggiorna i dati del profilo dell'utente autenticato.
+ *
+ * L'operazione:
+ * - modifica solo i campi inviati nel body;
+ * - controlla che la nuova email non sia già in uso;
+ * - cripta la nuova password se presente;
+ * - salva le modifiche nel database.
+ *
+ * @route PATCH /api/v1/profilo
+ * @access Private
  */
 router.patch('/', protectRoute, async (req, res) => {
     try {
         const { nome, cognome, email, password } = req.body;
         
-        // troviamo l'utente tramite l'ID del token
         let utente = await UtenteRegistrato.findById(req.utente.mongoId);
         if (!utente) {
             return res.status(404).json({ errore: 'Utente non trovato' });
         }
 
-        // aggiorniamo solo i campi inviati nel body
         if (nome) utente.nome = nome;
         if (cognome) utente.cognome = cognome;
         if (email) {
-            // controllo aggiuntivo se mail già presente nel database
             const emailEsistente = await Utente.findOne({ email: email, _id: { $ne: utente._id } });
             if (emailEsistente) {
                 return res.status(409).json({ errore: 'Questa email è già in uso da un altro account' });
@@ -82,7 +93,6 @@ router.patch('/', protectRoute, async (req, res) => {
             utente.passwordHash = await bcrypt.hash(password, saltRounds);
         }
 
-        // salvataggio delle modifiche
         const utenteAggiornato = await utente.save();
 
         res.status(200).json({ 
@@ -104,32 +114,34 @@ router.patch('/', protectRoute, async (req, res) => {
 });
 
 /**
- * Elimina permanentemente l'account dell'utente loggato.
- * Prima della cancellazione, anonimizza tutte le recensioni
- * dell'utente in conformità al "Diritto all'Oblio" (RF20, RNF12):
- * il contenuto e il rating restano visibili, ma il legame con
- * l'autore viene rimosso.
+ * Elimina permanentemente l'account dell'utente autenticato.
+ *
+ * L'operazione:
+ * - anonimizza le recensioni dell'utente;
+ * - rimuove il collegamento tra recensioni e autore;
+ * - elimina l'account dal database.
+ *
+ * Il contenuto delle recensioni resta visibile
+ * in conformità al diritto all'oblio.
  *
  * @route DELETE /api/v1/profilo
- * @param {import('express').Request} req
- * @param {import('express').Response} res
- * @returns {Promise<void>}
+ * @access Private
  */
 router.delete('/', protectRoute, async (req, res) => {
     try {
-        // Recupero dell'utente per ottenere il nome con cui sono state firmate le recensioni
         const utente = await UtenteRegistrato.findById(req.utente.mongoId);
 
         if (utente) {
-            const nomeCompleto = `${utente.nome || ''} ${utente.cognome || ''}`.trim();
-
-            // Anonimizzazione delle recensioni dell'utente
-            if (nomeCompleto) {
-                await Recensione.updateMany(
-                    { utente: nomeCompleto },
-                    { $set: { utente: 'Anonimo', anonima: true } }
-                );
-            }
+            await Recensione.updateMany(
+                { utente: req.utente.mongoId },
+                {
+                    $set: {
+                        nomeVisualizzato: 'Anonimo',
+                        anonima: true,
+                        utente: null
+                    }
+                }
+            );
         }
 
         const utenteEliminato = await Utente.findByIdAndDelete(req.utente.mongoId);
@@ -146,64 +158,116 @@ router.delete('/', protectRoute, async (req, res) => {
 });
 
 /**
- * Aggiunge un bivacco ai preferiti dell'utente registrato
+ * Aggiunge un bivacco ai preferiti dell'utente.
+ *
+ * L'operazione:
+ * - valida l'id del bivacco;
+ * - verifica che il bivacco esista;
+ * - controlla che l'utente possa gestire i preferiti;
+ * - aggiunge il bivacco alla lista dei preferiti.
+ *
  * @route POST /api/v1/profilo/preferiti/:bivaccoId
+ * @access Private
  */
 router.post('/preferiti/:bivaccoId', protectRoute, async (req, res) => {
     try {
         const { bivaccoId } = req.params;
 
-        // Usiamo UtenteRegistrato perché il campo 'preferiti' è definito lì
+        if (!mongoose.Types.ObjectId.isValid(bivaccoId)) {
+            return res.status(400).json({ errore: 'ID bivacco non valido' });
+        }
+
+        const bivacco = await Bivacco.findById(bivaccoId);
+        if (!bivacco) {
+            return res.status(404).json({ errore: 'Bivacco non trovato' });
+        }
+
+        const utenteBase = await Utente.findById(req.utente.mongoId);
+
+        if (!utenteBase) {
+            return res.status(404).json({ errore: 'Utente non trovato' });
+        }
+
+        if (utenteBase.discriminator !== 'UtenteRegistrato') {
+            return res.status(403).json({
+                errore: 'Solo gli utenti registrati standard possono gestire i preferiti'
+            });
+        }
+
         const utente = await UtenteRegistrato.findByIdAndUpdate(
             req.utente.mongoId,
-            { $addToSet: { preferiti: bivaccoId } }, // $addToSet evita duplicati
-            { new: true }
-        );
-
-        if (!utente) {
-            return res.status(403).json({ errore: 'Solo gli utenti registrati possono avere preferiti' });
-        }
+            { $addToSet: { preferiti: bivaccoId } },
+            { new: true, runValidators: true }
+        ).populate('preferiti');
 
         res.status(200).json({
             messaggio: 'Bivacco aggiunto ai preferiti',
             preferiti: utente.preferiti
         });
     } catch (error) {
-        res.status(500).json({ errore: 'Errore nell\'aggiunta ai preferiti' });
+        console.error('Errore aggiunta preferito:', error);
+        res.status(500).json({ errore: 'Errore nell’aggiunta ai preferiti' });
     }
 });
 
 /**
- * Rimuove un bivacco dai preferiti
+ * Rimuove un bivacco dai preferiti dell'utente.
+ *
+ * L'operazione:
+ * - valida l'id del bivacco;
+ * - controlla che l'utente possa gestire i preferiti;
+ * - rimuove il bivacco dalla lista dei preferiti aggiornata.
+ *
  * @route DELETE /api/v1/profilo/preferiti/:bivaccoId
+ * @access Private
  */
 router.delete('/preferiti/:bivaccoId', protectRoute, async (req, res) => {
     try {
         const { bivaccoId } = req.params;
 
+        if (!mongoose.Types.ObjectId.isValid(bivaccoId)) {
+            return res.status(400).json({ errore: 'ID bivacco non valido' });
+        }
+
+        const utenteBase = await Utente.findById(req.utente.mongoId);
+
+        if (!utenteBase) {
+            return res.status(404).json({ errore: 'Utente non trovato' });
+        }
+
+        if (utenteBase.discriminator !== 'UtenteRegistrato') {
+            return res.status(403).json({
+                errore: 'Solo gli utenti registrati standard possono gestire i preferiti'
+            });
+        }
+
         const utente = await UtenteRegistrato.findByIdAndUpdate(
             req.utente.mongoId,
-            { $pull: { preferiti: bivaccoId } }, // $pull rimuove l'ID dall'array
-            { new: true }
-        );
+            { $pull: { preferiti: bivaccoId } },
+            { new: true, runValidators: true }
+        ).populate('preferiti');
 
         res.status(200).json({
             messaggio: 'Bivacco rimosso dai preferiti',
             preferiti: utente.preferiti
         });
     } catch (error) {
+        console.error('Errore rimozione preferito:', error);
         res.status(500).json({ errore: 'Errore nella rimozione dai preferiti' });
     }
 });
 
 /**
- * Permette a un utente registrato di richiedere la promozione
- * al ruolo di Supporto Tecnico.
+ * Invia una richiesta di promozione a Supporto Tecnico.
+ *
+ * L'operazione:
+ * - recupera l'utente autenticato;
+ * - verifica che non abbia già il ruolo richiesto;
+ * - salva motivo e matricola della richiesta;
+ * - imposta lo stato della richiesta come in attesa.
  *
  * @route POST /api/v1/profilo/richiesta-supporto-tecnico
- * @param {import('express').Request} req
- * @param {import('express').Response} res
- * @returns {Promise<void>}
+ * @access Private
  */
 router.post('/richiesta-supporto-tecnico', protectRoute, async (req, res) => {
     try {
@@ -236,8 +300,16 @@ router.post('/richiesta-supporto-tecnico', protectRoute, async (req, res) => {
 });
 
 /**
- * @description Permette a UtenteRegistrato di richiedere ruolo SuperUser
- * @route POST /richiedi-super-user
+ * Invia una richiesta di promozione a SuperUser.
+ *
+ * L'operazione:
+ * - recupera l'utente autenticato;
+ * - verifica che non abbia già il ruolo richiesto;
+ * - salva il motivo della richiesta;
+ * - imposta lo stato della richiesta come in attesa.
+ *
+ * @route POST /api/v1/profilo/richiesta-superuser
+ * @access Private
  */
 router.post('/richiesta-superuser', protectRoute, async (req, res) => {
   try {
@@ -247,7 +319,7 @@ router.post('/richiesta-superuser', protectRoute, async (req, res) => {
       return res.status(404).json({message: 'Utente non trovato'});
     }
 
-    if (utente.discriminator === 'SuperUser') {                                             // per sicurezza aggiungo questa parte
+    if (utente.discriminator === 'SuperUser') {                                           
       return res.status(400).json({message: 'Possiedi già questo ruolo'});
     }
 

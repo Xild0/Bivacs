@@ -9,7 +9,7 @@ import {
   deleteProfile,
   logoutUser,
   getAllertePreferiti,
-  richiediSupportoTecnico, 
+  richiediSupportoTecnico,
   richiediSuperUser,
   getMieSegnalazioni
 } from '../services/api'
@@ -23,13 +23,12 @@ const profile = reactive({
   password: '',
   discriminator: '',
   preferiti: [],
-  richiestaSupportoTecnico: null, 
+  richiestaSupportoTecnico: null,
   richiestaSuperUser: null
 })
 
 const richiestaST = reactive({
-  motivo: '',
-  matricola: ''
+  motivo: ''
 })
 
 const richiestaSU = reactive({
@@ -43,11 +42,10 @@ const allerteMap = ref({})
 const mieSegnalazioni = ref([])
 const segnalazioniLoading = ref(false)
 
-
 /**
- * @description Carica i dati dell'utente dal backend e 
- * carica le allerte meteo dei preferiti SOLO se utente ha 
- * discriminator === UtenteRegistrato
+ * Carica i dati del profilo utente e le informazioni collegate al ruolo.
+ *
+ * @returns {Promise<void>}
  */
 async function loadProfile() {
   try {
@@ -62,9 +60,9 @@ async function loadProfile() {
     profile.richiestaSupportoTecnico = data.richiestaSupportoTecnico || null
     profile.richiestaSuperUser = data.richiestaSuperUser || null
 
-    // bugfix: allerte meteo richieste solo se utente è UtenteRegistrato
-    if(profile.discriminator === 'UtenteRegistrato' || !profile.discriminator){
+    if (profile.discriminator === 'UtenteRegistrato' || !profile.discriminator) {
       await loadAllerte()
+      await loadMieSegnalazioni()
     }
 
     loaded.value = true
@@ -75,6 +73,11 @@ async function loadProfile() {
   }
 }
 
+/**
+ * Salva le modifiche apportate al profilo utente.
+ *
+ * @returns {Promise<void>}
+ */
 async function saveProfile() {
   try {
     await updateProfile({
@@ -93,7 +96,14 @@ async function saveProfile() {
   }
 }
 
+/**
+ * Carica le segnalazioni inviate dall'utente registrato.
+ *
+ * @returns {Promise<void>}
+ */
 async function loadMieSegnalazioni() {
+  if (profile.discriminator !== 'UtenteRegistrato') return
+
   segnalazioniLoading.value = true
 
   try {
@@ -106,18 +116,21 @@ async function loadMieSegnalazioni() {
   }
 }
 
+/**
+ * Invia la richiesta per ottenere il ruolo di Supporto Tecnico.
+ *
+ * @returns {Promise<void>}
+ */
 async function inviaRichiestaSupporto() {
   try {
     await richiediSupportoTecnico({
-      motivo: richiestaST.motivo,
-      matricola: richiestaST.matricola
+      motivo: richiestaST.motivo
     })
 
     messageType.value = 'success'
     message.value = 'Richiesta inviata. Attendi approvazione.'
 
     richiestaST.motivo = ''
-    richiestaST.matricola = ''
 
     await loadProfile()
   } catch (error) {
@@ -126,21 +139,39 @@ async function inviaRichiestaSupporto() {
   }
 }
 
-async function inviaRichiestaSU(){
+/**
+ * Invia la richiesta per ottenere il ruolo di SuperUser.
+ *
+ * @returns {Promise<void>}
+ */
+async function inviaRichiestaSU() {
   try {
-    await richiediSuperUser({motivo: richiestaSU.motivo})
-    messageType.value='success'
+    await richiediSuperUser({
+      motivo: richiestaSU.motivo
+    })
+
+    messageType.value = 'success'
     message.value = 'Richiesta SuperUser inviata correttamente, attendi approvazione'
+
     richiestaSU.motivo = ''
+
     await loadProfile()
   } catch (error) {
-    messageType.value='error'
+    messageType.value = 'error'
     message.value = error.message
   }
 }
 
+/**
+ * Elimina definitivamente l'account utente dopo conferma.
+ *
+ * @returns {Promise<void>}
+ */
 async function removeAccount() {
-  const conferma = confirm('Sei sicuro/a di voler eliminare definitivamente il tuo account? Le tue recensioni resteranno visibili in forma anonima.')
+  const conferma = confirm(
+    'Sei sicuro/a di voler eliminare definitivamente il tuo account? Le tue recensioni resteranno visibili in forma anonima.'
+  )
+
   if (!conferma) return
 
   try {
@@ -154,12 +185,22 @@ async function removeAccount() {
   }
 }
 
+/**
+ * Effettua il logout dell'utente e chiude la modale.
+ *
+ * @returns {void}
+ */
 function submitLogout() {
   logoutUser()
   emit('auth-changed')
   emit('close')
 }
 
+/**
+ * Carica le allerte meteo associate ai bivacchi preferiti.
+ *
+ * @returns {Promise<void>}
+ */
 async function loadAllerte() {
   try {
     const data = await getAllertePreferiti()
@@ -177,15 +218,22 @@ async function loadAllerte() {
   }
 }
 
+/**
+ * Apre la scheda di un bivacco preferito e chiude la modale.
+ *
+ * @param {Object} bivacco - Bivacco selezionato dai preferiti.
+ * @returns {void}
+ */
 function openPreferito(bivacco) {
   emit('open-bivacco', bivacco)
   emit('close')
 }
 
+/**
+ * Carica il profilo al montaggio della modale.
+ */
 onMounted(() => {
   loadProfile()
-  loadAllerte()
-  loadMieSegnalazioni()
 })
 </script>
 
@@ -201,35 +249,35 @@ onMounted(() => {
     </p>
 
     <div v-if="loaded" class="profile-hero">
-  <div class="profile-avatar">
-    {{ (profile.nome?.[0] || profile.email?.[0] || 'U').toUpperCase() }}
-  </div>
+      <div class="profile-avatar">
+        {{ (profile.nome?.[0] || profile.email?.[0] || 'U').toUpperCase() }}
+      </div>
 
-  <div class="profile-info">
-    <h3>
-      {{ profile.nome || 'Utente' }} {{ profile.cognome || '' }}
-    </h3>
+      <div class="profile-info">
+        <h3>
+          {{ profile.nome || 'Utente' }} {{ profile.cognome || '' }}
+        </h3>
 
-    <p>{{ profile.email }}</p>
+        <p>{{ profile.email }}</p>
 
-    <span
-      class="role-badge"
-      :class="{
-        'role-user': profile.discriminator === 'UtenteRegistrato',
-        'role-tech': profile.discriminator === 'SupportoTecnico',
-        'role-super': profile.discriminator === 'SuperUser'
-      }"
-    >
-      {{
-        profile.discriminator === 'SupportoTecnico'
-          ? 'Supporto Tecnico'
-          : profile.discriminator === 'SuperUser'
-            ? 'Super User'
-            : 'Utente registrato'
-      }}
-    </span>
-  </div>
-</div>
+        <span
+          class="role-badge"
+          :class="{
+            'role-user': profile.discriminator === 'UtenteRegistrato',
+            'role-tech': profile.discriminator === 'SupportoTecnico',
+            'role-super': profile.discriminator === 'SuperUser'
+          }"
+        >
+          {{
+            profile.discriminator === 'SupportoTecnico'
+              ? 'Supporto Tecnico'
+              : profile.discriminator === 'SuperUser'
+                ? 'Super User'
+                : 'Utente registrato'
+          }}
+        </span>
+      </div>
+    </div>
 
     <form v-if="loaded" class="form" @submit.prevent="saveProfile">
       <div class="row">
@@ -269,184 +317,185 @@ onMounted(() => {
       <p>Caricamento profilo…</p>
     </div>
 
-    <div class="divider"></div>
+    <template v-if="loaded && profile.discriminator === 'UtenteRegistrato'">
+      <div class="divider"></div>
 
-    <section class="favorites-section">
-      <h3>I miei preferiti</h3>
+      <section class="favorites-section">
+        <h3>I miei preferiti</h3>
 
-      <div v-if="profile.preferiti.length" class="favorites-grid">
-        <button
-          v-for="bivacco in profile.preferiti"
-          :key="bivacco._id || bivacco"
-          type="button"
-          class="favorite-card"
-          @click="openPreferito(bivacco)"
-        >
-          <div class="favorite-top">
-            <h4>{{ bivacco.nome }}</h4>
+        <div v-if="profile.preferiti.length" class="favorites-grid">
+          <button
+            v-for="bivacco in profile.preferiti"
+            :key="bivacco._id || bivacco"
+            type="button"
+            class="favorite-card"
+            @click="openPreferito(bivacco)"
+          >
+            <div class="favorite-top">
+              <h4>{{ bivacco.nome }}</h4>
 
-            <div class="favorite-top-right">
+              <div class="favorite-top-right">
+                <span class="favorite-altitude">
+                  {{ bivacco.altitudine }} m
+                </span>
+
+                <span
+                  v-if="allerteMap[bivacco._id]"
+                  class="alert-badge"
+                  title="Meteo avverso previsto"
+                >
+                  ⚠️
+                </span>
+              </div>
+            </div>
+
+            <div class="favorite-meta">
+              <span>{{ bivacco.zona }}</span>
+              <span>{{ bivacco.postiLetto }} posti</span>
+            </div>
+
+            <div class="favorite-footer">
+              <span class="open-label">Apri scheda bivacco</span>
+              <span class="arrow">→</span>
+            </div>
+          </button>
+        </div>
+
+        <p v-else class="empty-favorites">
+          Nessun bivacco salvato nei preferiti.
+        </p>
+      </section>
+
+      <div class="divider"></div>
+
+      <section class="segnalazioni-section">
+        <h3>Le mie segnalazioni</h3>
+
+        <p v-if="segnalazioniLoading" class="empty-favorites">
+          Caricamento segnalazioni…
+        </p>
+
+        <div v-else-if="mieSegnalazioni.length" class="favorites-grid">
+          <div
+            v-for="segnalazione in mieSegnalazioni"
+            :key="segnalazione._id"
+            class="favorite-card"
+          >
+            <div class="favorite-top">
+              <h4>
+                {{ segnalazione.bivaccoId?.nome || 'Bivacco non disponibile' }}
+              </h4>
+
               <span class="favorite-altitude">
-                {{ bivacco.altitudine }} m
-              </span>
-
-              <span
-                v-if="allerteMap[bivacco._id]"
-                class="alert-badge"
-                title="Meteo avverso previsto"
-              >
-                ⚠️
+                {{ segnalazione.statoSegnalazione?.replaceAll('_', ' ').toUpperCase() }}
               </span>
             </div>
+
+            <div class="favorite-meta">
+              <span>{{ segnalazione.bivaccoId?.zona || 'Zona non indicata' }}</span>
+              <span>{{ new Date(segnalazione.createdAt).toLocaleDateString('it-IT') }}</span>
+            </div>
+
+            <p class="segnalazione-desc">
+              {{ segnalazione.descrizione }}
+            </p>
           </div>
-
-          <div class="favorite-meta">
-            <span>{{ bivacco.zona }}</span>
-            <span>{{ bivacco.postiLetto }} posti</span>
-          </div>
-
-          <div class="favorite-footer">
-            <span class="open-label">Apri scheda bivacco</span>
-            <span class="arrow">→</span>
-          </div>
-        </button>
-      </div>
-
-      <p v-else class="empty-favorites">
-        Nessun bivacco salvato nei preferiti.
-      </p>
-    </section>
-
-        <div class="divider"></div>
-
-    <section class="segnalazioni-section">
-      <h3>Le mie segnalazioni</h3>
-
-      <p v-if="segnalazioniLoading" class="empty-favorites">
-        Caricamento segnalazioni…
-      </p>
-
-      <div v-else-if="mieSegnalazioni.length" class="favorites-grid">
-        <div
-          v-for="segnalazione in mieSegnalazioni"
-          :key="segnalazione._id"
-          class="favorite-card"
-        >
-          <div class="favorite-top">
-            <h4>
-              {{ segnalazione.bivaccoId?.nome || 'Bivacco non disponibile' }}
-            </h4>
-
-            <span class="favorite-altitude">
-              {{ segnalazione.statoSegnalazione?.replaceAll('_', ' ').toUpperCase() }}
-            </span>
-          </div>
-
-          <div class="favorite-meta">
-            <span>{{ segnalazione.bivaccoId?.zona || 'Zona non indicata' }}</span>
-            <span>{{ new Date(segnalazione.createdAt).toLocaleDateString('it-IT') }}</span>
-          </div>
-
-          <p class="segnalazione-desc">
-            {{ segnalazione.descrizione }}
-          </p>
         </div>
-      </div>
 
-      <p v-else class="empty-favorites">
-        Non hai ancora inviato segnalazioni.
-      </p>
-    </section>
+        <p v-else class="empty-favorites">
+          Non hai ancora inviato segnalazioni.
+        </p>
+      </section>
 
-    <div class="divider"></div>
+      <div class="divider"></div>
+
+      <section class="support-request-section">
+        <h3>Richiedi ruolo Supporto Tecnico</h3>
+
+        <p
+          v-if="profile.richiestaSupportoTecnico?.stato === 'in_attesa'"
+          class="request-status"
+        >
+          Richiesta già inviata: in attesa di approvazione.
+        </p>
+
+        <form
+          v-else
+          class="form"
+          @submit.prevent="inviaRichiestaSupporto"
+        >
+          <label class="field">
+            <span class="field-label">Motivo richiesta</span>
+            <textarea
+              v-model="richiestaST.motivo"
+              class="textarea"
+              placeholder="Spiega perché richiedi l'accesso tecnico"
+              required
+            ></textarea>
+          </label>
+
+          <p class="dim-info">
+            La matricola tecnica verrà assegnata automaticamente dopo l’approvazione.
+          </p>
+
+          <button
+            class="btn btn-primary btn-block"
+            type="submit"
+            :disabled="!richiestaST.motivo"
+          >
+            Invia richiesta
+          </button>
+        </form>
+      </section>
+
+      <section class="support-request-section superuser-request-section">
+        <h3>Richiedi ruolo Super User</h3>
+
+        <p
+          v-if="profile.richiestaSuperUser?.stato === 'in_attesa'"
+          class="request-status"
+        >
+          Richiesta già inviata: in attesa di approvazione.
+        </p>
+
+        <form
+          v-else
+          class="form"
+          @submit.prevent="inviaRichiestaSU"
+        >
+          <label class="field">
+            <span class="field-label">Motivo richiesta</span>
+            <textarea
+              v-model="richiestaSU.motivo"
+              class="textarea"
+              placeholder="Spiega perché richiedi il ruolo di Super User"
+              required
+            ></textarea>
+          </label>
+
+          <button
+            class="btn btn-primary btn-block"
+            type="submit"
+            :disabled="!richiestaSU.motivo"
+          >
+            Invia richiesta
+          </button>
+        </form>
+      </section>
+    </template>
 
     <section
-      v-if="profile.discriminator !== 'SupportoTecnico'"
-      class="support-request-section"
-    >
-      <h3>Richiedi ruolo Supporto Tecnico</h3>
-
-      <p
-        v-if="profile.richiestaSupportoTecnico?.stato === 'in_attesa'"
-        class="request-status"
-      >
-        Richiesta già inviata: in attesa di approvazione.
-      </p>
-
-      <form
-        v-else
-        class="form"
-        @submit.prevent="inviaRichiestaSupporto"
-      >
-        <label class="field">
-          <span class="field-label">Motivo richiesta</span>
-          <textarea
-            v-model="richiestaST.motivo"
-            class="textarea"
-            placeholder="Spiega perché richiedi l'accesso tecnico"
-          ></textarea>
-        </label>
-
-        <label class="field">
-          <span class="field-label">Matricola / codice</span>
-          <input
-            v-model="richiestaST.matricola"
-            class="input"
-            placeholder="Es. ST002"
-          />
-        </label>
-
-        <button class="btn btn-primary btn-block" type="submit">
-          Invia richiesta
-        </button>
-      </form>
-    </section>
-
-    <section
-      v-if="profile.discriminator === 'SupportoTecnico'"
+      v-if="loaded && profile.discriminator === 'SupportoTecnico'"
       class="support-section"
     >
       <SupportoTecnicoPanel />
     </section>
 
-    <section 
-    v-if="profile.discriminator === 'SuperUser'"
-    class="support-section"
+    <section
+      v-if="loaded && profile.discriminator === 'SuperUser'"
+      class="support-section"
     >
       <SuperUserPanel />
-    </section>  
-
-    <section
-      v-if="profile.discriminator === 'UtenteRegistrato'"
-      class="support-request-section"
-    >
-      <h3>Richiedi ruolo Super User</h3>
-      <p
-        v-if="profile.richiestaSuperUser?.stato === 'in_attesa'"
-        class="request-status"
-      >
-        Richiesta già inviata: in attesa di approvazione.
-      </p>
-
-      <form
-        v-else
-        class="form"
-        @submit.prevent="inviaRichiestaSU"
-      >
-        <label class="field">
-          <span class="field-label">Motivo richiesta</span>
-          <textarea
-            v-model="richiestaSU.motivo"
-            class="textarea"
-            placeholder="Spiega perché richiedi il ruolo di Super User"
-            required
-          ></textarea>
-        </label>
-
-        <button class="btn btn-primary btn-block" type="submit" :disabled="!richiestaSU.motivo">
-          Invia richiesta
-        </button>
-      </form>
     </section>
 
     <div class="divider"></div>
@@ -556,13 +605,15 @@ onMounted(() => {
 }
 
 .favorites-section h3,
+.segnalazioni-section h3,
 .support-request-section h3 {
   font-size: 1rem;
   margin-bottom: 10px;
 }
 
 .empty-favorites,
-.request-status {
+.request-status,
+.dim-info {
   font-size: 13px;
   color: var(--text-tertiary);
   background: var(--bg-surface-2);
@@ -679,18 +730,17 @@ onMounted(() => {
   color: var(--accent);
 }
 
-.support-section {
-  margin-top: 22px;
+.segnalazione-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
 }
 
-@media (max-width: 420px) {
-  .row {
-    grid-template-columns: 1fr;
-  }
+.support-request-section {
+  margin-top: 24px;
+}
 
-  .favorite-top {
-    flex-direction: column;
-  }
+.support-section {
+  margin-top: 22px;
 }
 
 .profile-hero {
@@ -769,14 +819,13 @@ onMounted(() => {
   border: 1px solid rgba(251, 191, 36, 0.28);
 }
 
-.segnalazioni-section h3 {
-  font-size: 1rem;
-  margin-bottom: 10px;
-}
+@media (max-width: 420px) {
+  .row {
+    grid-template-columns: 1fr;
+  }
 
-.segnalazione-desc {
-  font-size: 13px;
-  color: var(--text-secondary);
-  line-height: 1.5;
+  .favorite-top {
+    flex-direction: column;
+  }
 }
 </style>

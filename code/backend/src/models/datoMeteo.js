@@ -6,6 +6,13 @@
 
 const mongoose = require('mongoose');
 
+/**
+ * Schema che memorizza le informazioni meteorologiche
+ * associate a un bivacco.
+ *
+ * @type {mongoose.Schema}
+ */
+
 const datoMeteoSchema = new mongoose.Schema({
     id: {
         type: Number,

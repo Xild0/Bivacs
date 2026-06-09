@@ -7,6 +7,12 @@
 const mongoose = require('mongoose');
 const Utente = require('./utente');
 
+/**
+ * Schema dei dati aggiuntivi associati a un utente SuperUser.
+ *
+ * @type {mongoose.Schema}
+ */
+
 const superUserSchema = new mongoose.Schema(
 {
     ente: {
@@ -25,5 +31,5 @@ const superUserSchema = new mongoose.Schema(
     timestamps: true
 });
 
-// superUser extends utente
+// SuperUser estende il modello base Utente tramite discriminator.
 module.exports = Utente.discriminator('SuperUser', superUserSchema);

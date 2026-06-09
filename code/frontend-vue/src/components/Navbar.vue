@@ -1,9 +1,3 @@
-/**
- * @file Navbar.vue
- * @description Barra di navigazione principale dell'applicazione.
- * Mostra accesso/profilo, pulsante SOS e cambia stile durante lo scroll.
- */
-
 <script setup>
 import { onMounted, onUnmounted, ref } from 'vue'
 import Logo from './Logo.vue'
@@ -17,20 +11,25 @@ const emit = defineEmits(['openEmergency', 'openAuth', 'openProfile'])
 const scrolled = ref(false)
 
 /**
- * Aggiorna lo stato della navbar in base alla posizione di scroll.
+ * Aggiorna lo stato visivo della navbar in base allo scroll verticale.
  *
  * @returns {void}
  */
-
 function onScroll() {
   scrolled.value = window.scrollY > 12
 }
 
+/**
+ * Attiva il listener di scroll al montaggio del componente.
+ */
 onMounted(() => {
   window.addEventListener('scroll', onScroll, { passive: true })
   onScroll()
 })
 
+/**
+ * Rimuove il listener di scroll quando il componente viene smontato.
+ */
 onUnmounted(() => {
   window.removeEventListener('scroll', onScroll)
 })

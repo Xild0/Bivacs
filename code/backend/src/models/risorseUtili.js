@@ -6,6 +6,13 @@
 
 const mongoose = require('mongoose');
 
+/**
+ * Schema che registra lo stato delle risorse disponibili
+ * presso un bivacco secondo le segnalazioni degli utenti.
+ *
+ * @type {mongoose.Schema}
+ */
+
 const risorseUtiliSchema = new mongoose.Schema({
     id: {
         type: Number,

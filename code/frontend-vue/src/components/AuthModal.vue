@@ -1,10 +1,10 @@
+<script setup>
 /**
  * @file AuthModal.vue
- * @description Modale per autenticazione utenti.
- * Gestisce login, registrazione e recupero password.
+ * @description Modale per l'autenticazione degli utenti.
+ * Gestisce login, registrazione, recupero password e reinvio della mail di verifica.
  */
 
-<script setup>
 import { reactive, ref } from 'vue'
 import Modal from './Modal.vue'
 import {
@@ -44,14 +44,16 @@ const registerForm = reactive({
  *
  * @returns {Promise<void>}
  */
-
 async function submitLogin() {
   message.value = ''
+  emailNonVerificata.value = ''
 
   try {
     await loginUser(loginForm)
+
     messageType.value = 'success'
     message.value = 'Accesso effettuato. Benvenuta.'
+
     emit('auth-changed')
     setTimeout(() => emit('close'), 700)
   } catch (error) {
@@ -60,6 +62,8 @@ async function submitLogin() {
     if (error.codiceErrore === 'EMAIL_NON_VERIFICATA') {
       emailNonVerificata.value = loginForm.email
       message.value = 'Devi prima verificare la tua email. Controlla la tua casella di posta.'
+    } else {
+      message.value = error.message || 'Credenziali non valide.'
     }
   }
 }
@@ -69,7 +73,6 @@ async function submitLogin() {
  *
  * @returns {Promise<void>}
  */
-
 async function recoverPassword() {
   message.value = ''
 
@@ -91,6 +94,12 @@ async function recoverPassword() {
   }
 }
 
+/**
+ * Reinvia la mail di verifica all'utente con email non verificata.
+ * Applica un cooldown per evitare invii ripetuti ravvicinati.
+ *
+ * @returns {Promise<void>}
+ */
 async function resendVerification() {
   if (!emailNonVerificata.value || resendCooldown.value > 0) return
 
@@ -122,7 +131,6 @@ async function resendVerification() {
  *
  * @returns {Promise<void>}
  */
-
 async function submitRegister() {
   message.value = ''
 
@@ -155,14 +163,14 @@ async function submitRegister() {
     <div class="tabs">
       <button
         :class="{ active: mode === 'login' }"
-        @click="mode = 'login'; message = ''; showPasswords = false"
+        @click="mode = 'login'; message = ''; emailNonVerificata = ''; showPasswords = false"
       >
         Accedi
       </button>
 
       <button
         :class="{ active: mode === 'register' }"
-        @click="mode = 'register'; message = ''; showPasswords = false"
+        @click="mode = 'register'; message = ''; emailNonVerificata = ''; showPasswords = false"
       >
         Registrati
       </button>
@@ -175,20 +183,19 @@ async function submitRegister() {
     </p>
 
     <button
-  v-if="emailNonVerificata && mode === 'login'"
-  type="button"
-  class="link-btn resend-btn"
-  :disabled="resendCooldown > 0"
-  @click="resendVerification"
->
-  {{
-    resendCooldown > 0
-      ? `Puoi rimandare la mail tra ${resendCooldown}s`
-      : 'Rimanda email di verifica'
-  }}
-</button>
+      v-if="emailNonVerificata && mode === 'login'"
+      type="button"
+      class="link-btn resend-btn"
+      :disabled="resendCooldown > 0"
+      @click="resendVerification"
+    >
+      {{
+        resendCooldown > 0
+          ? `Puoi rimandare la mail tra ${resendCooldown}s`
+          : 'Rimanda email di verifica'
+      }}
+    </button>
 
-    <!-- LOGIN -->
     <form v-if="mode === 'login'" class="form" @submit.prevent="submitLogin">
       <label class="field">
         <span class="field-label">Email</span>
@@ -226,7 +233,6 @@ async function submitRegister() {
       </button>
     </form>
 
-    <!-- REGISTER -->
     <form v-else class="form" @submit.prevent="submitRegister">
       <div class="row">
         <label class="field">

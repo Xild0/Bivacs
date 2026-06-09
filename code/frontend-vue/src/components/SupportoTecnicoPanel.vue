@@ -11,22 +11,21 @@ import {
   getRichiesteSupportoTecnico,
   approvaRichiestaSupportoTecnico,
   rifiutaRichiestaSupportoTecnico,
-  getRichiesteSuperUser, 
-  approvaRichiestaSuperUser, 
+  getRichiesteSuperUser,
+  approvaRichiestaSuperUser,
   rifiutaRichiestaSuperUser
 } from '../services/api'
 
 const logs = ref([])
 const configs = ref([])
 const bivacchi = ref([])
-const richieste = ref([])
-
 const loading = ref(false)
 const message = ref('')
 const messageType = ref('info')
 
 const richiesteSupporto = ref([])
 const richiesteSuperUser = ref([])
+const richiestaInCorso = ref(null)
 
 const configForm = reactive({
   provider: 'Open-Meteo',
@@ -34,6 +33,8 @@ const configForm = reactive({
   enabled: true,
   timeoutMs: 5000
 })
+
+const bivaccoMode = ref('modifica')
 
 const bivaccoForm = reactive({
   bivaccoId: '',
@@ -50,8 +51,6 @@ const bivaccoForm = reactive({
   emergenza: false
 })
 
-const bivaccoMode = ref('modifica')  // 'modifica' | 'creazione'
-
 const nuovoBivaccoForm = reactive({
   nome: '',
   latitudine: '',
@@ -66,6 +65,11 @@ const nuovoBivaccoForm = reactive({
   emergenza: false
 })
 
+/**
+ * Ripristina i campi del form di creazione bivacco.
+ *
+ * @returns {void}
+ */
 function resetNuovoBivacco() {
   nuovoBivaccoForm.nome = ''
   nuovoBivaccoForm.latitudine = ''
@@ -80,97 +84,20 @@ function resetNuovoBivacco() {
   nuovoBivaccoForm.emergenza = false
 }
 
-async function submitNuovoBivacco() {
-  message.value = ''
-
-  if (!nuovoBivaccoForm.nome ||
-      !nuovoBivaccoForm.latitudine ||
-      !nuovoBivaccoForm.longitudine ||
-      !nuovoBivaccoForm.altitudine ||
-      !nuovoBivaccoForm.zona) {
-    messageType.value = 'error'
-    message.value = 'Compila almeno nome, coordinate, altitudine e zona.'
-    return
-  }
-
-  try {
-    await creaBivaccoTecnico({
-      nome: nuovoBivaccoForm.nome,
-      latitudine: Number(nuovoBivaccoForm.latitudine),
-      longitudine: Number(nuovoBivaccoForm.longitudine),
-      altitudine: Number(nuovoBivaccoForm.altitudine),
-      postiLetto: Number(nuovoBivaccoForm.postiLetto) || 0,
-      dotazioni: nuovoBivaccoForm.dotazioni,
-      zona: nuovoBivaccoForm.zona,
-      tipoStruttura: nuovoBivaccoForm.tipoStruttura,
-      acquaPresente: nuovoBivaccoForm.acquaPresente,
-      legnaDisponibile: nuovoBivaccoForm.legnaDisponibile,
-      emergenza: nuovoBivaccoForm.emergenza
-    })
-
-    messageType.value = 'success'
-    message.value = `Bivacco "${nuovoBivaccoForm.nome}" creato con successo`
-    resetNuovoBivacco()
-    bivacchi.value = await getBivacchi()
-  } catch (error) {
-    messageType.value = 'error'
-    message.value = error.message
-  }
-}
-
-
+/**
+ * Carica le richieste per diventare Supporto Tecnico.
+ *
+ * @returns {Promise<void>}
+ */
 async function loadRichiesteSupporto() {
   richiesteSupporto.value = await getRichiesteSupportoTecnico()
 }
 
-async function approvaRichiesta(utenteId) {
-  try {
-    await approvaRichiestaSupportoTecnico(utenteId)
-    messageType.value = 'success'
-    message.value = 'Richiesta approvata correttamente'
-    await loadRichiesteSupporto()
-  } catch (error) {
-    messageType.value = 'error'
-    message.value = error.message
-  }
-}
-
-async function approvaSU(utenteId) {
-  try {
-    await approvaRichiestaSuperUser(utenteId)
-    messageType.value='success'
-    message.value='Utente riconosciuto come SuperUser'
-    richiesteSuperUser.value=await getRichiesteSuperUser()
-  } catch (error) {
-    messageType.value='error'
-    message.value=error.message
-  }
-}
-
-async function rifiutaSU(utenteId) {
-  try {
-    await rifiutaRichiestaSuperUser(utenteId)
-    messageType.value='success'
-    message.value='Richiesta SuperUser rifiutata'
-    richiesteSuperUser.value=await getRichiesteSuperUser()
-  } catch (error) {
-    messageType.value='error'
-    message.value=error.message
-  }
-}
-
-async function rifiutaRichiesta(utenteId) {
-  try {
-    await rifiutaRichiestaSupportoTecnico(utenteId)
-    messageType.value= 'success'
-    message.value= 'Richiesta Supporto Tecnico rifiutata'
-    await loadRichiesteSupporto()
-  } catch (error) {
-    messageType.value= 'error'
-    message.value= error.message
-  }
-}
-
+/**
+ * Carica tutti i dati necessari al pannello di supporto tecnico.
+ *
+ * @returns {Promise<void>}
+ */
 async function loadSupportoData() {
   loading.value = true
   message.value = ''
@@ -180,7 +107,7 @@ async function loadSupportoData() {
     configs.value = await getConfigApi()
     bivacchi.value = await getBivacchi()
     richiesteSupporto.value = await getRichiesteSupportoTecnico()
-    richiesteSuperUser.value=await getRichiesteSuperUser()
+    richiesteSuperUser.value = await getRichiesteSuperUser()
   } catch (error) {
     messageType.value = 'error'
     message.value = error.message
@@ -189,6 +116,103 @@ async function loadSupportoData() {
   }
 }
 
+/**
+ * Approva la richiesta di un utente per diventare Supporto Tecnico.
+ *
+ * @param {string} utenteId - ID dell'utente richiedente.
+ * @returns {Promise<void>}
+ */
+async function approvaRichiesta(utenteId) {
+  if (richiestaInCorso.value) return
+  richiestaInCorso.value = utenteId
+
+  try {
+    await approvaRichiestaSupportoTecnico(utenteId)
+    messageType.value = 'success'
+    message.value = 'Richiesta approvata correttamente'
+    await loadRichiesteSupporto()
+  } catch (error) {
+    messageType.value = 'error'
+    message.value = error.message
+  } finally {
+    richiestaInCorso.value = null
+  }
+}
+
+/**
+ * Rifiuta la richiesta di un utente per diventare Supporto Tecnico.
+ *
+ * @param {string} utenteId - ID dell'utente richiedente.
+ * @returns {Promise<void>}
+ */
+async function rifiutaRichiesta(utenteId) {
+  if (richiestaInCorso.value) return
+  richiestaInCorso.value = utenteId
+
+  try {
+    await rifiutaRichiestaSupportoTecnico(utenteId)
+    messageType.value = 'success'
+    message.value = 'Richiesta Supporto Tecnico rifiutata'
+    await loadRichiesteSupporto()
+  } catch (error) {
+    messageType.value = 'error'
+    message.value = error.message
+  } finally {
+    richiestaInCorso.value = null
+  }
+}
+
+/**
+ * Approva la richiesta di un utente per diventare SuperUser.
+ *
+ * @param {string} utenteId - ID dell'utente richiedente.
+ * @returns {Promise<void>}
+ */
+async function approvaSU(utenteId) {
+  if (richiestaInCorso.value) return
+  richiestaInCorso.value = utenteId
+
+  try {
+    await approvaRichiestaSuperUser(utenteId)
+    messageType.value = 'success'
+    message.value = 'Utente riconosciuto come SuperUser'
+    richiesteSuperUser.value = await getRichiesteSuperUser()
+  } catch (error) {
+    messageType.value = 'error'
+    message.value = error.message
+  } finally {
+    richiestaInCorso.value = null
+  }
+}
+
+/**
+ * Rifiuta la richiesta di un utente per diventare SuperUser.
+ *
+ * @param {string} utenteId - ID dell'utente richiedente.
+ * @returns {Promise<void>}
+ */
+async function rifiutaSU(utenteId) {
+  if (richiestaInCorso.value) return
+  richiestaInCorso.value = utenteId
+
+  try {
+    await rifiutaRichiestaSuperUser(utenteId)
+    messageType.value = 'success'
+    message.value = 'Richiesta SuperUser rifiutata'
+    richiesteSuperUser.value = await getRichiesteSuperUser()
+  } catch (error) {
+    messageType.value = 'error'
+    message.value = error.message
+  } finally {
+    richiestaInCorso.value = null
+  }
+}
+
+/**
+ * Crea o aggiorna una configurazione API esterna.
+ *
+ * @returns {Promise<void>}
+ */
 async function submitConfig() {
   message.value = ''
 
@@ -222,6 +246,11 @@ async function submitConfig() {
   }
 }
 
+/**
+ * Compila il form tecnico con i dati del bivacco selezionato.
+ *
+ * @returns {void}
+ */
 function selezionaBivacco() {
   const bivacco = bivacchi.value.find(b => b._id === bivaccoForm.bivaccoId)
   if (!bivacco) return
@@ -239,6 +268,11 @@ function selezionaBivacco() {
   bivaccoForm.emergenza = Boolean(bivacco.emergenza)
 }
 
+/**
+ * Aggiorna i dati tecnici del bivacco selezionato.
+ *
+ * @returns {Promise<void>}
+ */
 async function submitBivacco() {
   if (!bivaccoForm.bivaccoId) {
     messageType.value = 'error'
@@ -270,11 +304,57 @@ async function submitBivacco() {
   }
 }
 
+/**
+ * Crea un nuovo bivacco tramite pannello tecnico.
+ *
+ * @returns {Promise<void>}
+ */
+async function submitNuovoBivacco() {
+  message.value = ''
 
+  if (
+    !nuovoBivaccoForm.nome ||
+    !nuovoBivaccoForm.latitudine ||
+    !nuovoBivaccoForm.longitudine ||
+    !nuovoBivaccoForm.altitudine ||
+    !nuovoBivaccoForm.zona
+  ) {
+    messageType.value = 'error'
+    message.value = 'Compila almeno nome, coordinate, altitudine e zona.'
+    return
+  }
+
+  try {
+    await creaBivaccoTecnico({
+      nome: nuovoBivaccoForm.nome,
+      latitudine: Number(nuovoBivaccoForm.latitudine),
+      longitudine: Number(nuovoBivaccoForm.longitudine),
+      altitudine: Number(nuovoBivaccoForm.altitudine),
+      postiLetto: Number(nuovoBivaccoForm.postiLetto) || 0,
+      dotazioni: nuovoBivaccoForm.dotazioni,
+      zona: nuovoBivaccoForm.zona,
+      tipoStruttura: nuovoBivaccoForm.tipoStruttura,
+      acquaPresente: nuovoBivaccoForm.acquaPresente,
+      legnaDisponibile: nuovoBivaccoForm.legnaDisponibile,
+      emergenza: nuovoBivaccoForm.emergenza
+    })
+
+    messageType.value = 'success'
+    message.value = `Bivacco "${nuovoBivaccoForm.nome}" creato con successo`
+    resetNuovoBivacco()
+    bivacchi.value = await getBivacchi()
+  } catch (error) {
+    messageType.value = 'error'
+    message.value = error.message
+  }
+}
+
+/**
+ * Carica i dati tecnici al montaggio del componente.
+ */
 onMounted(() => {
   loadSupportoData()
 })
-
 </script>
 
 <template>
@@ -284,7 +364,8 @@ onMounted(() => {
         <p class="label">Supporto Tecnico</p>
         <h3>Area gestione tecnica</h3>
       </div>
-      <button class="btn btn-ghost" @click="loadSupportoData">
+
+      <button class="btn btn-ghost" type="button" @click="loadSupportoData">
         Aggiorna
       </button>
     </header>
@@ -298,7 +379,6 @@ onMounted(() => {
     </p>
 
     <div v-else class="support-layout">
-
       <section class="support-card">
         <h4>Log API esterne</h4>
 
@@ -334,27 +414,32 @@ onMounted(() => {
             class="log-row"
           >
             <strong>{{ utente.email }}</strong>
+
             <small>
               {{ utente.richiestaSupportoTecnico?.motivo || 'Nessun motivo indicato' }}
             </small>
+
             <small>
-              Matricola: {{ utente.richiestaSupportoTecnico?.matricolaRichiesta || 'non indicata' }}
+              La matricola verrà assegnata automaticamente all’approvazione.
             </small>
 
             <div class="azioni-richiesta">
               <button
                 class="btn btn-primary"
                 type="button"
+                :disabled="richiestaInCorso === utente._id"
                 @click="approvaRichiesta(utente._id)"
               >
-                Approva
+                {{ richiestaInCorso === utente._id ? 'Operazione…' : 'Approva' }}
               </button>
+
               <button
                 class="btn btn-danger"
                 type="button"
+                :disabled="richiestaInCorso === utente._id"
                 @click="rifiutaRichiesta(utente._id)"
               >
-                rifiuta
+                Rifiuta
               </button>
             </div>
           </div>
@@ -375,26 +460,38 @@ onMounted(() => {
             class="log-row"
           >
             <strong>{{ utente.email }}</strong>
+
             <small>
               {{ utente.richiestaSuperUser?.motivo || 'Nessun motivo indicato' }}
             </small>
 
             <div class="azioni-richiesta">
-              <button class="btn btn-primary" type="button" @click="approvaSU(utente._id)">
-                Approva
+              <button
+                class="btn btn-primary"
+                type="button"
+                :disabled="richiestaInCorso === utente._id"
+                @click="approvaSU(utente._id)"
+              >
+                {{ richiestaInCorso === utente._id ? 'Operazione…' : 'Approva' }}
               </button>
-              <button class="btn btn-danger" type="button" @click="rifiutaSU(utente._id)">
+
+              <button
+                class="btn btn-danger"
+                type="button"
+                :disabled="richiestaInCorso === utente._id"
+                @click="rifiutaSU(utente._id)"
+              >
                 Rifiuta
               </button>
             </div>
           </div>
         </div>
+
         <p v-else class="empty">
           Nessuna richiesta in attesa.
         </p>
       </section>
 
-      <!-- Configurazione API -->
       <section class="support-card">
         <h4>Configurazione API</h4>
 
@@ -435,16 +532,18 @@ onMounted(() => {
         </div>
       </section>
 
-      <!-- Gestione Bivacchi -->
       <section class="support-card support-card-wide">
         <div class="bivacco-tabs">
           <button
+            type="button"
             :class="{ active: bivaccoMode === 'creazione' }"
             @click="bivaccoMode = 'creazione'"
           >
             Aggiungi nuovo
           </button>
+
           <button
+            type="button"
             :class="{ active: bivaccoMode === 'modifica' }"
             @click="bivaccoMode = 'modifica'"
           >
@@ -452,7 +551,6 @@ onMounted(() => {
           </button>
         </div>
 
-        <!-- Modalità creazione -->
         <form
           v-if="bivaccoMode === 'creazione'"
           class="form"
@@ -461,32 +559,32 @@ onMounted(() => {
           <div class="form-grid">
             <label class="field">
               <span>Nome *</span>
-              <input v-model="nuovoBivaccoForm.nome" class="input" placeholder="Bivacco Mario Rossi" />
+              <input v-model="nuovoBivaccoForm.nome" class="input" />
             </label>
 
             <label class="field">
               <span>Zona *</span>
-              <input v-model="nuovoBivaccoForm.zona" class="input" placeholder="Adamello / Brenta / …" />
+              <input v-model="nuovoBivaccoForm.zona" class="input" />
             </label>
 
             <label class="field">
-              <span>Latitudine * (decimali)</span>
-              <input v-model="nuovoBivaccoForm.latitudine" type="number" step="0.000001" class="input" placeholder="46.123456" />
+              <span>Latitudine *</span>
+              <input v-model="nuovoBivaccoForm.latitudine" type="number" step="0.000001" class="input" />
             </label>
 
             <label class="field">
               <span>Longitudine *</span>
-              <input v-model="nuovoBivaccoForm.longitudine" type="number" step="0.000001" class="input" placeholder="10.987654" />
+              <input v-model="nuovoBivaccoForm.longitudine" type="number" step="0.000001" class="input" />
             </label>
 
             <label class="field">
-              <span>Altitudine * (m)</span>
-              <input v-model="nuovoBivaccoForm.altitudine" type="number" class="input" placeholder="2350" />
+              <span>Altitudine *</span>
+              <input v-model="nuovoBivaccoForm.altitudine" type="number" class="input" />
             </label>
 
             <label class="field">
               <span>Posti letto</span>
-              <input v-model="nuovoBivaccoForm.postiLetto" type="number" class="input" placeholder="4" />
+              <input v-model="nuovoBivaccoForm.postiLetto" type="number" class="input" />
             </label>
 
             <label class="field">
@@ -501,11 +599,7 @@ onMounted(() => {
 
           <label class="field">
             <span>Dotazioni</span>
-            <textarea
-              v-model="nuovoBivaccoForm.dotazioni"
-              class="textarea"
-              placeholder="Stufa a legna, brande, coperte, tavolo…"
-            ></textarea>
+            <textarea v-model="nuovoBivaccoForm.dotazioni" class="textarea"></textarea>
           </label>
 
           <div class="checks">
@@ -528,16 +622,9 @@ onMounted(() => {
           <button class="btn btn-primary btn-block" type="submit">
             Crea bivacco
           </button>
-
-          <small class="form-hint">
-          </small>
         </form>
 
-        <form
-          v-else
-          class="form"
-          @submit.prevent="submitBivacco"
-        >
+        <form v-else class="form" @submit.prevent="submitBivacco">
           <label class="field">
             <span>Bivacco</span>
             <select
@@ -615,18 +702,11 @@ onMounted(() => {
           </button>
         </form>
       </section>
-
     </div>
   </section>
 </template>
 
 <style scoped>
-.azioni-richiesta{
-  display: flex;
-  gap: 8px;
-  margin-top: 6px;
-}
-
 .support-panel {
   display: flex;
   flex-direction: column;
@@ -665,7 +745,7 @@ onMounted(() => {
 
 .msg-success {
   background: var(--success-bg);
-  border: 1px solid rgba(52,211,153,0.28);
+  border: 1px solid rgba(52, 211, 153, 0.28);
   color: var(--success);
 }
 
@@ -679,42 +759,6 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 18px;
-}
-
-.support-card {
-  background: var(--bg-surface-2);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--r-lg);
-  padding: 20px;
-}
-
-.support-card h4 {
-  font-size: 1.15rem;
-  margin-bottom: 16px;
-}
-
-.bivacco-tabs {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  background: var(--bg-surface-3);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--r-md);
-  padding: 4px;
-  margin-bottom: 18px;
-}
-
-.bivacco-tabs button {
-  padding: 10px 14px;
-  border-radius: calc(var(--r-md) - 4px);
-  color: var(--text-tertiary);
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.bivacco-tabs button.active {
-  background: var(--accent-bg);
-  border: 1px solid var(--accent-border);
-  color: var(--accent-hi);
 }
 
 .support-card {
@@ -808,10 +852,12 @@ onMounted(() => {
   letter-spacing: 0.06em;
 }
 
-.checks {
+.checks,
+.azioni-richiesta {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
+  margin-top: 6px;
 }
 
 .check {
@@ -830,29 +876,38 @@ onMounted(() => {
   color: var(--danger);
 }
 
+.bivacco-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: var(--bg-surface-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-md);
+  padding: 4px;
+  margin-bottom: 18px;
+}
+
+.bivacco-tabs button {
+  padding: 10px 14px;
+  border-radius: calc(var(--r-md) - 4px);
+  color: var(--text-tertiary);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.bivacco-tabs button.active {
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
+  color: var(--accent-hi);
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 @media (max-width: 780px) {
-  .support-grid,
   .form-grid {
     grid-template-columns: 1fr;
   }
-
-  .support-card-wide {
-    grid-column: auto;
-  }
-}
-
-@keyframes lampeggiaSegnalazioni {
-  0%, 100% {
-    box-shadow: 0 0 0 rgba(248, 113, 113, 0);
-  }
-  50% {
-    box-shadow: 0 0 26px rgba(248, 113, 113, 0.45);
-  }
-}
-
-.foto-link {
-  font-size: 12px;
-  color: var(--accent);
-  font-weight: 700;
 }
 </style>

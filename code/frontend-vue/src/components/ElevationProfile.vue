@@ -1,8 +1,3 @@
-/**
- * @file ElevationProfile.vue
- * @description Visualizza il profilo altimetrico SVG di un percorso.
- */
-
 <script setup>
 import { computed } from 'vue'
 
@@ -15,13 +10,16 @@ const props = defineProps({
 })
 
 /**
- * Calcola statistiche altimetriche del profilo.
+ * Calcola i valori minimi, massimi e la distanza massima del profilo altimetrico.
+ *
+ * @returns {{ minE: number, maxE: number, maxD: number } | null} Statistiche del profilo oppure null se non ci sono dati.
  */
-
 const stats = computed(() => {
   if (props.profile.length === 0) return null
+
   const elevs = props.profile.map(p => p.elevation)
   const dists = props.profile.map(p => p.distance)
+
   return {
     minE: Math.min(...elevs),
     maxE: Math.max(...elevs),
@@ -30,11 +28,13 @@ const stats = computed(() => {
 })
 
 /**
- * Genera i path SVG del grafico altimetrico.
+ * Genera i tracciati SVG della linea e dell'area del profilo altimetrico.
+ *
+ * @returns {{ line: string, area: string }} Path SVG della linea e dell'area sottostante.
  */
-
 const paths = computed(() => {
   if (!stats.value) return { line: '', area: '' }
+
   const { minE, maxE, maxD } = stats.value
   const W = 400
   const H = 120

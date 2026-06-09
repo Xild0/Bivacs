@@ -1,10 +1,15 @@
 /**
  * @file alert.js
  * @description Modello Mongoose per gli alert associati ai bivacchi.
- * Un alert rappresenta un avviso attivo o disattivo visibile agli utenti.
  */
 
 const mongoose = require('mongoose');
+
+/**
+ * Schema Mongoose che rappresenta un alert associato a un bivacco.
+ *
+ * @type {mongoose.Schema}
+ */
 
 const alertSchema = new mongoose.Schema({
     id: {
@@ -27,9 +32,16 @@ const alertSchema = new mongoose.Schema({
     }
 }, { timestamps: true });
 
-alertSchema.methods.revoca = async function(){
+/**
+ * Disattiva l'alert impostando il campo `attivo` a false
+ * e salva il documento aggiornato nel database.
+ *
+ * @returns {Promise<mongoose.Document>} Documento alert aggiornato.
+ */
+
+alertSchema.methods.revoca = async function () {
     this.attivo = false;
-    return await this.save()
+    return await this.save();
 };
 
-module.exports = mongoose.model('Alert', alertSchema);      
+module.exports = mongoose.model('Alert', alertSchema);

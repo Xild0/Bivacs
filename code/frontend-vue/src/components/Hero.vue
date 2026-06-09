@@ -1,8 +1,3 @@
-/**
- * @file Hero.vue
- * @description Hero section principale della homepage Bivacs.
- */
-
 <script setup>
 import { computed } from 'vue'
 
@@ -14,22 +9,17 @@ const props = defineProps({
 })
 
 /**
- * Calcola statistiche generali sui bivacchi caricati.
+ * Calcola le statistiche generali dei bivacchi mostrati nella hero.
+ *
+ * @returns {Array<{ value: number|string, label: string }>} Statistiche da visualizzare.
  */
-
 const stats = computed(() => {
   const count = props.bivacchi.length
   const zones = new Set(props.bivacchi.map(b => b.zona).filter(Boolean)).size
-  const ratings = props.bivacchi
-    .map(b => Number(b.mediaStelle) || 0)
-    .filter(r => r > 0)
-  const avg = ratings.length
-    ? (ratings.reduce((s, r) => s + r, 0) / ratings.length).toFixed(1)
-    : '—'
 
   return [
     { value: count || '—', label: 'Bivacchi catalogati' },
-    { value: zones || '—',  label: 'Zone alpine' },
+    { value: zones || '—', label: 'Zone alpine' }
   ]
 })
 </script>

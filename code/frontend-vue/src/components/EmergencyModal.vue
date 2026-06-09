@@ -1,27 +1,5 @@
-/**
- * @file EmergencyModal.vue
- * @description Modale informativa per emergenze alpine e numeri utili.
- */
-
 <script setup>
 import Modal from './Modal.vue'
-
-async function attivaAllarme() {
-  try {
-    const msg = {msg:'Struttura inagibile'};
-    await getApi.post('/api/v1/bivacchi/${bivacco.id}/emergenza', msg);
-  } catch (error){
-    console.error(error);
-  }
-}
-
-async function disattivaAllarme() {
-  try  {
-    await getApi.delete('/api/v1/bivacchi/${bivacco.id}/emergenza');
-  } catch (error){
-    console.error(error);
-  }
-}
 
 const emit = defineEmits(['close'])
 </script>
