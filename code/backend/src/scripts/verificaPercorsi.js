@@ -1,10 +1,16 @@
 /**
  * @file verificaPercorsi.js
- * @description Verifica le associazioni percorso GPX → bivacco.
- * Legge i file GPX da uploads/gpx, calcola la distanza minima tra il tracciato
- * e il bivacco associato, e segnala anomalie.
+ * @description Script per la verifica delle associazioni tra percorsi GPX e bivacchi.
  *
- * Uso: node src/scripts/verificaPercorsi.js
+ * L'operazione:
+ * - legge i file GPX dalla cartella uploads/gpx;
+ * - calcola la distanza minima tra tracciato e bivacco associato;
+ * - segnala percorsi senza bivacco;
+ * - segnala bivacchi senza percorso;
+ * - evidenzia associazioni sospette.
+ *
+ * Uso:
+ * node src/scripts/verificaPercorsi.js
  */
 
 const fs = require('fs')
@@ -19,6 +25,16 @@ const Bivacco = require('../models/bivacco')
 const GPX_DIR = path.join(__dirname, '../../uploads/gpx')
 const SOGLIA_SOSPETTA_METRI = 2000
 
+/**
+ * Calcola la distanza in metri tra due coordinate geografiche.
+ *
+ * @param {number} lat1 - Latitudine del primo punto.
+ * @param {number} lon1 - Longitudine del primo punto.
+ * @param {number} lat2 - Latitudine del secondo punto.
+ * @param {number} lon2 - Longitudine del secondo punto.
+ * @returns {number} Distanza in metri.
+ */
+
 function haversine(lat1, lon1, lat2, lon2) {
   const R = 6371000
   const toRad = deg => deg * Math.PI / 180
@@ -28,6 +44,13 @@ function haversine(lat1, lon1, lat2, lon2) {
     Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
+
+/**
+ * Estrae i punti geografici da un file GPX.
+ *
+ * @param {string} filePath - Percorso locale del file GPX.
+ * @returns {Array<{lat: number, lon: number}>} Lista dei punti estratti.
+ */
 
 function parseGpxPoints(filePath) {
   if (!fs.existsSync(filePath)) return []
@@ -41,6 +64,14 @@ function parseGpxPoints(filePath) {
     .filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lon))
 }
 
+/**
+ * Calcola la distanza minima tra un insieme di punti GPX e un bivacco.
+ *
+ * @param {Array<{lat: number, lon: number}>} points - Punti del tracciato GPX.
+ * @param {Object} bivacco - Documento bivacco con latitudine e longitudine.
+ * @returns {number} Distanza minima in metri.
+ */
+
 function minDistanceToBivacco(points, bivacco) {
   let min = Infinity
   for (const pt of points) {
@@ -52,6 +83,19 @@ function minDistanceToBivacco(points, bivacco) {
   }
   return min
 }
+
+/**
+ * Esegue la verifica delle associazioni tra percorsi GPX e bivacchi.
+ *
+ * L'operazione:
+ * - recupera percorsi e bivacchi dal database;
+ * - segnala percorsi senza bivacco;
+ * - calcola le distanze minime tracciato-bivacco;
+ * - segnala bivacchi senza percorso;
+ * - riepiloga le associazioni sospette.
+ *
+ * @returns {Promise<void>}
+ */
 
 async function main() {
   await connectDB()

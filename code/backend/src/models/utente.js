@@ -1,10 +1,22 @@
 /**
  * @file utente.js
  * @description Modello Mongoose base per gli utenti del sistema.
- * Gestisce credenziali, email, lingua, verifica account, token di reset password e discriminator role-based.
+ *
+ * Include:
+ * - credenziali e lingua preferita;
+ * - verifica account tramite email;
+ * - token per recupero password;
+ * - discriminator per la gestione dei ruoli;
+ * - richieste di promozione a SupportoTecnico e SuperUser.
  */
 
 const mongoose = require('mongoose');
+
+/**
+ * Schema base degli utenti del sistema.
+ *
+ * @type {mongoose.Schema}
+ */
 
 const utenteSchema = new mongoose.Schema(
 {
@@ -16,8 +28,14 @@ const utenteSchema = new mongoose.Schema(
     email: {
         type: String, 
         required: [true, 'L\'email dell\'utente è obbligatoria'],
-        unique: true,                                                   // molto importante per evitare duplicati nelle mail
+        unique: true,                                                 
         validate:{
+            /**
+             * Verifica la validità sintattica dell'indirizzo email.
+             *
+             * @param {string} v - Email da validare.
+             * @returns {boolean}
+             */
             validator: function(v) {
                 return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
             },

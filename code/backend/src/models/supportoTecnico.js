@@ -7,6 +7,12 @@
 const mongoose = require('mongoose');
 const Utente = require('./utente');
 
+/**
+ * Schema dei dati aggiuntivi associati a un utente SupportoTecnico.
+ *
+ * @type {mongoose.Schema}
+ */
+
 const supportoTecnicoSchema = new mongoose.Schema(
 {
     matricola: {
@@ -19,5 +25,5 @@ const supportoTecnicoSchema = new mongoose.Schema(
     timestamps: true
 });
 
-// supportoTecnico extends utente
+// SupportoTecnico estende il modello base Utente tramite discriminator.
 module.exports = Utente.discriminator('SupportoTecnico', supportoTecnicoSchema);

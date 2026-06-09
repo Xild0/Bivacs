@@ -6,6 +6,12 @@
 
 const mongoose = require('mongoose');
 
+/**
+ * Schema che rappresenta un percorso GPX associato a un bivacco.
+ *
+ * @type {mongoose.Schema}
+ */
+
 const percorsoSchema = new mongoose.Schema({
     id: {
         type: Number,

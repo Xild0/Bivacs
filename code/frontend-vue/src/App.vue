@@ -1,11 +1,12 @@
-<!--
-  @file App.vue
-  @description Componente root dell'applicazione Bivacs.
-  Gestisce caricamento dati, autenticazione, dettagli bivacchi,
-  modali globali, notifiche e coordinamento tra componenti.
--->
-
+```vue
 <script setup>
+/**
+ * @file App.vue
+ * @description Componente root dell'applicazione Bivacs.
+ * Gestisce il caricamento dei dati, l'autenticazione, i dettagli dei bivacchi,
+ * le modali globali, le notifiche e il coordinamento tra i componenti principali.
+ */
+
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 
 import Navbar from './components/Navbar.vue'
@@ -19,6 +20,7 @@ import AuthModal from './components/AuthModal.vue'
 import ProfileModal from './components/ProfileModal.vue'
 import RouteModal from './components/RouteModal.vue'
 import ResetPassword from './components/ResetPassword.vue'
+import { io } from 'socket.io-client'
 
 import {
   getBivacchi,
@@ -43,6 +45,7 @@ const currentUser = ref(null)
 const preferitiIds = ref([])
 
 const resetTokenAttivo = ref(null)
+const detailsResetKey = ref(0)
 
 const notTemp = ref({
   visible: false,
@@ -51,6 +54,25 @@ const notTemp = ref({
 })
 
 const meteoMap = ref({})
+
+const SOCKET_URL =
+  import.meta.env.VITE_SOCKET_URL ||
+  'http://localhost:5000'
+
+let socket = null
+
+/**
+ * Aggiorna i dati visualizzati quando cambia lo stato del banner di emergenza.
+ *
+ * @returns {void}
+ */
+function onBannerChange() {
+  if (selectedBivacco.value) {
+    refreshSelectedBivacco()
+  } else {
+    loadBivacchi()
+  }
+}
 
 /**
  * Carica l'elenco dei bivacchi dal backend applicando eventuali filtri.
@@ -160,6 +182,16 @@ function onClearRoute() {
 }
 
 /**
+ * Chiude la modale del percorso e forza il reset del componente dettagli.
+ *
+ * @returns {void}
+ */
+function closeRouteModal() {
+  routeModal.value = null
+  detailsResetKey.value++
+}
+
+/**
  * Aggiorna lo stato di autenticazione dopo login, logout o modifica account.
  *
  * @returns {void}
@@ -235,9 +267,8 @@ function mostraNotTemp(text, type = 'info', durata = 4000) {
 }
 
 /**
- * Gestisce i parametri URL prodotti dai link inviati via email:
- * - verificato=true|false per la verifica email;
- * - reset=<token> per il recupero password.
+ * Gestisce i parametri URL prodotti dai link inviati via email.
+ * Riconosce i parametri di verifica email e reset password.
  *
  * @returns {void}
  */
@@ -264,7 +295,7 @@ function gestisciQueryString() {
 }
 
 /**
- * Gestisce la scadenza della sessione quando il backend restituisce 401.
+ * Gestisce la scadenza della sessione quando il backend restituisce errore 401.
  *
  * @returns {void}
  */
@@ -280,12 +311,21 @@ onMounted(async () => {
   loadUserData()
   gestisciQueryString()
   window.addEventListener('bivacs:auth-expired', gestisciSessioneScaduta)
+
+  socket = io(SOCKET_URL)
+  socket.on('BannerAttivato', onBannerChange)
+  socket.on('bannerRevocato', onBannerChange)
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('bivacs:auth-expired', gestisciSessioneScaduta)
+
+  if (socket) {
+    socket.disconnect()
+  }
 })
 </script>
+
 
 <template>
   <div class="app">
@@ -393,6 +433,7 @@ onBeforeUnmount(() => {
         <aside class="details-pane">
           <BivaccoDetails
             v-if="selectedBivacco"
+            :key="`${selectedBivacco._id}-${detailsResetKey}`"
             :bivacco="selectedBivacco"
             :is-logged="logged"
             :current-user="currentUser"
@@ -449,7 +490,7 @@ onBeforeUnmount(() => {
       v-if="routeModal"
       :result="routeModal.result"
       :bivacco="routeModal.bivacco"
-      @close="routeModal = null"
+      @close="closeRouteModal"
     />
 
     <ResetPassword

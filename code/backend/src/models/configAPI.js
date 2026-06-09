@@ -1,9 +1,21 @@
 /**
  * @file configAPI.js
- * @description Modello per configurare provider API esterne.
+ * @description Modello Mongoose per configurare i provider API esterni.
+ *
+ * Include:
+ * - nome del provider;
+ * - URL base configurabile;
+ * - stato di abilitazione;
+ * - timeout di chiamata.
  */
 
 const mongoose = require('mongoose');
+
+/**
+ * Schema di configurazione dei provider API esterni.
+ *
+ * @type {mongoose.Schema}
+ */
 
 const configAPISchema = new mongoose.Schema({
   id: {

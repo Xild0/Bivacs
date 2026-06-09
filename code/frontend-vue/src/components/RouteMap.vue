@@ -15,6 +15,53 @@ const mapEl = ref(null)
 let map = null
 let routeLayer = null
 
+/**
+ * Verifica che una coordinata sia valida.
+ *
+ * @param {Array<number|string>} coord - Coordinata nel formato [latitudine, longitudine].
+ * @returns {boolean} True se la coordinata contiene valori numerici validi.
+ */
+function isValidCoord(coord) {
+  return (
+    Array.isArray(coord) &&
+    coord.length >= 2 &&
+    Number.isFinite(Number(coord[0])) &&
+    Number.isFinite(Number(coord[1]))
+  )
+}
+
+/**
+ * Restituisce la coordinata di partenza del percorso.
+ *
+ * @returns {Array<number|string>} Coordinata di partenza.
+ */
+function getStartCoord() {
+  if (props.routeCoords?.length > 1 && isValidCoord(props.routeCoords[0])) {
+    return props.routeCoords[0]
+  }
+
+  return props.startCoord
+}
+
+/**
+ * Restituisce la coordinata finale del percorso.
+ *
+ * @returns {Array<number|string>} Coordinata di arrivo.
+ */
+function getEndCoord() {
+  if (props.routeCoords?.length > 1) {
+    const last = props.routeCoords[props.routeCoords.length - 1]
+    if (isValidCoord(last)) return last
+  }
+
+  return props.endCoord
+}
+
+/**
+ * Crea l'icona Leaflet per il punto di partenza.
+ *
+ * @returns {L.DivIcon} Icona del marker di partenza.
+ */
 function makeStartIcon() {
   return L.divIcon({
     html: `
@@ -30,6 +77,11 @@ function makeStartIcon() {
   })
 }
 
+/**
+ * Crea l'icona Leaflet per il punto di arrivo.
+ *
+ * @returns {L.DivIcon} Icona del marker di arrivo.
+ */
 function makeEndIcon() {
   return L.divIcon({
     html: `
@@ -45,6 +97,11 @@ function makeEndIcon() {
   })
 }
 
+/**
+ * Disegna sulla mappa il percorso, il tracciato ufficiale e i marker di partenza/arrivo.
+ *
+ * @returns {void}
+ */
 function renderRoute() {
   if (!map) return
 
@@ -57,7 +114,6 @@ function renderRoute() {
 
   const boundsCoords = []
 
-  // Overlay GPX SAT: solo riferimento, tratteggiato
   if (props.officialTrailCoords?.length > 1) {
     L.polyline(props.officialTrailCoords, {
       color: '#94A3B8',
@@ -71,7 +127,6 @@ function renderRoute() {
     boundsCoords.push(...props.officialTrailCoords)
   }
 
-  // Percorso principale ORS
   if (props.routeCoords?.length > 1) {
     const halo = L.polyline(props.routeCoords, {
       color: '#FFFFFF',
@@ -91,11 +146,14 @@ function renderRoute() {
 
     boundsCoords.push(...props.routeCoords)
 
-    L.marker(props.startCoord, { icon: makeStartIcon() })
+    const start = getStartCoord()
+    const end = getEndCoord()
+
+    L.marker(start, { icon: makeStartIcon() })
       .bindPopup(`<strong>Partenza</strong><br>${props.startName}`)
       .addTo(routeLayer)
 
-    L.marker(props.endCoord, { icon: makeEndIcon() })
+    L.marker(end, { icon: makeEndIcon() })
       .bindPopup(`<strong>Arrivo</strong><br>${props.endName}`)
       .addTo(routeLayer)
 
@@ -105,6 +163,9 @@ function renderRoute() {
   }
 }
 
+/**
+ * Inizializza la mappa Leaflet e disegna il percorso.
+ */
 onMounted(async () => {
   await nextTick()
 
@@ -123,12 +184,18 @@ onMounted(async () => {
   setTimeout(() => map?.invalidateSize(), 300)
 })
 
+/**
+ * Ridisegna il percorso quando cambiano coordinate o tracciati.
+ */
 watch(
-  () => [props.routeCoords, props.officialTrailCoords],
+  () => [props.routeCoords, props.officialTrailCoords, props.startCoord, props.endCoord],
   () => renderRoute(),
   { deep: true }
 )
 
+/**
+ * Rimuove la mappa Leaflet quando il componente viene smontato.
+ */
 onBeforeUnmount(() => {
   if (map) {
     map.remove()

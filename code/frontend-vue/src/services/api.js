@@ -5,7 +5,7 @@
  * segnalazioni, meteo, percorsi e funzioni del Supporto Tecnico.
  */
 
-const API_URL = import.meta.env.VITE_API_BASE || 'http://localhost:3000/api/v1'
+const API_URL = import.meta.env.VITE_API_BASE || 'http://localhost:5000/api/v1'
 const ORS_API_KEY = import.meta.env.VITE_ORS_API_KEY || ''
 
 /**
@@ -340,7 +340,7 @@ export async function getRecensioni(bivaccoId) {
  * @returns {Promise<Object>}
  */
 export async function createRecensione(payload) {
-  const response = await fetch(`${API_URL}/recensioni`, {
+  const response = await fetchAuth(`${API_URL}/recensioni`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
@@ -681,53 +681,64 @@ export async function rifiutaRichiestaSupportoTecnico(utenteId, motivoRifiuto = 
 }
 
 /**
- * @description invia una richiesta per ottenere ruolo di SuperUser
- * @param {Object} payload - motivo richiesta
+ * Invia una richiesta per ottenere il ruolo di SuperUser.
+ *
+ * @param {Object} payload - Dati della richiesta.
  * @returns {Promise<Object>}
  */
 export async function richiediSuperUser(payload) {
-  const resp = await fetchAuth(`${API_URL}/profilo/richiesta-superuser`, {
+  const response = await fetchAuth(`${API_URL}/profilo/richiesta-superuser`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json'
+    },
     body: JSON.stringify(payload)
   })
-  return parseResponse(resp)
+
+  return parseResponse(response)
 }
 
 /**
- * @description recupera tutte le richieste non approvate 
+ * Recupera tutte le richieste di promozione a SuperUser non ancora approvate.
+ *
  * @returns {Promise<Array>}
  */
 export async function getRichiesteSuperUser() {
-  const resp = await fetchAuth(`${API_URL}/supporto/richieste-superuser`)
-  return parseResponse(resp)
+  const response = await fetchAuth(`${API_URL}/supporto/richieste-superuser`)
+  return parseResponse(response)
 }
 
 /**
- * @description approva richiesta di promozione a SuperUser
- * @param {string} utenteId - objectId utente
+ * Approva una richiesta di promozione a SuperUser.
+ *
+ * @param {string} utenteId - ObjectId dell'utente.
  * @returns {Promise<Object>}
  */
 export async function approvaRichiestaSuperUser(utenteId) {
-  const resp = await fetchAuth(`${API_URL}/supporto/richieste-superuser/${utenteId}/approva`, {
+  const response = await fetchAuth(`${API_URL}/supporto/richieste-superuser/${utenteId}/approva`, {
     method: 'PATCH'
   })
-  return parseResponse(resp)
+
+  return parseResponse(response)
 }
 
 /**
- * @description rifiuta richiesta di promozione a SuperUser
- * @param {string} utenteId - objectId utente
- * @param {string} [motivoRifiuto] - Motivo (totalmente opzionale)
+ * Rifiuta una richiesta di promozione a SuperUser.
+ *
+ * @param {string} utenteId - ObjectId dell'utente.
+ * @param {string} [motivoRifiuto] - Motivazione opzionale del rifiuto.
  * @returns {Promise<Object>}
  */
 export async function rifiutaRichiestaSuperUser(utenteId, motivoRifiuto = '') {
-  const resp = await fetchAuth(`${API_URL}/supporto/richieste-superuser/${utenteId}/rifiuta`, {
+  const response = await fetchAuth(`${API_URL}/supporto/richieste-superuser/${utenteId}/rifiuta`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({motivoRifiuto})
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ motivoRifiuto })
   })
-  return parseResponse(resp)
+
+  return parseResponse(response)
 }
 
 /**
@@ -750,24 +761,35 @@ export async function geocode(text) {
     'boundary.country': 'IT'
   })
 
-  const response = await fetch(`https://api.openrouteservice.org/geocode/search?${params}`)
+  const response = await fetch(
+    `https://api.openrouteservice.org/geocode/search?${params}`
+  )
+
   const data = await parseResponse(response)
 
-  return data.features || []
+  return (data.features || []).map((feature) => ({
+    nome:
+      feature.properties?.label ||
+      feature.properties?.name ||
+      'Luogo selezionato',
+
+    lat: feature.geometry?.coordinates?.[1],
+    lon: feature.geometry?.coordinates?.[0]
+  }))
 }
 
 /**
- * Calcola la distanza in metri tra due coordinate.
+ * Calcola la distanza in metri tra due coordinate geografiche.
  *
- * @param {number} lat1
- * @param {number} lon1
- * @param {number} lat2
- * @param {number} lon2
+ * @param {number} lat1 - Latitudine del primo punto.
+ * @param {number} lon1 - Longitudine del primo punto.
+ * @param {number} lat2 - Latitudine del secondo punto.
+ * @param {number} lon2 - Longitudine del secondo punto.
  * @returns {number}
  */
 function haversine(lat1, lon1, lat2, lon2) {
   const R = 6371000
-  const toRad = deg => (deg * Math.PI) / 180
+  const toRad = (deg) => (deg * Math.PI) / 180
 
   const dLat = toRad(lat2 - lat1)
   const dLon = toRad(lon2 - lon1)
@@ -858,30 +880,55 @@ export async function calcolaTragitto(startCoord, endCoord) {
     throw new Error('Chiave OpenRouteService non configurata')
   }
 
+  const startLat = Number(startCoord[0])
+  const startLng = Number(startCoord[1])
+  const endLat = Number(endCoord[0])
+  const endLng = Number(endCoord[1])
+
+  if (
+    !Number.isFinite(startLat) ||
+    !Number.isFinite(startLng) ||
+    !Number.isFinite(endLat) ||
+    !Number.isFinite(endLng)
+  ) {
+    throw new Error('Coordinate non valide per il calcolo del tragitto')
+  }
+
   const body = {
     coordinates: [
-      [startCoord[1], startCoord[0]],
-      [endCoord[1], endCoord[0]]
+      [startLng, startLat],
+      [endLng, endLat]
     ],
     elevation: true,
     instructions: true,
-    preference: 'recommended'
+    preference: 'recommended',
+    radiuses: [-1, -1]
   }
 
-  const response = await fetch('https://api.openrouteservice.org/v2/directions/foot-hiking/geojson', {
-    method: 'POST',
-    headers: {
-      Authorization: ORS_API_KEY,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(body)
-  })
+  const response = await fetch(
+    'https://api.openrouteservice.org/v2/directions/foot-hiking/geojson',
+    {
+      method: 'POST',
+      headers: {
+        Authorization: ORS_API_KEY,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(body)
+    }
+  )
 
-  const data = await parseResponse(response)
+  let data = await parseResponse(response)
+
+  if (typeof data === 'string') {
+    data = JSON.parse(data)
+  }
+
   const feature = data.features?.[0]
 
   if (!feature) {
-    throw new Error('Percorso non trovato')
+    throw new Error(
+      'Percorso automatico non trovato. Puoi comunque scaricare il tracciato GPX SAT più vicino al bivacco.'
+    )
   }
 
   const rawCoords = feature.geometry.coordinates || []
@@ -889,7 +936,11 @@ export async function calcolaTragitto(startCoord, endCoord) {
   const profile = calcolaDistanzaProfilo(rawCoords)
   const dislivelli = calcolaDislivelliPuliti(profile)
 
-  const distance = feature.properties?.summary?.distance || profile.at(-1)?.distance || 0
+  const distance =
+    feature.properties?.summary?.distance ||
+    profile.at(-1)?.distance ||
+    0
+
   const duration =
     feature.properties?.summary?.duration ||
     stimaDurataEscursionistica(distance, dislivelli.ascent)
@@ -906,115 +957,136 @@ export async function calcolaTragitto(startCoord, endCoord) {
 }
 
 /**
- * @description recupera tutti i ticket di manutenzione
+ * Recupera tutti i ticket di manutenzione.
+ *
  * @returns {Promise<Array>}
  */
 export async function getTicket() {
-  const resp = await fetchAuth(`${API_URL}/ticket`)
-  return parseResponse(resp)
+  const response = await fetchAuth(`${API_URL}/ticket`)
+  return parseResponse(response)
 }
 
 /**
- * @description apre un nuivo ticket a partire da una segnalazione
- * @param {string} segnalazioneId - objectId segnalazione
+ * Apre un nuovo ticket a partire da una segnalazione.
+ *
+ * @param {string} segnalazioneId - ObjectId della segnalazione.
  * @returns {Promise<Object>}
  */
 export async function apriTicket(segnalazioneId) {
-  const resp = await fetchAuth(`${API_URL}/ticket`,{
+  const response = await fetchAuth(`${API_URL}/ticket`, {
     method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({segnalazioneId})
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ segnalazioneId })
   })
-  return parseResponse(resp)
+
+  return parseResponse(response)
 }
 
 /**
- * @description aggiorna lo stato ticket
- * @param {string} ticketId - objectId ticket
- * @param {string} nuovoStato - nuovo stato ticket
+ * Aggiorna lo stato di un ticket.
+ *
+ * @param {string} ticketId - ObjectId del ticket.
+ * @param {string} nuovoStato - Nuovo stato del ticket.
  * @returns {Promise<Object>}
  */
 export async function aggiornaStatoTicket(ticketId, nuovoStato) {
-  const resp = await fetchAuth(`${API_URL}/ticket/${ticketId}/stato`,{
+  const response = await fetchAuth(`${API_URL}/ticket/${ticketId}/stato`, {
     method: 'PATCH',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({nuovoStato})
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ nuovoStato })
   })
-  return parseResponse(resp)
+
+  return parseResponse(response)
 }
 
 /**
- * @description chiude un ticket registrando le note di intervento fornite
- * @param {string} ticketId - objectId ticket
- * @param {string} note - note intervento
+ * Chiude un ticket registrando le note di intervento.
+ *
+ * @param {string} ticketId - ObjectId del ticket.
+ * @param {string} note - Note dell'intervento effettuato.
  * @returns {Promise<Object>}
  */
 export async function chiudiTicket(ticketId, note) {
-  const resp = await fetchAuth(`${API_URL}/ticket/${ticketId}/chiudi`,{
+  const response = await fetchAuth(`${API_URL}/ticket/${ticketId}/chiudi`, {
     method: 'PATCH',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({note})
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ note })
   })
-  return parseResponse(resp)
+
+  return parseResponse(response)
 }
 
 /**
- * @description archivia un ticket GIA CHIUSO
- * @param {string} ticketId - objectId ticket
+ * Archivia un ticket precedentemente chiuso.
+ *
+ * @param {string} ticketId - ObjectId del ticket.
  * @returns {Promise<Object>}
  */
 export async function archiviaTicket(ticketId) {
-  const resp = await fetchAuth(`${API_URL}/ticket/${ticketId}/archivia`,{
+  const response = await fetchAuth(`${API_URL}/ticket/${ticketId}/archivia`, {
     method: 'PATCH'
   })
-  return parseResponse(resp)
+
+  return parseResponse(response)
 }
 
 /**
- * @description attiva alerr di emergenza su un bivacco
- * @param {string} bivaccoId - objectId bivacco
- * @param {string} messaggio - messaggio dell'emergenza
+ * Attiva un alert di emergenza per un bivacco.
+ *
+ * @param {string} bivaccoId - ObjectId del bivacco.
+ * @param {string} messaggio - Messaggio dell'emergenza.
  * @returns {Promise<Object>}
  */
 export async function attivaEmergenza(bivaccoId, messaggio) {
-  const resp = await fetchAuth(`${API_URL}/alert`, {
+  const response = await fetchAuth(`${API_URL}/alert`, {
     method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({bivaccoId, messaggio})
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ bivaccoId, messaggio })
   })
 
-  return parseResponse(resp)
+  return parseResponse(response)
 }
 
 /**
- * @description revoca l'emergenza di un bivacco
- * @param {string} bivaccoId - objectId bivacco
+ * Revoca l'alert di emergenza associato a un bivacco.
+ *
+ * @param {string} bivaccoId - ObjectId del bivacco.
  * @returns {Promise<Object>}
  */
 export async function revocaEmergenza(bivaccoId) {
-  const resp = await fetchAuth(`${API_URL}/alert/${bivaccoId}/revoca`, {
+  const response = await fetchAuth(`${API_URL}/alert/${bivaccoId}/revoca`, {
     method: 'PATCH'
   })
 
-  return parseResponse(resp)
+  return parseResponse(response)
 }
 
 /**
- * @description Esporta l'intero dataset delle segnalazioni in formato CSV
- * @async
- * @function exportCSV
- * @route GET /api/v1/supporto/segnalazioni/export/csv
- * @returns {Promise<string>} contenuto del file CSV
+ * Esporta il dataset completo delle segnalazioni in formato CSV.
+ *
+ * @returns {Promise<string>} Contenuto del file CSV.
  */
 export async function exportCSV() {
-  const resp = await fetchAuth(`${API_URL}/supporto/segnalazioni/export/csv`)
-  if (!resp.ok) {
+  const response = await fetchAuth(`${API_URL}/supporto/segnalazioni/export/csv`)
+
+  if (!response.ok) {
     let messaggio = 'Errore durante l\'esportazione del dataset'
+
     try {
-      const e = await resp.json()
-      messaggio = e.errore || messaggio
+      const error = await response.json()
+      messaggio = error.errore || messaggio
     } catch {}
+
     throw new Error(messaggio)
   }
-  return resp.text()
+
+  return response.text()
 }

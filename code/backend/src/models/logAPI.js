@@ -6,6 +6,12 @@
 
 const mongoose = require('mongoose');
 
+/**
+ * Schema per il tracciamento delle invocazioni verso API esterne.
+ *
+ * @type {mongoose.Schema}
+ */
+
 const logAPISchema = new mongoose.Schema({
     id: {
         type: Number,
@@ -21,7 +27,6 @@ const logAPISchema = new mongoose.Schema({
     },
     dettaglioErrore: {
         type: String
-        // non required: presente solo in caso di errore
     }
 }, { timestamps: true });
 

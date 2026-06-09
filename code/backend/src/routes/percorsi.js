@@ -1,7 +1,13 @@
 /**
  * @file percorsi.js
- * @description Route Express per la gestione dei percorsi associati ai bivacchi.
- * Espone endpoint per leggere, creare, servire e scaricare percorsi GPX.
+ * @description API REST per la gestione dei percorsi associati ai bivacchi.
+ *
+ * Include:
+ * - consultazione dei percorsi;
+ * - creazione di nuovi percorsi;
+ * - ricerca automatica del file GPX più vicino;
+ * - visualizzazione dei tracciati GPX;
+ * - download dei file GPX.
  */
 
 const express = require('express');
@@ -15,9 +21,13 @@ const { protectRoute } = require('../middlewares/authMiddleware');
 const GPX_DIR = path.join(__dirname, '../../uploads/gpx');
 
 /**
- * Recupera tutti i percorsi presenti nel database.
+ * Recupera tutti i percorsi.
+ *
+ * Restituisce la lista completa dei percorsi presenti
+ * nel database, includendo il bivacco associato.
  *
  * @route GET /api/v1/percorsi
+ * @access Public
  */
 router.get('/', async (req, res) => {
     try {
@@ -46,7 +56,11 @@ let gpxCache = null
  * Calcola la distanza in metri tra due coordinate geografiche
  * utilizzando la formula di Haversine.
  *
- * @returns {number}
+ * @param {number} lat1 - Latitudine del primo punto.
+ * @param {number} lon1 - Longitudine del primo punto.
+ * @param {number} lat2 - Latitudine del secondo punto.
+ * @param {number} lon2 - Longitudine del secondo punto.
+ * @returns {number} Distanza in metri.
  */
 
 function haversine(lat1, lon1, lat2, lon2) {
@@ -68,8 +82,8 @@ function haversine(lat1, lon1, lat2, lon2) {
 /**
  * Estrae tutti i punti geografici presenti in un file GPX.
  *
- * @param {string} filePath
- * @returns {Array<{lat:number, lon:number}>}
+ * @param {string} filePath - Percorso locale del file GPX.
+ * @returns {Array<{lat: number, lon: number}>} Lista dei punti geografici estratti.
  */
 
 function estraiPuntiGpx(filePath) {
@@ -114,7 +128,8 @@ function estraiPuntiGpx(filePath) {
  * Carica e memorizza in cache i file GPX disponibili
  * per velocizzare le successive ricerche.
  *
- * @returns {Array}
+ * @returns {Array<{file: string, filePath: string, points: Array<{lat: number, lon: number}>}>}
+ * Lista dei file GPX caricati con i rispettivi punti.
  */
 
 function caricaGpxCache() {
@@ -155,8 +170,9 @@ function caricaGpxCache() {
  * Individua il file GPX SAT più vicino alle coordinate
  * del bivacco specificato.
  *
- * @param {Object} bivacco
- * @returns {Object|null}
+ * @param {Object} bivacco - Documento bivacco con latitudine e longitudine.
+ * @returns {{file: string, filePath: string, distanza: number}|null}
+ * File GPX più vicino oppure null.
  */
 
 function trovaGpxPiuVicino(bivacco) {
@@ -191,10 +207,16 @@ function trovaGpxPiuVicino(bivacco) {
 }
 
 /**
- * Trova automaticamente il GPX SAT più vicino al bivacco.
- * Non richiede documenti Percorso nel database.
+ * Trova automaticamente il file GPX più vicino a un bivacco.
  *
- * GET /api/v1/percorsi/bivacco/:bivaccoId/auto-gpx
+ * L'operazione:
+ * - recupera il bivacco tramite ObjectId MongoDB;
+ * - analizza i file GPX disponibili;
+ * - individua il tracciato più vicino;
+ * - restituisce il file GPX se entro la distanza massima consentita.
+ *
+ * @route GET /api/v1/percorsi/bivacco/:bivaccoId/auto-gpx
+ * @access Public
  */
 router.get('/bivacco/:bivaccoId/auto-gpx', async (req, res) => {
   try {
@@ -232,9 +254,16 @@ router.get('/bivacco/:bivaccoId/auto-gpx', async (req, res) => {
 })
 
 /**
- * Download automatico GPX SAT più vicino.
+ * Scarica automaticamente il file GPX più vicino a un bivacco.
  *
- * GET /api/v1/percorsi/bivacco/:bivaccoId/auto-download
+ * L'operazione:
+ * - recupera il bivacco tramite ObjectId MongoDB;
+ * - individua il file GPX più vicino;
+ * - verifica che sia entro la distanza massima consentita;
+ * - scarica il file con un nome basato sul bivacco.
+ *
+ * @route GET /api/v1/percorsi/bivacco/:bivaccoId/auto-download
+ * @access Private
  */
 router.get('/bivacco/:bivaccoId/auto-download', protectRoute, async (req, res) => {
   try {
@@ -266,9 +295,13 @@ router.get('/bivacco/:bivaccoId/auto-download', protectRoute, async (req, res) =
 
 
 /**
- * Recupera un percorso specifico tramite ObjectId MongoDB.
+ * Recupera un percorso specifico.
+ *
+ * Cerca il percorso tramite ObjectId MongoDB
+ * e restituisce anche il bivacco associato.
  *
  * @route GET /api/v1/percorsi/:id
+ * @access Public
  */
 router.get('/:id', async (req, res) => {
     try {
@@ -292,9 +325,13 @@ router.get('/:id', async (req, res) => {
 });
 
 /**
- * Crea un nuovo percorso associato a un bivacco.
+ * Crea un nuovo percorso.
+ *
+ * L'operazione riceve i dati del percorso
+ * e li salva nel database.
  *
  * @route POST /api/v1/percorsi
+ * @access Public
  */
 router.post('/', async (req, res) => {
     try {
@@ -310,10 +347,15 @@ router.post('/', async (req, res) => {
 });
 
 /**
- * Serve il file GPX di un percorso per la visualizzazione del tracciato sulla mappa (US14).
- * Endpoint pubblico: non richiede autenticazione.
+ * Restituisce il file GPX di un percorso.
+ *
+ * L'operazione:
+ * - recupera il percorso tramite ObjectId MongoDB;
+ * - verifica che esista un file GPX associato;
+ * - serve il file per la visualizzazione del tracciato sulla mappa.
  *
  * @route GET /api/v1/percorsi/:id/gpx
+ * @access Public
  */
 router.get('/:id/gpx', async (req, res) => {
     try {
@@ -347,10 +389,15 @@ router.get('/:id/gpx', async (req, res) => {
 });
 
 /**
- * Scarica il file GPX di un percorso per la navigazione offline (US16, RF19).
- * Endpoint riservato a utenti autenticati.
+ * Scarica il file GPX di un percorso.
+ *
+ * L'operazione:
+ * - recupera il percorso tramite ObjectId MongoDB;
+ * - verifica che il file GPX esista;
+ * - scarica il file per la navigazione offline.
  *
  * @route GET /api/v1/percorsi/:id/download
+ * @access Private
  */
 router.get('/:id/download', protectRoute, async (req, res) => {
     try {

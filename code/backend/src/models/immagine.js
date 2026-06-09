@@ -6,6 +6,12 @@
 
 const mongoose = require('mongoose');
 
+/**
+ * Schema che rappresenta un'immagine allegata a una segnalazione.
+ *
+ * @type {mongoose.Schema}
+ */
+
 const immagineSchema = new mongoose.Schema({
     id: {
         type: Number,

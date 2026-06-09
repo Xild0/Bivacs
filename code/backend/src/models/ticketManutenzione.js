@@ -6,6 +6,13 @@
 
 const mongoose = require('mongoose');
 
+/**
+ * Schema che rappresenta un ticket di manutenzione
+ * generato a partire da una segnalazione.
+ *
+ * @type {mongoose.Schema}
+ */
+
 const ticketManutenzioneSchema = new mongoose.Schema({
     id: {
         type: Number,
@@ -32,10 +39,9 @@ const ticketManutenzioneSchema = new mongoose.Schema({
         type: Date,
         default: Date.now
     },
-    dataChiusura: {  // fix: era DataChiusura
-        type: Date
-        // rimosso required: non esiste alla creazione del ticket
-    },
+    dataChiusura: {
+    type: Date
+},
     note: {
         type: String
     }

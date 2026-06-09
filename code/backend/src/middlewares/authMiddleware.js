@@ -32,10 +32,6 @@ const protectRoute = (req, res, next) => {
     try {
         const extracted = jwt.verify(token, process.env.JWT_SECRET);
         
-        /**
-         * Aggiungiamo i dati estratti all'oggetto richiesta, in questo modo
-         * le rotte successive sapranno chi è l'utente che si sta connettendo
-         */
         req.utente = extracted; 
         next(); 
     } catch (error) {
@@ -68,21 +64,22 @@ const isStaff = (req, res, next) => {
 };
 
 /**
- * Verifica che l'utente autenticato abbia i privilegi di SuperUser
- * @param {import('express').Request} req - Oggetto richiesta Express con dati utente già decodificati.
- * @param {import('express').Response res - Oggetto risposta Express.
- * @param {import('express').NextFunction next - Funzione per passare al middleware successivo.
+ * Verifica che l'utente autenticato possieda il ruolo SuperUser.
+ * Deve essere utilizzato dopo il middleware `protectRoute`.
+ *
+ * @param {import('express').Request} req - Richiesta Express contenente i dati dell'utente autenticato.
+ * @param {import('express').Response} res - Risposta Express.
+ * @param {import('express').NextFunction} next - Middleware successivo.
  * @returns {void}
  */
+
 const isSuperUser = (req, res, next) => {
     if(req.utente.discriminator === 'SuperUser'){
         return next();
     }
     return res.status(403).json({
-        errore: "Accesso negato. Solo SuperUser posso accedere"
+        errore: 'Accesso negato. Solo i SuperUser possono accedere.'
     });
 };
 
-
-// Esportiamo tutto
 module.exports = { protectRoute, isStaff, isSuperUser };

@@ -1,12 +1,20 @@
 /**
  * @file getNewSequence.js
- * @description Restituisce il valore successivo di una sequenza numerica
- * gestita automaticamente da MongoDB, se non esiste viene creata partendo da 1
+ * @description Utility per la gestione delle sequenze numeriche progressive.
  *
- * @param {string} nomeSequenza - identificatore sequenza
- * @returns {Promise<number>} prossimo intero della sequenza
+ * Include:
+ * - ricerca della sequenza tramite identificatore;
+ * - incremento automatico del contatore;
+ * - creazione della sequenza se non esiste.
  */
 const Counter = require('../models/counter');
+
+/**
+ * Restituisce il valore successivo di una sequenza numerica.
+ *
+ * @param {string} nomeSequenza - Identificatore della sequenza.
+ * @returns {Promise<number>} Valore aggiornato della sequenza.
+ */
 
 async function getNextSequence(nomeSequenza) {
     const counter = await Counter.findOneAndUpdate(

@@ -6,6 +6,12 @@
 
 const mongoose = require('mongoose');
 
+/**
+ * Schema che rappresenta una recensione associata a un bivacco.
+ *
+ * @type {mongoose.Schema}
+ */
+
 const recensioneSchema = new mongoose.Schema({
   bivaccoId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -13,6 +19,11 @@ const recensioneSchema = new mongoose.Schema({
     required: true
   },
   utente: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: 'Utente',
+  default: null
+  },
+  nomeVisualizzato: {
     type: String,
     default: 'Anonimo'
   },
@@ -61,6 +72,15 @@ recensioneSchema.statics.calcolaMedia = async function(bivaccoId) {
     });
   }
 };
+
+/**
+ * Hook eseguito dopo il salvataggio di una recensione.
+ * Aggiorna automaticamente media voti e numero recensioni
+ * del bivacco associato.
+ *
+ * @async
+ * @returns {Promise<void>}
+ */
 
 recensioneSchema.post('save', async function() {
   const constructorWithMethod = /** @type {unknown} */ (this.constructor);

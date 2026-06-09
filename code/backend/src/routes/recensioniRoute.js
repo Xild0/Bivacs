@@ -1,7 +1,11 @@
 /**
  * @file recensioniRoute.js
- * @description Route Express per la gestione delle recensioni dei bivacchi.
- * Permette di creare recensioni e recuperare quelle associate a un bivacco.
+ * @description API REST per la gestione delle recensioni dei bivacchi.
+ *
+ * Include:
+ * - creazione di recensioni;
+ * - gestione delle recensioni anonime;
+ * - recupero delle recensioni associate a un bivacco.
  */
 
 const express = require('express');
@@ -9,21 +13,27 @@ const router = express.Router();
 
 const Recensione = require('../models/recensione');
 const Bivacco = require('../models/bivacco');
+const { protectRoute } = require('../middlewares/authMiddleware');
 
 /**
  * Crea una nuova recensione per un bivacco.
- * Se la recensione è anonima, il nome visualizzato viene impostato ad "Anonimo".
+ *
+ * L'operazione:
+ * - verifica che il bivacco esista;
+ * - recupera l'utente autenticato;
+ * - imposta il nome visualizzato;
+ * - salva la recensione nel database.
+ *
+ * Se la recensione è anonima, il nome visualizzato
+ * viene impostato ad "Anonimo".
  *
  * @route POST /api/v1/recensioni
- * @param {import('express').Request} req - Richiesta HTTP con bivaccoId, utente, stelle, testo e anonima.
- * @param {import('express').Response} res - Risposta HTTP.
- * @returns {Promise<void>} Recensione salvata oppure errore di validazione.
+ * @access Private
  */
 
-router.post('/', async (req, res) => {
+router.post('/', protectRoute, async (req, res) => {
   try {
-
-    const { bivaccoId, utente, stelle, testo, anonima } = req.body;
+    const { bivaccoId, stelle, testo, anonima } = req.body;
 
     const bivacco = await Bivacco.findById(bivaccoId);
 
@@ -33,11 +43,25 @@ router.post('/', async (req, res) => {
       });
     }
 
+    const Utente = require('../models/utente');
+    const utenteAutenticato = await Utente.findById(req.utente.mongoId);
+
+    if (!utenteAutenticato) {
+      return res.status(404).json({
+        message: 'Utente non trovato'
+      });
+    }
+
+    const nomeVisualizzato = anonima
+      ? 'Anonimo'
+      : `${utenteAutenticato.nome || ''} ${utenteAutenticato.cognome || ''}`.trim()
+        || utenteAutenticato.email
+        || 'Escursionista';
+
     const nuovaRecensione = new Recensione({
       bivaccoId,
-      utente: anonima
-        ? 'Anonimo'
-        : (utente || 'Escursionista'),
+      utente: req.utente.mongoId,
+      nomeVisualizzato,
       stelle,
       testo,
       anonima: anonima || false
@@ -46,9 +70,7 @@ router.post('/', async (req, res) => {
     const recensioneSalvata = await nuovaRecensione.save();
 
     res.status(201).json(recensioneSalvata);
-
   } catch (err) {
-
     const errorMessage =
       err instanceof Error
         ? err.message
@@ -64,23 +86,24 @@ router.post('/', async (req, res) => {
 /**
  * Recupera tutte le recensioni associate a un bivacco.
  *
+ * L'operazione:
+ * - cerca le recensioni tramite id del bivacco;
+ * - include alcune informazioni dell'utente autore;
+ * - ordina i risultati dalla recensione più recente.
+ *
  * @route GET /api/v1/recensioni/:bivaccoId
- * @param {import('express').Request} req - Richiesta HTTP con parametro bivaccoId.
- * @param {import('express').Response} res - Risposta HTTP.
- * @returns {Promise<void>} Lista recensioni ordinate dalla più recente.
+ * @access Public
  */
 
 router.get('/:bivaccoId', async (req, res) => {
   try {
-
     const recensioni = await Recensione
       .find({ bivaccoId: req.params.bivaccoId })
+      .populate('utente', 'email discriminator')
       .sort({ createdAt: -1 });
 
     res.status(200).json(recensioni);
-
   } catch (err) {
-
     const errorMessage =
       err instanceof Error
         ? err.message

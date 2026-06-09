@@ -1,18 +1,8 @@
-/**
- * @file ResetPassword.vue
- * @description Modale per impostare una nuova password tramite token di reset.
- */
-
 <script setup>
 import { reactive, ref } from 'vue'
 import Modal from './Modal.vue'
 import { resetPassword } from '../services/api'
 
-/**
- * Props del componente.
- * @typedef {Object} ResetPasswordProps
- * @property {string} token - token monouso ricevuto dalla query string ?reset=...
- */
 const props = defineProps({
   token: { type: String, required: true }
 })
@@ -29,9 +19,7 @@ const messageType = ref('info')
 const inCorso = ref(false)
 
 /**
- * Invia la nuova password al backend insieme al token ricevuto via mail.
- * In caso di successo emette `reset-success` per permettere a App.vue di
- * mostrare un avviso.
+ * Invia la nuova password al backend usando il token di reset.
  *
  * @returns {Promise<void>}
  */
@@ -43,6 +31,7 @@ async function submitReset() {
     message.value = 'Le due password non coincidono.'
     return
   }
+
   if (form.nuovaPassword.length < 8) {
     messageType.value = 'error'
     message.value = 'La password deve essere di almeno 8 caratteri.'
@@ -50,6 +39,7 @@ async function submitReset() {
   }
 
   inCorso.value = true
+
   try {
     await resetPassword(props.token, form.nuovaPassword)
     messageType.value = 'success'

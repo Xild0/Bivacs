@@ -1,8 +1,3 @@
-/**
- * @file BivaccoMap.vue
- * @description Visualizzazione mappa interattiva Leaflet dei bivacchi.
- */
-
 <script setup>
 import { onMounted, onBeforeUnmount, watch, ref, nextTick } from 'vue'
 import L from 'leaflet'
@@ -23,12 +18,11 @@ let map = null
 let markersLayer = null
 
 /**
- * Crea un marker personalizzato Leaflet.
+ * Crea un marker personalizzato Leaflet per rappresentare un bivacco.
  *
- * @param {boolean} [emergency=false] - Indica se il bivacco è in emergenza.
- * @returns {L.DivIcon}
+ * @param {boolean} [emergency=false] - Indica se il bivacco è in stato di emergenza.
+ * @returns {L.DivIcon} Icona personalizzata da usare sulla mappa.
  */
-
 function makeIcon(emergency = false) {
   const color = emergency ? '#EF4444' : '#1E88E5'
   const dark = emergency ? '#991B1B' : '#0E6FA8'
@@ -82,11 +76,10 @@ function makeIcon(emergency = false) {
 }
 
 /**
- * Disegna tutti i marker dei bivacchi sulla mappa.
+ * Disegna sulla mappa i marker dei bivacchi con coordinate valide.
  *
  * @returns {void}
  */
-
 function renderMarkers() {
   if (!map || !markersLayer) return
 
@@ -98,13 +91,12 @@ function renderMarkers() {
     const lat = Number(bivacco.latitudine)
     const lng = Number(bivacco.longitudine)
 
-
     if (lat < 45.6 || lat > 46.6 || lng < 10.4 || lng > 12.0) {
-    console.warn('Coordinate sospette per bivacco:', bivacco.nome, {
-      latitudine: lat,
-      longitudine: lng
-    })
-  }
+      console.warn('Coordinate sospette per bivacco:', bivacco.nome, {
+        latitudine: lat,
+        longitudine: lng
+      })
+    }
 
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
       console.warn('Coordinate non valide per bivacco:', bivacco.nome, bivacco)
@@ -136,6 +128,9 @@ function renderMarkers() {
   }
 }
 
+/**
+ * Inizializza la mappa Leaflet e carica il layer dei marker.
+ */
 onMounted(async () => {
   await nextTick()
 
@@ -161,6 +156,9 @@ onMounted(async () => {
   }, 150)
 })
 
+/**
+ * Rimuove la mappa Leaflet quando il componente viene smontato.
+ */
 onBeforeUnmount(() => {
   if (map) {
     map.remove()
@@ -168,6 +166,9 @@ onBeforeUnmount(() => {
   }
 })
 
+/**
+ * Aggiorna i marker quando cambia la lista dei bivacchi.
+ */
 watch(
   () => props.bivacchi,
   () => {

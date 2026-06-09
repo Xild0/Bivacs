@@ -1,6 +1,8 @@
 /**
  * @file alert.js
- * @description Route per attivazione/revoca alert di emergenza (solo SuperUser)
+ * @description Definizione delle API REST per la gestione degli alert
+ * di emergenza associati ai bivacchi.
+ * Le operazioni di attivazione e revoca sono riservate agli utenti SuperUser.
  */
 
 const express = require('express');
@@ -11,9 +13,17 @@ const getNextSequence = require('../utils/getNewSequence');
 const {protectRoute, isSuperUser} = require('../middlewares/authMiddleware');
 
 /**
- *@description Attiva AlertEmergenza su un bivacco (bivacco.emergenza)
- * SOLO SE non è già presente un alert
+ * Attiva un nuovo alert di emergenza per un bivacco.
+ *
+ * L'operazione:
+ * - verifica l'esistenza del bivacco;
+ * - controlla che non siano già presenti alert attivi;
+ * - crea un nuovo alert;
+ * - aggiorna lo stato di emergenza del bivacco;
+ * - notifica i client connessi tramite Socket.IO.
+ *
  * @route POST /api/v1/alert
+ * @access Private (SuperUser)
  */
 router.post('/', protectRoute, isSuperUser, async (req, res) => {
     try {
@@ -39,8 +49,17 @@ router.post('/', protectRoute, isSuperUser, async (req, res) => {
             messaggio,
             attivo: true
         });
-        await Bivacco.findByIdAndUpdate(bivaccoId, { emergenza: true });
-
+        await Bivacco.findByIdAndUpdate(bivaccoId, {
+            emergenza: true,
+            noteEmergenza: messaggio
+        });
+        const socketServer = req.app.get('socketServer');
+        if (socketServer) {
+            socketServer.emit('BannerAttivato', {
+                bivaccoId: bivacco._id,
+                messaggio
+            });
+        }
         res.status(201).json({messaggio: 'Emergenza attivata', alert});
     } catch (error) {
         res.status(500).json({errore: error.message});
@@ -48,8 +67,15 @@ router.post('/', protectRoute, isSuperUser, async (req, res) => {
 });
 
 /**
- *@description revoca alert emergenza da un bivacco
+ * Revoca l'alert di emergenza attivo associato a un bivacco.
+ *
+ * L'operazione:
+ * - disattiva l'alert corrente;
+ * - rimuove lo stato di emergenza del bivacco;
+ * - notifica i client connessi tramite Socket.IO.
+ *
  * @route PATCH /api/v1/alert/:bivaccoId/revoca
+ * @access Private (SuperUser)
  */
 router.patch('/:bivaccoId/revoca', protectRoute, isSuperUser, async (req, res) => {
     try {
@@ -59,8 +85,17 @@ router.patch('/:bivaccoId/revoca', protectRoute, isSuperUser, async (req, res) =
             alert.attivo = false;
             await alert.save();
         }
-        await Bivacco.findByIdAndUpdate(bivaccoId, {emergenza: false});
+       await Bivacco.findByIdAndUpdate(bivaccoId, {
+            emergenza: false,
+            noteEmergenza: ''
+        });
 
+        const socketServer = req.app.get('socketServer');
+        if (socketServer) {
+            socketServer.emit('bannerRevocato', {
+                bivaccoId
+            });
+        }
         res.json({messaggio: 'Emergenza revocata'});
     } catch (error) {
         res.status(500).json({errore: 'Errore revoca emergenza'});
