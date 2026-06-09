@@ -5,7 +5,7 @@
  * segnalazioni, meteo, percorsi e funzioni del Supporto Tecnico.
  */
 
-const API_URL = import.meta.env.VITE_API_BASE || 'http://localhost:3000/api/v1'
+const API_URL = import.meta.env.VITE_API_BASE || 'http://localhost:5000/api/v1'
 const ORS_API_KEY = import.meta.env.VITE_ORS_API_KEY || ''
 
 /**

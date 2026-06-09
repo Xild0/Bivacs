@@ -57,7 +57,7 @@ const meteoMap = ref({})
 
 const SOCKET_URL =
   import.meta.env.VITE_SOCKET_URL ||
-  'http://localhost:3000'
+  'http://localhost:5000'
 
 let socket = null
 
