@@ -22,6 +22,9 @@ const { protectRoute } = require('../middlewares/authMiddleware');
 const meteoTrentino = require('../utils/meteoTrentino');
 
 const OPEN_METEO_URL = 'https://api.open-meteo.com/v1/forecast';
+// Cache in memoria delle previsioni (per evitare status 429)
+const cachePrevisioni = new Map();  
+const TTL_PREVISIONI_MS = 30 * 60 * 1000;                     // soliti 30 minuti
 
 /**
  * Recupera l'URL base configurato per un provider API.
@@ -356,8 +359,18 @@ router.get('/:bivaccoId/previsioni', async (req, res) => {
     const bivacco = await Bivacco.findById(req.params.bivaccoId);
 
     if (!bivacco) {
-      return res.status(404).json({
-        message: 'Bivacco non trovato'
+      return res.status(404).json({ message: 'Bivacco non trovato' });
+    }
+
+    const cacheKey = String(bivacco._id);
+    const inCache = cachePrevisioni.get(cacheKey);
+
+    // usiamo la cache fresca in memoria
+    if (inCache && (Date.now() - inCache.timestamp) < TTL_PREVISIONI_MS) {
+      return res.status(200).json({
+        bivacco: { id: bivacco._id, nome: bivacco.nome },
+        previsioni: inCache.previsioni,
+        provider: 'cache'
       });
     }
 
@@ -374,9 +387,15 @@ router.get('/:bivaccoId/previsioni', async (req, res) => {
 
     if (!response.ok) {
       await salvaLog('Open-Meteo', false, `HTTP ${response.status}`);
-      return res.status(502).json({
-        message: 'Errore nella chiamata al provider meteo'
-      });
+      // se ho una cache vecchia la utilizzo al posto di ritornare lo status 502
+      if (inCache) {
+        return res.status(200).json({
+          bivacco: { id: bivacco._id, nome: bivacco.nome },
+          previsioni: inCache.previsioni,
+          provider: 'cache-stale'
+        });
+      }
+      return res.status(502).json({ message: 'Errore nella chiamata al provider meteo' });
     }
 
     const data = await response.json();
@@ -396,22 +415,27 @@ router.get('/:bivaccoId/previsioni', async (req, res) => {
       };
     });
 
+    cachePrevisioni.set(cacheKey, { previsioni, timestamp: Date.now() });
+
     await salvaLog('Open-Meteo', true);
 
     res.status(200).json({
-      bivacco: {
-        id: bivacco._id,
-        nome: bivacco.nome
-      },
+      bivacco: { id: bivacco._id, nome: bivacco.nome },
       previsioni
     });
   } catch (error) {
     await salvaLog('Open-Meteo', false, error.message);
 
-    res.status(500).json({
-      message: 'Errore recupero previsioni',
-      error: error.message
-    });
+    // eseguo un fallback su cache vecchia anche in caso di eccezzione
+    const vecchia = cachePrevisioni.get(String(req.params.bivaccoId));
+    if (vecchia) {
+      return res.status(200).json({
+        previsioni: vecchia.previsioni,
+        provider: 'cache-stale'
+      });
+    }
+
+    res.status(500).json({ message: 'Errore recupero previsioni', error: error.message });
   }
 });
 
