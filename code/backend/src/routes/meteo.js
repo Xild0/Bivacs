@@ -386,6 +386,7 @@ router.get('/:bivaccoId/previsioni', async (req, res) => {
 
     if (!response.ok) {
       await salvaLog('Open-Meteo', false, `HTTP ${response.status}`);
+      // seesista una cache vecchia, viene servita invece dello status 502
       if (inCache) {
         return res.status(200).json({
           bivacco: { id: bivacco._id, nome: bivacco.nome },
