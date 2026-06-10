@@ -261,7 +261,7 @@ Esito atteso: **8 suite, 68 test, tutti superati**. Coprono consultazione bivacc
 ## Documentazione API
 
 - **Online (Apiary):** https://portal.swaggerhub.com/apis/bivacs/bivacsAPI/1.0.0
-- **Nel repository:** [`docs/openabi.taml`](docs/openabi.yaml)
+- **Nel repository:** [`docs/openapi.yaml`](docs/openapi.yaml) 
 
 Tutte le API sono esposte sotto il prefisso `/api/v1`.
 
