@@ -279,6 +279,22 @@ router.get('/:bivaccoId', async (req, res) => {
       return res.status(404).json({ message: 'Bivacco non trovato' });
     }
 
+    // LASCIARE COSI PER IL DEPLOY
+    //  CACHE: se esiste un dato meteo recente, riusalo (evita il 429) 
+    const TTL_MS = 30 * 60 * 1000;                                          // 30 minuti
+    const datoRecente = await DatoMeteo.findOne({ bivacco: bivacco._id })
+      .sort({ aggiornato: -1 });
+
+    if (datoRecente &&
+        (Date.now() - new Date(datoRecente.aggiornato).getTime()) < TTL_MS) {
+      return res.status(200).json({
+        bivacco: { id: bivacco._id, nome: bivacco.nome },
+        provider: 'cache',
+        stazione: null,
+        meteo: datoRecente
+      });
+    }
+
     const { temperatura, vento, precipitazioni, provider, stazione } =
       await getOsservazioni(bivacco.latitudine, bivacco.longitudine);
 
@@ -299,19 +315,26 @@ router.get('/:bivaccoId', async (req, res) => {
     });
 
     res.status(200).json({
-      bivacco: {
-        id: bivacco._id,
-        nome: bivacco.nome
-      },
+      bivacco: { id: bivacco._id, nome: bivacco.nome },
       provider,
       stazione: stazione || null,
       meteo: datoMeteo
     });
   } catch (error) {
-    res.status(500).json({
-      message: 'Errore recupero meteo',
-      error: error.message
-    });
+    try {         // Se entrambi i provider falliscono, usa il dato vecchio anziché ritornare 500
+      const datoVecchio = await DatoMeteo.findOne({ bivacco: req.params.bivaccoId })
+        .sort({ aggiornato: -1 });
+      if (datoVecchio) {
+        return res.status(200).json({
+          bivacco: { id: datoVecchio.bivacco },
+          provider: 'cache-stale',
+          stazione: null,
+          meteo: datoVecchio
+        });
+      }
+    } catch (_) { /* ignora */ }
+
+    res.status(500).json({ message: 'Errore recupero meteo', error: error.message });
   }
 });
 
