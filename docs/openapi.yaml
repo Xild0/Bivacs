@@ -1,0 +1,3169 @@
+openapi: 3.0.3
+info:
+  title: Bivacs API
+  description: Documentazione REST API del progetto Bivacs, piattaforma per la consultazione, gestione e monitoraggio dei bivacchi nella Provincia Autonoma di Trento.
+  version: 1.0.0
+
+servers:
+  - url: https://bivacs.onrender.com
+    description: Produzione
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Errore:
+      type: object
+      properties:
+        errore:
+          type: string
+
+    UtenteRegistrato:
+      type: object
+      properties:
+        id:
+          type: integer
+        nome:
+          type: string
+        cognome:
+          type: string
+        email:
+          type: string
+        discriminator:
+          type: string
+
+    Bivacco:
+      type: object
+      properties:
+        _id:
+          type: string
+        id:
+          type: integer
+        nome:
+          type: string
+        latitudine:
+          type: number
+        longitudine:
+          type: number
+        altitudine:
+          type: integer
+        postiLetto:
+          type: integer
+        dotazioni:
+          type: string
+        zona:
+          type: string
+        tipoStruttura:
+          type: string
+        emergenza:
+          type: boolean
+        acquaPresente:
+          type: boolean
+        legnaDisponibile:
+          type: boolean
+
+    Percorso:
+      type: object
+      properties:
+        _id:
+          type: string
+        id:
+          type: integer
+        bivacco:
+          type: string
+        tipo:
+          type: string
+        gpxFile:
+          type: string
+        dislivello:
+          type: integer
+        difficolta:
+          type: string
+        lunghezza:
+          type: number
+        durataStimata:
+          type: integer
+
+    Segnalazione:
+      type: object
+      properties:
+        _id:
+          type: string
+        utenteId:
+          type: object
+        bivaccoId:
+          type: object
+        descrizione:
+          type: string
+        foto:
+          type: string
+        immagini:
+          type: array
+          items:
+            type: string
+        statoSegnalazione:
+          type: string
+          enum: [inviata, presa_in_carico, in_corso, risolta, archiviata]
+
+    Ticket:
+      type: object
+      properties:
+        _id:
+          type: string
+        id:
+          type: integer
+        segnalazione:
+          type: object
+        stato:
+          type: string
+          enum: [aperto, in_lavorazione, chiuso, archiviato]
+        dataApertura:
+          type: string
+          format: date-time
+        note:
+          type: string
+          nullable: true
+        dataChiusura:
+          type: string
+          format: date-time
+          nullable: true
+
+    Alert:
+      type: object
+      properties:
+        _id:
+          type: string
+        id:
+          type: integer
+        bivacco:
+          type: string
+        messaggio:
+          type: string
+        attivo:
+          type: boolean
+
+    DatoMeteo:
+      type: object
+      properties:
+        _id:
+          type: string
+        id:
+          type: integer
+        bivacco:
+          type: string
+        temperatura:
+          type: number
+        vento:
+          type: number
+        precipitazioni:
+          type: number
+        allertaPAT:
+          type: boolean
+        livelloRischio:
+          type: string
+          enum: [basso, moderato, marcato, forte]
+        aggiornato:
+          type: string
+          format: date-time
+
+tags:
+  - name: Autenticazione
+  - name: Profilo
+  - name: Bivacchi
+  - name: Percorsi
+  - name: Recensioni
+  - name: Segnalazioni
+  - name: Ticket
+  - name: Alert
+  - name: Meteo
+  - name: Supporto
+
+paths:
+
+  # ─────────────────────────────────────────
+  # AUTENTICAZIONE
+  # ─────────────────────────────────────────
+
+  /api/v1/auth/register:
+    post:
+      tags: [Autenticazione]
+      summary: Registrazione utente
+      description: Registra un nuovo utente e invia una email di verifica.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nome, cognome, email, password, dataNascita]
+              properties:
+                nome:
+                  type: string
+                  example: Giovanna
+                cognome:
+                  type: string
+                  example: Gagliardo
+                email:
+                  type: string
+                  example: gg@gmail.com
+                password:
+                  type: string
+                  example: password123
+                dataNascita:
+                  type: string
+                  format: date
+                  example: "2005-01-13"
+      responses:
+        "201":
+          description: Utente registrato con successo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  utente:
+                    $ref: "#/components/schemas/UtenteRegistrato"
+        "400":
+          description: Campi mancanti o password troppo corta
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+        "409":
+          description: Email gia registrata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+
+  /api/v1/auth/login:
+    post:
+      tags: [Autenticazione]
+      summary: Login utente
+      description: Effettua il login e restituisce un token JWT.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  example: gg@gmail.com
+                password:
+                  type: string
+                  example: password123
+      responses:
+        "200":
+          description: Login effettuato con successo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messaggio:
+                    type: string
+                  token:
+                    type: string
+        "400":
+          description: Campi mancanti
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+        "401":
+          description: Credenziali non valide
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+        "403":
+          description: Email non verificata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  errore:
+                    type: string
+                  codiceErrore:
+                    type: string
+                    example: EMAIL_NON_VERIFICATA
+        "404":
+          description: Utente non trovato
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  errore:
+                    type: string
+                  codiceErrore:
+                    type: string
+                    example: UTENTE_NON_TROVATO
+
+  /api/v1/auth/verify-email:
+    get:
+      tags: [Autenticazione]
+      summary: Verifica email
+      description: Verifica l'email tramite token ricevuto via posta elettronica. Redirige al frontend.
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
+          example: abc123token
+      responses:
+        "302":
+          description: Redirect al frontend
+
+  /api/v1/auth/recupero_password:
+    post:
+      tags: [Autenticazione]
+      summary: Recupero password
+      description: Invia una email con link per il reset password.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  example: gg@gmail.com
+      responses:
+        "200":
+          description: Email di recupero inviata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messaggio:
+                    type: string
+        "404":
+          description: Email non trovata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+
+  /api/v1/auth/reset-password/{token}:
+    post:
+      tags: [Autenticazione]
+      summary: Reset password
+      description: Imposta una nuova password usando il token ricevuto via email.
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+          example: abc123token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nuovaPassword]
+              properties:
+                nuovaPassword:
+                  type: string
+                  example: nuovaPassword123
+      responses:
+        "200":
+          description: Password aggiornata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messaggio:
+                    type: string
+        "400":
+          description: Token non valido o scaduto
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+
+  /api/v1/auth/resend-verification:
+    post:
+      tags: [Autenticazione]
+      summary: Reinvio email di verifica
+      description: Genera un nuovo token e reinvia l'email di conferma account.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  example: gg@gmail.com
+      responses:
+        "200":
+          description: Email di verifica inviata nuovamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messaggio:
+                    type: string
+        "400":
+          description: Account gia verificato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+        "404":
+          description: Utente non trovato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+
+  # ─────────────────────────────────────────
+  # PROFILO
+  # ─────────────────────────────────────────
+
+  /api/v1/profilo:
+    get:
+      tags: [Profilo]
+      summary: Visualizza profilo
+      description: Restituisce i dati del profilo dell'utente autenticato, inclusi i bivacchi preferiti.
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Profilo utente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  _id:
+                    type: string
+                  id:
+                    type: integer
+                  email:
+                    type: string
+                  nome:
+                    type: string
+                  cognome:
+                    type: string
+                  discriminator:
+                    type: string
+                  preferiti:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Bivacco"
+        "401":
+          description: Non autorizzato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+
+    patch:
+      tags: [Profilo]
+      summary: Aggiorna profilo
+      description: Aggiorna i dati dell'utente autenticato. Tutti i campi sono opzionali.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nome:
+                  type: string
+                cognome:
+                  type: string
+                email:
+                  type: string
+                password:
+                  type: string
+      responses:
+        "200":
+          description: Profilo aggiornato
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messaggio:
+                    type: string
+                  utente:
+                    $ref: "#/components/schemas/UtenteRegistrato"
+        "409":
+          description: Email gia in uso
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+
+    delete:
+      tags: [Profilo]
+      summary: Elimina profilo
+      description: Elimina definitivamente l'account. Le recensioni vengono anonimizzate.
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Account eliminato
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messaggio:
+                    type: string
+        "401":
+          description: Non autorizzato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+
+  /api/v1/profilo/preferiti/{bivaccoId}:
+    parameters:
+      - name: bivaccoId
+        in: path
+        required: true
+        schema:
+          type: string
+        example: 6a057945e53a4acc0f4bf812
+    post:
+      tags: [Profilo]
+      summary: Aggiungi preferito
+      description: Aggiunge un bivacco alla lista preferiti dell'utente autenticato.
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Bivacco aggiunto ai preferiti
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messaggio:
+                    type: string
+                  preferiti:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Bivacco"
+        "403":
+          description: Solo utenti registrati standard
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+        "404":
+          description: Bivacco non trovato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+    delete:
+      tags: [Profilo]
+      summary: Rimuovi preferito
+      description: Rimuove un bivacco dalla lista preferiti dell'utente autenticato.
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Bivacco rimosso dai preferiti
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messaggio:
+                    type: string
+                  preferiti:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Bivacco"
+        "403":
+          description: Solo utenti registrati standard
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+
+  /api/v1/profilo/richiesta-supporto-tecnico:
+    post:
+      tags: [Profilo]
+      summary: Richiesta promozione Supporto Tecnico
+      description: Invia una richiesta di promozione al ruolo di Supporto Tecnico.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                motivo:
+                  type: string
+                matricola:
+                  type: string
+      responses:
+        "200":
+          description: Richiesta inviata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messaggio:
+                    type: string
+        "400":
+          description: Ruolo gia posseduto
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        "404":
+          description: Utente non trovato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+
+  /api/v1/profilo/richiesta-superuser:
+    post:
+      tags: [Profilo]
+      summary: Richiesta promozione SuperUser
+      description: Invia una richiesta di promozione al ruolo di SuperUser.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                motivo:
+                  type: string
+      responses:
+        "200":
+          description: Richiesta inviata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        "400":
+          description: Ruolo gia posseduto
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        "404":
+          description: Utente non trovato
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+
+  # ─────────────────────────────────────────
+  # BIVACCHI
+  # ─────────────────────────────────────────
+
+  /api/v1/bivacchi:
+    get:
+      tags: [Bivacchi]
+      summary: Lista bivacchi
+      description: Restituisce la lista dei bivacchi con filtri opzionali.
+      parameters:
+        - name: nome
+          in: query
+          schema:
+            type: string
+          example: Bailoni
+        - name: zona
+          in: query
+          schema:
+            type: string
+          example: Marzola
+        - name: altitudineMin
+          in: query
+          schema:
+            type: integer
+          example: 1000
+        - name: altitudineMax
+          in: query
+          schema:
+            type: integer
+          example: 2500
+        - name: postiLetto
+          in: query
+          schema:
+            type: integer
+          example: 4
+        - name: tipoStruttura
+          in: query
+          schema:
+            type: string
+          example: fisso
+      responses:
+        "200":
+          description: Lista bivacchi
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Bivacco"
+        "500":
+          description: Errore interno
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+
+    post:
+      tags: [Bivacchi]
+      summary: Crea bivacco
+      description: Crea un nuovo bivacco nel sistema.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id, nome, latitudine, longitudine, altitudine, zona]
+              properties:
+                id:
+                  type: integer
+                  example: 10
+                nome:
+                  type: string
+                  example: Bivacco Test
+                latitudine:
+                  type: number
+                  example: 46.0
+                longitudine:
+                  type: number
+                  example: 11.2
+                altitudine:
+                  type: integer
+                  example: 1800
+                postiLetto:
+                  type: integer
+                  example: 4
+                dotazioni:
+                  type: string
+                  example: "Tavolo, brande"
+                zona:
+                  type: string
+                  example: Test
+                tipoStruttura:
+                  type: string
+                  example: fisso
+                emergenza:
+                  type: boolean
+                  example: false
+                acquaPresente:
+                  type: boolean
+                  example: true
+                legnaDisponibile:
+                  type: boolean
+                  example: true
+      responses:
+        "201":
+          description: Bivacco creato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bivacco"
+        "400":
+          description: Campi obbligatori mancanti
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        "409":
+          description: ID gia esistente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+
+  /api/v1/bivacchi/emergenze_attive:
+    get:
+      tags: [Bivacchi]
+      summary: Emergenze attive
+      description: Restituisce la lista di tutti gli alert di emergenza attualmente attivi.
+      responses:
+        "200":
+          description: Lista emergenze attive
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Alert"
+        "500":
+          description: Errore interno
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+
+  /api/v1/bivacchi/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        example: 6a057945e53a4acc0f4bf812
+    get:
+      tags: [Bivacchi]
+      summary: Dettaglio bivacco
+      description: Restituisce la scheda dettagliata di un bivacco, inclusi ticket e stato risorse.
+      responses:
+        "200":
+          description: Scheda bivacco
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bivacco:
+                    $ref: "#/components/schemas/Bivacco"
+                  ticketManutenzione:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Ticket"
+                  risorse:
+                    type: object
+                    properties:
+                      acqua:
+                        type: string
+                      legna:
+                        type: string
+        "400":
+          description: ID non valido
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        "404":
+          description: Bivacco non trovato
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+    delete:
+      tags: [Bivacchi]
+      summary: Elimina bivacco
+      description: Elimina un bivacco tramite ObjectId MongoDB.
+      responses:
+        "200":
+          description: Bivacco eliminato
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        "404":
+          description: Bivacco non trovato
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+
+  /api/v1/bivacchi/{id}/percorsi:
+    get:
+      tags: [Bivacchi]
+      summary: Percorsi di un bivacco
+      description: Restituisce i percorsi associati a un bivacco.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: 6a057945e53a4acc0f4bf812
+      responses:
+        "200":
+          description: Lista percorsi
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Percorso"
+        "404":
+          description: Bivacco non trovato
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+
+  /api/v1/bivacchi/{id}/risorse:
+    post:
+      tags: [Bivacchi]
+      summary: Aggiorna risorse bivacco
+      description: "Aggiorna la disponibilita di acqua e legna. Valori accettati: disponibile, scarsa, assente."
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: 6a057945e53a4acc0f4bf812
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [acqua, legna]
+              properties:
+                acqua:
+                  type: string
+                  enum: [disponibile, scarsa, assente]
+                  example: disponibile
+                legna:
+                  type: string
+                  enum: [disponibile, scarsa, assente]
+                  example: scarsa
+      responses:
+        "201":
+          description: Risorse aggiornate
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  risorse:
+                    type: object
+                  bivacco:
+                    $ref: "#/components/schemas/Bivacco"
+        "400":
+          description: Campi mancanti
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        "401":
+          description: Non autorizzato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+        "404":
+          description: Bivacco non trovato
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+
+  /api/v1/bivacchi/{id}/emergenza:
+    post:
+      tags: [Bivacchi]
+      summary: Attiva emergenza bivacco
+      description: Attiva lo stato di emergenza per un bivacco. Riservato ai SuperUser. Il parametro id e l'ID numerico del bivacco.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 2
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                note:
+                  type: string
+                  example: "Frana sulla strada di accesso."
+      responses:
+        "201":
+          description: Emergenza attivata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  bivacco:
+                    $ref: "#/components/schemas/Bivacco"
+        "401":
+          description: Non autorizzato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+        "403":
+          description: Accesso riservato ai SuperUser
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+        "404":
+          description: Bivacco non trovato
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+
+  /api/v1/bivacchi/{id}/revoca-emergenza:
+    delete:
+      tags: [Bivacchi]
+      summary: Revoca emergenza bivacco
+      description: Revoca lo stato di emergenza di un bivacco. Riservato ai SuperUser. Il parametro id e l'ID numerico del bivacco.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 2
+      responses:
+        "200":
+          description: Emergenza revocata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        "401":
+          description: Non autorizzato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+        "403":
+          description: Accesso riservato ai SuperUser
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+        "404":
+          description: Bivacco non trovato
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+
+  # ─────────────────────────────────────────
+  # PERCORSI
+  # ─────────────────────────────────────────
+
+  /api/v1/percorsi:
+    get:
+      tags: [Percorsi]
+      summary: Lista percorsi
+      description: Restituisce tutti i percorsi disponibili, incluso il bivacco associato.
+      responses:
+        "200":
+          description: Lista percorsi
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Percorso"
+
+    post:
+      tags: [Percorsi]
+      summary: Crea percorso
+      description: Crea un nuovo percorso associato a un bivacco.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [bivacco, tipo, gpxFile, dislivello, difficolta, lunghezza, durataStimata]
+              properties:
+                id:
+                  type: integer
+                  example: 1
+                bivacco:
+                  type: string
+                  example: 6a057945e53a4acc0f4bf812
+                tipo:
+                  type: string
+                  example: ottimale
+                gpxFile:
+                  type: string
+                  example: E412.gpx
+                dislivello:
+                  type: integer
+                  example: 450
+                difficolta:
+                  type: string
+                  example: E
+                lunghezza:
+                  type: number
+                  example: 6.8
+                durataStimata:
+                  type: integer
+                  example: 170
+      responses:
+        "201":
+          description: Percorso creato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Percorso"
+        "400":
+          description: Errore creazione
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+
+  /api/v1/percorsi/bivacco/{bivaccoId}/auto-gpx:
+    get:
+      tags: [Percorsi]
+      summary: GPX automatico bivacco
+      description: Individua e restituisce il file GPX SAT piu vicino alle coordinate del bivacco.
+      parameters:
+        - name: bivaccoId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: 6a057945e53a4acc0f4bf812
+      responses:
+        "200":
+          description: File GPX
+          content:
+            application/gpx+xml:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: Nessun GPX disponibile
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  filePiuVicino:
+                    type: string
+                  distanza:
+                    type: integer
+
+  /api/v1/percorsi/bivacco/{bivaccoId}/auto-download:
+    get:
+      tags: [Percorsi]
+      summary: Download GPX automatico bivacco
+      description: Scarica automaticamente il file GPX SAT piu vicino al bivacco. Richiede autenticazione.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: bivaccoId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: 6a057945e53a4acc0f4bf812
+      responses:
+        "200":
+          description: File GPX scaricato
+          content:
+            application/gpx+xml:
+              schema:
+                type: string
+                format: binary
+        "401":
+          description: Non autorizzato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+        "404":
+          description: Nessun GPX disponibile
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+
+  /api/v1/percorsi/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        example: 6a0000000000000000000001
+    get:
+      tags: [Percorsi]
+      summary: Dettaglio percorso
+      description: Restituisce un percorso specifico tramite ObjectId MongoDB.
+      responses:
+        "200":
+          description: Percorso
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Percorso"
+        "404":
+          description: Percorso non trovato
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+
+  /api/v1/percorsi/{id}/gpx:
+    get:
+      tags: [Percorsi]
+      summary: Visualizza GPX percorso
+      description: Restituisce il file GPX associato a un percorso per la visualizzazione sulla mappa.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: 6a0000000000000000000001
+      responses:
+        "200":
+          description: File GPX
+          content:
+            application/gpx+xml:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: GPX non trovato
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+
+  /api/v1/percorsi/{id}/download:
+    get:
+      tags: [Percorsi]
+      summary: Download GPX percorso
+      description: Scarica il file GPX di un percorso. Richiede autenticazione.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: 6a0000000000000000000001
+      responses:
+        "200":
+          description: File GPX scaricato
+          content:
+            application/gpx+xml:
+              schema:
+                type: string
+                format: binary
+        "401":
+          description: Non autorizzato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+        "404":
+          description: Percorso non trovato
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+
+  # ─────────────────────────────────────────
+  # RECENSIONI
+  # ─────────────────────────────────────────
+
+  /api/v1/recensioni:
+    post:
+      tags: [Recensioni]
+      summary: Crea recensione
+      description: Inserisce una recensione per un bivacco. Richiede autenticazione. Supporta recensioni anonime.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [bivaccoId, stelle, testo]
+              properties:
+                bivaccoId:
+                  type: string
+                  example: 6a057945e53a4acc0f4bf812
+                stelle:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+                  example: 5
+                testo:
+                  type: string
+                  example: "Bivacco molto bello e ben tenuto."
+                anonima:
+                  type: boolean
+                  example: false
+      responses:
+        "201":
+          description: Recensione creata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  _id:
+                    type: string
+                  bivaccoId:
+                    type: string
+                  utente:
+                    type: string
+                  nomeVisualizzato:
+                    type: string
+                  stelle:
+                    type: integer
+                  testo:
+                    type: string
+                  anonima:
+                    type: boolean
+        "400":
+          description: Errore creazione
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        "401":
+          description: Non autorizzato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+        "404":
+          description: Bivacco non trovato
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+
+  /api/v1/recensioni/{bivaccoId}:
+    get:
+      tags: [Recensioni]
+      summary: Lista recensioni bivacco
+      description: Restituisce tutte le recensioni di un bivacco, ordinate dalla piu recente.
+      parameters:
+        - name: bivaccoId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: 6a057945e53a4acc0f4bf812
+      responses:
+        "200":
+          description: Lista recensioni
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    _id:
+                      type: string
+                    bivaccoId:
+                      type: string
+                    utente:
+                      type: object
+                      nullable: true
+                    nomeVisualizzato:
+                      type: string
+                    stelle:
+                      type: integer
+                    testo:
+                      type: string
+                    anonima:
+                      type: boolean
+
+  # ─────────────────────────────────────────
+  # SEGNALAZIONI
+  # ─────────────────────────────────────────
+
+  /api/v1/segnalazioni:
+    post:
+      tags: [Segnalazioni]
+      summary: Crea segnalazione
+      description: Crea una segnalazione per un bivacco con foto allegata. Body in multipart/form-data.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [bivaccoId, descrizione, foto]
+              properties:
+                bivaccoId:
+                  type: string
+                  example: 6a057945e53a4acc0f4bf812
+                descrizione:
+                  type: string
+                  example: "Il tavolo interno e rotto."
+                foto:
+                  type: string
+                  format: binary
+      responses:
+        "201":
+          description: Segnalazione creata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messaggio:
+                    type: string
+                  segnalazione:
+                    $ref: "#/components/schemas/Segnalazione"
+        "400":
+          description: Foto obbligatoria
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+        "401":
+          description: Non autorizzato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+
+  /api/v1/segnalazioni/attive:
+    get:
+      tags: [Segnalazioni]
+      summary: Segnalazioni attive
+      description: Restituisce le segnalazioni non archiviate, ordinate dalla piu recente.
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Lista segnalazioni attive
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Segnalazione"
+        "401":
+          description: Non autorizzato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+
+  /api/v1/segnalazioni/storico:
+    get:
+      tags: [Segnalazioni]
+      summary: Storico segnalazioni staff
+      description: Restituisce lo storico completo di tutte le segnalazioni. Accessibile solo allo Staff.
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Storico segnalazioni
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Segnalazione"
+        "401":
+          description: Non autorizzato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+        "403":
+          description: Accesso negato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+
+  /api/v1/segnalazioni/mie:
+    get:
+      tags: [Segnalazioni]
+      summary: Le mie segnalazioni
+      description: Restituisce le segnalazioni inviate dall'utente autenticato.
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Segnalazioni personali
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Segnalazione"
+        "401":
+          description: Non autorizzato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+
+  /api/v1/segnalazioni/bivacco/{bivaccoId}:
+    get:
+      tags: [Segnalazioni]
+      summary: Segnalazioni per bivacco
+      description: Restituisce le segnalazioni di un bivacco. Gli utenti standard vedono solo quelle attive.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: bivaccoId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: 6a057945e53a4acc0f4bf812
+      responses:
+        "200":
+          description: Segnalazioni del bivacco
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Segnalazione"
+        "401":
+          description: Non autorizzato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+
+  /api/v1/segnalazioni/{id}/stato:
+    patch:
+      tags: [Segnalazioni]
+      summary: Aggiorna stato segnalazione
+      description: Aggiorna lo stato di una segnalazione. Accessibile solo allo Staff.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: 6a3333333333333333333333
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nuovoStato]
+              properties:
+                nuovoStato:
+                  type: string
+                  enum: [inviata, presa_in_carico, in_corso, risolta, archiviata]
+                  example: in_corso
+      responses:
+        "200":
+          description: Stato aggiornato
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messaggio:
+                    type: string
+                  segnalazione:
+                    $ref: "#/components/schemas/Segnalazione"
+        "400":
+          description: Stato non valido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+        "404":
+          description: Segnalazione non trovata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+
+  # ─────────────────────────────────────────
+  # TICKET
+  # ─────────────────────────────────────────
+
+  /api/v1/ticket:
+    get:
+      tags: [Ticket]
+      summary: Lista ticket
+      description: Restituisce la coda dei ticket di manutenzione. Riservato ai SuperUser.
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Lista ticket
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Ticket"
+        "401":
+          description: Non autorizzato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+        "403":
+          description: Accesso riservato ai SuperUser
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+
+    post:
+      tags: [Ticket]
+      summary: Crea ticket
+      description: Crea un nuovo ticket da una segnalazione esistente. Riservato ai SuperUser.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [segnalazioneId]
+              properties:
+                segnalazioneId:
+                  type: string
+                  example: 6a3333333333333333333333
+      responses:
+        "201":
+          description: Ticket creato
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messaggio:
+                    type: string
+                  ticket:
+                    $ref: "#/components/schemas/Ticket"
+        "401":
+          description: Non autorizzato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+        "404":
+          description: Segnalazione non trovata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+        "409":
+          description: Ticket gia esistente per questa segnalazione
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+
+  /api/v1/ticket/{id}/stato:
+    patch:
+      tags: [Ticket]
+      summary: Aggiorna stato ticket
+      description: Aggiorna lo stato di un ticket e sincronizza la segnalazione collegata. Riservato ai SuperUser.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: 6a5555555555555555555555
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nuovoStato]
+              properties:
+                nuovoStato:
+                  type: string
+                  enum: [aperto, in_lavorazione, chiuso, archiviato]
+                  example: in_lavorazione
+      responses:
+        "200":
+          description: Stato aggiornato
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messaggio:
+                    type: string
+                  ticket:
+                    $ref: "#/components/schemas/Ticket"
+        "400":
+          description: Stato non valido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+        "404":
+          description: Ticket non trovato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+
+  /api/v1/ticket/{id}/chiudi:
+    patch:
+      tags: [Ticket]
+      summary: Chiudi ticket
+      description: Chiude un ticket con note di intervento obbligatorie. Riservato ai SuperUser.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: 6a5555555555555555555555
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [note]
+              properties:
+                note:
+                  type: string
+                  example: "Tavolo riparato. Intervento completato il 20/07/2024."
+      responses:
+        "200":
+          description: Ticket chiuso
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messaggio:
+                    type: string
+                  ticket:
+                    $ref: "#/components/schemas/Ticket"
+        "400":
+          description: Note obbligatorie
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+        "404":
+          description: Ticket non trovato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+
+  /api/v1/ticket/{id}/archivia:
+    patch:
+      tags: [Ticket]
+      summary: Archivia ticket
+      description: Archivia un ticket gia chiuso. Riservato ai SuperUser.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: 6a5555555555555555555555
+      responses:
+        "200":
+          description: Ticket archiviato
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messaggio:
+                    type: string
+                  ticket:
+                    $ref: "#/components/schemas/Ticket"
+        "400":
+          description: Solo ticket chiusi possono essere archiviati
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+        "404":
+          description: Ticket non trovato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+
+  # ─────────────────────────────────────────
+  # ALERT
+  # ─────────────────────────────────────────
+
+  /api/v1/alert:
+    post:
+      tags: [Alert]
+      summary: Attiva alert emergenza
+      description: Crea un nuovo alert di emergenza e notifica i client via Socket.IO. Riservato ai SuperUser.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [bivaccoId, messaggio]
+              properties:
+                bivaccoId:
+                  type: string
+                  example: 6a057945e53a4acc0f4bf812
+                messaggio:
+                  type: string
+                  example: "Frana sulla strada di accesso."
+      responses:
+        "201":
+          description: Emergenza attivata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messaggio:
+                    type: string
+                  alert:
+                    $ref: "#/components/schemas/Alert"
+        "400":
+          description: Campi obbligatori mancanti
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+        "401":
+          description: Non autorizzato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+        "404":
+          description: Bivacco non trovato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+        "409":
+          description: Alert gia attivo su questo bivacco
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+
+  /api/v1/alert/{bivaccoId}/revoca:
+    patch:
+      tags: [Alert]
+      summary: Revoca alert emergenza
+      description: Revoca l'alert attivo per un bivacco e notifica i client via Socket.IO. Riservato ai SuperUser.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: bivaccoId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: 6a057945e53a4acc0f4bf812
+      responses:
+        "200":
+          description: Emergenza revocata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messaggio:
+                    type: string
+        "401":
+          description: Non autorizzato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+        "403":
+          description: Accesso riservato ai SuperUser
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+
+  # ─────────────────────────────────────────
+  # METEO
+  # ─────────────────────────────────────────
+
+  /api/v1/meteo/preferiti/allerte:
+    get:
+      tags: [Meteo]
+      summary: Allerte meteo preferiti
+      description: Restituisce le condizioni meteo attuali per i bivacchi preferiti dell'utente.
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Allerte meteo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalePreferiti:
+                    type: integer
+                  allerte:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        bivacco:
+                          type: object
+                        meteo:
+                          type: object
+                          properties:
+                            temperatura:
+                              type: number
+                            vento:
+                              type: number
+                            precipitazioni:
+                              type: number
+                            livelloRischio:
+                              type: string
+                            allerta:
+                              type: boolean
+        "401":
+          description: Non autorizzato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+        "404":
+          description: Utente non trovato
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+
+  /api/v1/meteo/sintetico:
+    post:
+      tags: [Meteo]
+      summary: Meteo sintetico multiplo
+      description: Restituisce dati meteo sintetici per una lista di bivacchi.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [bivacchiIds]
+              properties:
+                bivacchiIds:
+                  type: array
+                  items:
+                    type: string
+                  example: ["6a057945e53a4acc0f4bf812"]
+      responses:
+        "200":
+          description: Meteo sintetico
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  meteoSintetico:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        bivaccoId:
+                          type: string
+                        nome:
+                          type: string
+                        temperatura:
+                          type: number
+                        vento:
+                          type: number
+                        precipitazioni:
+                          type: number
+                        livelloRischio:
+                          type: string
+                        allerta:
+                          type: boolean
+        "400":
+          description: Array vuoto o mancante
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+
+  /api/v1/meteo/{bivaccoId}:
+    get:
+      tags: [Meteo]
+      summary: Meteo realtime bivacco
+      description: Restituisce le condizioni meteo attuali. Usa MeteoTrentino come provider primario e Open-Meteo come fallback. Cache 30 minuti.
+      parameters:
+        - name: bivaccoId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: 6a057945e53a4acc0f4bf812
+      responses:
+        "200":
+          description: Dati meteo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bivacco:
+                    type: object
+                  provider:
+                    type: string
+                  stazione:
+                    type: string
+                    nullable: true
+                  meteo:
+                    $ref: "#/components/schemas/DatoMeteo"
+        "404":
+          description: Bivacco non trovato
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        "500":
+          description: Errore recupero meteo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+
+  /api/v1/meteo/{bivaccoId}/previsioni:
+    get:
+      tags: [Meteo]
+      summary: Previsioni meteo bivacco
+      description: Restituisce le previsioni meteo per i prossimi 3 giorni tramite Open-Meteo.
+      parameters:
+        - name: bivaccoId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: 6a057945e53a4acc0f4bf812
+      responses:
+        "200":
+          description: Previsioni meteo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bivacco:
+                    type: object
+                  previsioni:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        giorno:
+                          type: string
+                          format: date
+                        temperaturaMin:
+                          type: number
+                        temperaturaMax:
+                          type: number
+                        precipitazioni:
+                          type: number
+                        ventoMax:
+                          type: number
+                        livelloRischio:
+                          type: string
+                        allerta:
+                          type: boolean
+                  provider:
+                    type: string
+        "404":
+          description: Bivacco non trovato
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        "502":
+          description: Errore provider meteo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+
+  # ─────────────────────────────────────────
+  # SUPPORTO TECNICO
+  # ─────────────────────────────────────────
+
+  /api/v1/supporto/log-api:
+    get:
+      tags: [Supporto]
+      summary: Log API esterne
+      description: Recupera gli ultimi 100 log delle chiamate ai provider API esterni. Riservato al Supporto Tecnico.
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Lista log API
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    _id:
+                      type: string
+                    id:
+                      type: integer
+                    provider:
+                      type: string
+                    esito:
+                      type: boolean
+                    dettaglioErrore:
+                      type: string
+                    createdAt:
+                      type: string
+                      format: date-time
+        "401":
+          description: Non autorizzato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+        "403":
+          description: Accesso riservato al Supporto Tecnico
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+
+  /api/v1/supporto/config-api:
+    get:
+      tags: [Supporto]
+      summary: Lista configurazioni provider API
+      description: Recupera tutte le configurazioni dei provider API esterne. Riservato al Supporto Tecnico.
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Lista configurazioni
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    _id:
+                      type: string
+                    id:
+                      type: integer
+                    provider:
+                      type: string
+                    baseUrl:
+                      type: string
+                    enabled:
+                      type: boolean
+                    timeoutMs:
+                      type: integer
+        "401":
+          description: Non autorizzato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+        "403":
+          description: Accesso riservato al Supporto Tecnico
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+
+    post:
+      tags: [Supporto]
+      summary: Crea configurazione provider API
+      description: Crea una nuova configurazione per un provider API esterno. Riservato al Supporto Tecnico.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [provider, baseUrl]
+              properties:
+                provider:
+                  type: string
+                  example: Open-Meteo
+                baseUrl:
+                  type: string
+                  example: https://api.open-meteo.com/v1/forecast
+                enabled:
+                  type: boolean
+                  example: true
+                timeoutMs:
+                  type: integer
+                  example: 5000
+      responses:
+        "201":
+          description: Configurazione creata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  _id:
+                    type: string
+                  provider:
+                    type: string
+                  baseUrl:
+                    type: string
+                  enabled:
+                    type: boolean
+                  timeoutMs:
+                    type: integer
+        "400":
+          description: Campi obbligatori mancanti
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        "401":
+          description: Non autorizzato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+        "409":
+          description: Configurazione gia esistente per questo provider
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+
+  /api/v1/supporto/config-api/{id}:
+    patch:
+      tags: [Supporto]
+      summary: Aggiorna configurazione provider API
+      description: Aggiorna una configurazione API esistente. Riservato al Supporto Tecnico.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: 6a057945e53a4acc0f4bf812
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                baseUrl:
+                  type: string
+                  example: https://api.open-meteo.com/v1/forecast
+                enabled:
+                  type: boolean
+                  example: true
+                timeoutMs:
+                  type: integer
+                  example: 8000
+      responses:
+        "200":
+          description: Configurazione aggiornata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  config:
+                    type: object
+        "400":
+          description: Nessun campo da aggiornare
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        "401":
+          description: Non autorizzato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+        "404":
+          description: Configurazione non trovata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+
+  /api/v1/supporto/bivacchi:
+    post:
+      tags: [Supporto]
+      summary: Crea bivacco (Supporto Tecnico)
+      description: Crea un nuovo bivacco. Riservato al Supporto Tecnico. L'ID numerico viene generato automaticamente.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nome, latitudine, longitudine, altitudine, zona]
+              properties:
+                nome:
+                  type: string
+                  example: Bivacco Test
+                latitudine:
+                  type: number
+                  example: 46.0
+                longitudine:
+                  type: number
+                  example: 11.2
+                altitudine:
+                  type: integer
+                  example: 1800
+                postiLetto:
+                  type: integer
+                  example: 4
+                dotazioni:
+                  type: string
+                  example: "Tavolo, brande"
+                zona:
+                  type: string
+                  example: Marzola
+                tipoStruttura:
+                  type: string
+                  example: fisso
+                emergenza:
+                  type: boolean
+                  example: false
+                acquaPresente:
+                  type: boolean
+                  example: true
+                legnaDisponibile:
+                  type: boolean
+                  example: true
+      responses:
+        "201":
+          description: Bivacco creato
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  bivacco:
+                    $ref: "#/components/schemas/Bivacco"
+        "400":
+          description: Campi obbligatori mancanti
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        "401":
+          description: Non autorizzato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+        "403":
+          description: Accesso riservato al Supporto Tecnico
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+
+  /api/v1/supporto/bivacchi/{id}:
+    patch:
+      tags: [Supporto]
+      summary: Aggiorna bivacco (Supporto Tecnico)
+      description: Aggiorna i dati di un bivacco esistente. Riservato al Supporto Tecnico. Tutti i campi sono opzionali.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: 6a057945e53a4acc0f4bf812
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nome:
+                  type: string
+                latitudine:
+                  type: number
+                longitudine:
+                  type: number
+                altitudine:
+                  type: integer
+                postiLetto:
+                  type: integer
+                dotazioni:
+                  type: string
+                zona:
+                  type: string
+                tipoStruttura:
+                  type: string
+                acquaPresente:
+                  type: boolean
+                legnaDisponibile:
+                  type: boolean
+                emergenza:
+                  type: boolean
+      responses:
+        "200":
+          description: Bivacco aggiornato
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  bivacco:
+                    $ref: "#/components/schemas/Bivacco"
+        "400":
+          description: Nessun campo da aggiornare
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        "401":
+          description: Non autorizzato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+        "403":
+          description: Accesso riservato al Supporto Tecnico
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+        "404":
+          description: Bivacco non trovato
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+
+  /api/v1/supporto/richieste-supporto:
+    get:
+      tags: [Supporto]
+      summary: Lista richieste promozione Supporto Tecnico
+      description: Recupera tutte le richieste di promozione a Supporto Tecnico in attesa. Riservato al Supporto Tecnico.
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Lista richieste in attesa
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UtenteRegistrato"
+        "401":
+          description: Non autorizzato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+        "403":
+          description: Accesso riservato al Supporto Tecnico
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+
+  /api/v1/supporto/richieste-supporto/{utenteId}/approva:
+    patch:
+      tags: [Supporto]
+      summary: Approva richiesta Supporto Tecnico
+      description: Approva la promozione a Supporto Tecnico, assegna matricola e invia email di conferma. Riservato al Supporto Tecnico.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: utenteId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: 6a0842a207d8b17a91562638
+      responses:
+        "200":
+          description: Utente promosso a Supporto Tecnico
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  utente:
+                    $ref: "#/components/schemas/UtenteRegistrato"
+        "400":
+          description: Richiesta gia gestita
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        "401":
+          description: Non autorizzato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+        "404":
+          description: Utente non trovato
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+
+  /api/v1/supporto/richieste-supporto/{utenteId}/rifiuta:
+    patch:
+      tags: [Supporto]
+      summary: Rifiuta richiesta Supporto Tecnico
+      description: Rifiuta la richiesta di promozione a Supporto Tecnico e invia email di notifica. Riservato al Supporto Tecnico.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: utenteId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: 6a0842a207d8b17a91562638
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                motivoRifiuto:
+                  type: string
+                  example: "Matricola non verificabile."
+      responses:
+        "200":
+          description: Richiesta rifiutata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  utente:
+                    $ref: "#/components/schemas/UtenteRegistrato"
+        "400":
+          description: Richiesta gia gestita
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        "401":
+          description: Non autorizzato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+        "404":
+          description: Utente non trovato
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+
+  /api/v1/supporto/richieste-superuser:
+    get:
+      tags: [Supporto]
+      summary: Lista richieste promozione SuperUser
+      description: Recupera tutte le richieste di promozione a SuperUser in attesa. Riservato al Supporto Tecnico.
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Lista richieste in attesa
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UtenteRegistrato"
+        "401":
+          description: Non autorizzato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+        "403":
+          description: Accesso riservato al Supporto Tecnico
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+
+  /api/v1/supporto/richieste-superuser/{utenteId}/approva:
+    patch:
+      tags: [Supporto]
+      summary: Approva richiesta SuperUser
+      description: Approva la promozione a SuperUser e invia email di conferma. Riservato al Supporto Tecnico.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: utenteId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: 6a0842a207d8b17a91562638
+      responses:
+        "200":
+          description: Utente promosso a SuperUser
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  utente:
+                    $ref: "#/components/schemas/UtenteRegistrato"
+        "400":
+          description: Richiesta gia gestita
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        "401":
+          description: Non autorizzato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+        "404":
+          description: Utente non trovato
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+
+  /api/v1/supporto/richieste-superuser/{utenteId}/rifiuta:
+    patch:
+      tags: [Supporto]
+      summary: Rifiuta richiesta SuperUser
+      description: Rifiuta la richiesta di promozione a SuperUser e invia email di notifica. Riservato al Supporto Tecnico.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: utenteId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: 6a0842a207d8b17a91562638
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                motivoRifiuto:
+                  type: string
+                  example: "Motivazione insufficiente."
+      responses:
+        "200":
+          description: Richiesta rifiutata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  utente:
+                    $ref: "#/components/schemas/UtenteRegistrato"
+        "400":
+          description: Richiesta gia gestita
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        "401":
+          description: Non autorizzato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+        "404":
+          description: Utente non trovato
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+
+  /api/v1/supporto/segnalazioni:
+    get:
+      tags: [Supporto]
+      summary: Segnalazioni attive (Supporto Tecnico)
+      description: Recupera tutte le segnalazioni non archiviate con dettagli di utente e bivacco. Riservato al Supporto Tecnico.
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Lista segnalazioni attive
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Segnalazione"
+        "401":
+          description: Non autorizzato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+        "403":
+          description: Accesso riservato al Supporto Tecnico
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+
+  /api/v1/supporto/segnalazioni/export/csv:
+    get:
+      tags: [Supporto]
+      summary: Esporta segnalazioni in CSV
+      description: Esporta tutte le segnalazioni in formato CSV con colonne ID, email utente, nome bivacco, stato, descrizione e data. Riservato allo Staff.
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: File CSV scaricato
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+              example: |
+                ID Segnalazione,Email Utente,Nome Bivacco,Stato,Descrizione,Data Creazione
+                6a333...,gg@gmail.com,Bivacco Marzola,inviata,"Il tavolo e rotto",2024-07-10T08:00:00.000Z
+        "401":
+          description: Non autorizzato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+        "403":
+          description: Accesso riservato allo Staff
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+        "404":
+          description: Nessuna segnalazione presente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+
+  /api/v1/supporto/ticket:
+    get:
+      tags: [Supporto]
+      summary: Coda ticket (Supporto Tecnico)
+      description: Recupera tutti i ticket non archiviati, ordinati per priorita e data di apertura. Riservato al Supporto Tecnico.
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Coda ticket
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Ticket"
+        "401":
+          description: Non autorizzato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+        "403":
+          description: Accesso riservato al Supporto Tecnico
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+
+    post:
+      tags: [Supporto]
+      summary: Crea ticket (Supporto Tecnico)
+      description: Crea un nuovo ticket da una segnalazione esistente con priorita opzionale. Riservato al Supporto Tecnico.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [segnalazioneId]
+              properties:
+                segnalazioneId:
+                  type: string
+                  example: 6a3333333333333333333333
+                priority:
+                  type: integer
+                  minimum: 1
+                  maximum: 10
+                  example: 5
+      responses:
+        "201":
+          description: Ticket creato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ticket"
+        "401":
+          description: Non autorizzato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+        "404":
+          description: Segnalazione non trovata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+        "409":
+          description: Ticket gia aperto per questa segnalazione
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+
+  /api/v1/supporto/ticket/{id}/stato:
+    patch:
+      tags: [Supporto]
+      summary: Aggiorna stato ticket (Supporto Tecnico)
+      description: Aggiorna stato e note di un ticket sincronizzando la segnalazione collegata. Riservato al Supporto Tecnico.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: 6a5555555555555555555555
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [stato]
+              properties:
+                stato:
+                  type: string
+                  enum: [aperto, in_lavorazione, chiuso, archiviato]
+                  example: in_lavorazione
+                note:
+                  type: string
+                  example: "Intervento in corso."
+      responses:
+        "200":
+          description: Ticket aggiornato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ticket"
+        "400":
+          description: Stato non valido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+        "401":
+          description: Non autorizzato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+        "404":
+          description: Ticket non trovato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+
+  /api/v1/supporto/ticket/{id}/archivia:
+    patch:
+      tags: [Supporto]
+      summary: Archivia ticket (Supporto Tecnico)
+      description: Archivia un ticket gia chiuso e aggiorna la segnalazione associata. Riservato al Supporto Tecnico.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: 6a5555555555555555555555
+      responses:
+        "200":
+          description: Ticket archiviato
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messaggio:
+                    type: string
+                  ticket:
+                    $ref: "#/components/schemas/Ticket"
+        "400":
+          description: Il ticket deve essere chiuso prima di poter essere archiviato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+        "401":
+          description: Non autorizzato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"
+        "404":
+          description: Ticket non trovato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errore"

@@ -68,7 +68,7 @@ I bivacchi sono **già popolati** sul database condiviso: chi prova l'applicazio
 
 **Servizi esterni** — MeteoTrentino (provider meteo primario) · Open-Meteo (fallback + previsioni) · OpenRouteService (routing) · Gmail SMTP · Tracciati GPX SAT.
 
-**DevOps / strumenti** — Git e GitHub (Feature Branch Workflow) · npm · Docker · Jest + Supertest + MongoDB Memory Server (test) · Apiary / API Blueprint (documentazione API).
+**DevOps / strumenti** — Git e GitHub (Feature Branch Workflow) · npm · Docker · Jest + Supertest + MongoDB Memory Server (test) · SwaggerHub (documentazione API).
 
 ---
 
@@ -102,7 +102,7 @@ Bivacs/
 │       ├── vite.config.js
 │       └── package.json
 ├── docs/
-│   └── apiary.apib           # Documentazione API (API Blueprint)
+│   └── openapi.yaml          # Documentazione API (API Blueprint)
 ├── .gitattributes
 ├── .gitignore
 └── README.md
@@ -260,8 +260,8 @@ Esito atteso: **8 suite, 68 test, tutti superati**. Coprono consultazione bivacc
 
 ## Documentazione API
 
-- **Online (Apiary):** https://bivacs.docs.apiary.io
-- **Nel repository:** [`docs/apiary.apib`](docs/apiary.apib) (mirror in formato API Blueprint)
+- **Online (Apiary):** https://portal.swaggerhub.com/apis/bivacs/bivacsAPI/1.0.0
+- **Nel repository:** [`docs/openabi.taml`](docs/openabi.yaml)
 
 Tutte le API sono esposte sotto il prefisso `/api/v1`.
 
